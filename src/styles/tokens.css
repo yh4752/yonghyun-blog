@@ -1,0 +1,47 @@
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/fonts/geist/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-text: #111827;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-code-bg: #f3f4f6;
+  --color-accent: #2563eb;
+  --color-accent-soft: #dbeafe;
+  --color-positive: #0f766e;
+  --color-warm: #b45309;
+  --font-sans: "Pretendard", "Geist Sans", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --content-width: 1120px;
+  --prose-width: 720px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #111111;
+  --color-surface: #18181b;
+  --color-text: #f1f5f9;
+  --color-muted: #a1a1aa;
+  --color-border: #27272a;
+  --color-code-bg: #1f2937;
+  --color-accent: #60a5fa;
+  --color-accent-soft: #1e3a5f;
+  --color-positive: #5eead4;
+  --color-warm: #fbbf24;
+}
