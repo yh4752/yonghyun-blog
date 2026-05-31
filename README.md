@@ -5,6 +5,7 @@ Personal tech blog and portfolio
 
 ```bash
 npm run dev
+npm run validate:posts -- --source --project yonghyun-blog
 npm run sync:posts
 npm run validate:posts
 npm run build

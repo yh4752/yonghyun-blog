@@ -128,7 +128,7 @@ v1 허용 태그:
 - `Vector Search`
 - `Astro`
 
-새 태그가 필요하면 먼저 `src/data/tags.ts`와 문서를 함께 수정한다.
+새 태그가 필요하면 먼저 `src/data/tags.json`과 문서를 함께 수정한다.
 
 `featured`:
 
@@ -248,7 +248,7 @@ npm run sync:posts
 동작:
 
 - `posts.config.yml`의 `sources`를 읽는다.
-- `README.md`, `topic-queue.md` 같은 운영 문서는 제외한다.
+- `README.md`, `WRITING_GUIDE.ko.md`, `topic-queue.md` 같은 운영 문서는 제외한다.
 - `draft: false`인 글만 발행본으로 복사한다.
 - 원본에서 제거되었거나 `draft: true`로 바뀐 글은 발행본에서 제거한다.
 - asset 디렉터리를 함께 복사한다.
@@ -287,15 +287,33 @@ CI나 다른 컴퓨터에서는 `POSTS_SIGAK_PATH` 같은 환경변수 override�
 
 ## Validation 동작
 
-명령:
+원본 검증 명령:
+
+```bash
+npm run validate:posts -- --source --project sigak
+npm run validate:posts -- --source --project yonghyun-blog
+```
+
+동작:
+
+- `posts.config.yml`의 source path를 직접 읽는다.
+- `draft: true` 초안도 검사한다.
+- `--project <slug>`를 주면 해당 프로젝트 source만 검사한다.
+- 전체 source를 검사하고 싶으면 `--project`를 생략한다.
+
+발행본 검증 명령:
 
 ```bash
 npm run validate:posts
 ```
 
+동작:
+
+- `src/content/blog`에 동기화된 발행본만 검사한다.
+- 실제 공개 빌드에 들어갈 글의 최종 관문으로 사용한다.
+
 Warning:
 
-- `date`가 파일명 날짜와 다르다.
 - 딥다이브 글에 `검증` 섹션이 없다.
 - 개발 로그에 `다음 단계` 섹션이 없다.
 - `summary`가 80자 미만 또는 160자 초과다.
@@ -303,14 +321,12 @@ Warning:
 Error:
 
 - 필수 frontmatter가 없다.
-- `draft: false`인데 `summary`가 비어 있다.
-- `draft: false`인데 `tags`가 비어 있다.
-- `draft: false`인데 제목에 `제목을 입력하세요`가 남아 있다.
+- `summary`가 비어 있다.
+- `tags`가 비어 있다.
 - `project`가 `posts.config.yml`과 `src/data/projects.json` 양쪽에 등록된 프로젝트가 아니다.
 - `type`이 허용된 값이 아니다.
 - 허용되지 않은 tag가 있다.
 - 같은 프로젝트 안에서 slug가 중복된다.
-- asset 경로가 깨졌다.
 
 Warning은 exit code 0으로 끝낸다. Error는 exit code 1로 실패시킨다.
 
@@ -328,6 +344,7 @@ Warning은 exit code 0으로 끝낸다. Error는 exit code 1로 실패시킨다.
 제외 대상:
 
 - `README.md`
+- `WRITING_GUIDE.ko.md`
 - `topic-queue.md`
 
 이관 방식:
@@ -344,6 +361,7 @@ Warning은 exit code 0으로 끝낸다. Error는 exit code 1로 실패시킨다.
 발행 전 실행:
 
 ```bash
+npm run validate:posts -- --source --project <project>
 npm run sync:posts
 npm run validate:posts
 npm run build

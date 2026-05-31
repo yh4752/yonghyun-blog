@@ -6,12 +6,39 @@ const ROOT = process.cwd();
 const POST_TYPES = new Set(["dev-log", "deep-dive", "debugging", "architecture", "performance", "research"]);
 const REQUIRED = ["title", "date", "type", "project", "tags", "summary", "draft"];
 
+function parseArgs(argv) {
+  const args = { source: false, project: undefined };
+  for (let index = 0; index < argv.length; index += 1) {
+    const item = argv[index];
+    if (item === "--source") {
+      args.source = true;
+      continue;
+    }
+    if (item === "--project") {
+      args.project = argv[index + 1];
+      index += 1;
+      continue;
+    }
+    if (item.startsWith("--project=")) {
+      args.project = item.slice("--project=".length);
+    }
+  }
+  return args;
+}
+
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
 }
 
 function readConfig() {
   return parse(fs.readFileSync(path.join(ROOT, "posts.config.yml"), "utf8"));
+}
+
+function expandPath(value) {
+  const home = process.env.HOME;
+  if (!home) throw new Error("HOME environment variable is required.");
+  const expanded = value.replace(/^\~(?=\/|$)/, home).replace(/\$\{HOME\}/g, home);
+  return path.isAbsolute(expanded) ? expanded : path.resolve(ROOT, expanded);
 }
 
 function readPost(file) {
@@ -39,15 +66,46 @@ function listMarkdownFiles(dir) {
   return files;
 }
 
+function matchesInclude(filename, patterns = ["*.md"]) {
+  return patterns.some((pattern) => {
+    if (pattern === "*.md") return filename.endsWith(".md");
+    return filename === pattern;
+  });
+}
+
+function listSourceMarkdownFiles(config, projectFilter) {
+  const sources = config.sources ?? [];
+  const matchingSources = projectFilter ? sources.filter((source) => source.project === projectFilter) : sources;
+  const files = [];
+
+  for (const source of matchingSources) {
+    const sourceDir = expandPath(source.path);
+    if (!fs.existsSync(sourceDir)) continue;
+    const excluded = new Set(source.exclude ?? []);
+    for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      if (!matchesInclude(entry.name, source.include) || excluded.has(entry.name)) continue;
+      files.push(path.join(sourceDir, entry.name));
+    }
+  }
+
+  return files;
+}
+
+const args = parseArgs(process.argv.slice(2));
 const config = readConfig();
 const contentDir = path.resolve(ROOT, config.site.contentDir);
 const sourceProjects = new Set((config.sources ?? []).map((source) => source.project));
 const metadataProjects = new Set(readJson("src/data/projects.json").map((project) => project.slug));
 const allowedTags = new Set(readJson("src/data/tags.json"));
-const files = listMarkdownFiles(contentDir);
+const files = args.source ? listSourceMarkdownFiles(config, args.project) : listMarkdownFiles(contentDir);
 const errors = [];
 const warnings = [];
 const seenSlugs = new Map();
+
+if (args.project && !sourceProjects.has(args.project)) {
+  errors.push(`unknown project '${args.project}' in posts.config.yml.`);
+}
 
 for (const file of files) {
   const relative = path.relative(ROOT, file);
@@ -109,4 +167,5 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(files.length === 0 ? "No posts to validate." : `Validated ${files.length} posts.`);
+const targetLabel = args.source ? "source posts" : "posts";
+console.log(files.length === 0 ? `No ${targetLabel} to validate.` : `Validated ${files.length} ${targetLabel}.`);
