@@ -1,32 +1,19 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import ArchiveBoard from "../components/home/ArchiveBoard.astro";
-import PostList from "../components/blog/PostList.astro";
-import ProjectCard from "../components/project/ProjectCard.astro";
 import { getPublishedPosts } from "../utils/posts";
-import { getFeaturedProjects } from "../utils/projects";
 import { projects as allProjects } from "../data/projects";
 
 const posts = await getPublishedPosts();
-const featuredPosts = posts.filter((post) => post.data.featured).slice(0, 4);
-const projects = getFeaturedProjects();
-const latestPost = posts[0];
-const validationPost =
-  posts.find((post) => post.project === "yonghyun-blog" && post.data.type === "deep-dive") ??
-  posts.find((post) => post.project === "yonghyun-blog");
-const projectPostCounts = posts.reduce<Record<string, number>>((counts, post) => {
-  counts[post.project] = (counts[post.project] ?? 0) + 1;
-  return counts;
-}, {});
 ---
 
-<BaseLayout>
+<BaseLayout hideFooter>
   <section class="home-hero">
     <div class="intro">
-      <p>Personal Archive · est. 2026</p>
-      <h1>검색, RAG, 아키텍처를 만들며 내린 판단을 보관합니다.</h1>
-      <span>결과물만 나열하지 않고, 어떤 문제를 봤고 왜 그 설계를 선택했는지 폴더, 노트, 로그처럼 정리하는 기술 아카이브입니다.</span>
-      <dl>
+      <p class="kicker">Personal Archive <span>· est. 2026</span></p>
+      <h1>검색, RAG, 아키텍처를 만들며<br />내린 판단을 보관합니다.</h1>
+      <p class="support">결과물만 나열하지 않고, 어떤 문제를 봤고 왜 그 설계를 선택했는지 폴더, 노트, 로그처럼 정리하는 기술 아카이브입니다.</p>
+      <dl class="meta">
         <div>
           <dt>Now</dt>
           <dd>building Sigak</dd>
@@ -41,82 +28,74 @@ const projectPostCounts = posts.reduce<Record<string, number>>((counts, post) =>
         </div>
       </dl>
     </div>
-    <ArchiveBoard
-      projects={allProjects}
-      latestPost={latestPost}
-      validationPost={validationPost}
-      projectPostCounts={projectPostCounts}
-    />
-  </section>
-
-  <section class="section" aria-labelledby="current-project-title">
-    <div class="section-heading">
-      <p>Current Project</p>
-      <h2 id="current-project-title">진행 중인 프로젝트</h2>
-    </div>
-    <div class="project-grid">
-      {projects.map((project) => <ProjectCard project={project} relatedPostCount={projectPostCounts[project.slug] ?? 0} />)}
-    </div>
-  </section>
-
-  <section class="section" aria-labelledby="featured-posts-title">
-    <div class="section-heading">
-      <p>Featured Writing</p>
-      <h2 id="featured-posts-title">대표 글</h2>
-    </div>
-    <PostList posts={featuredPosts} />
+    <ArchiveBoard projects={allProjects} posts={posts} />
   </section>
 </BaseLayout>
 
 <style>
   .home-hero {
     display: grid;
-    grid-template-columns: minmax(0, 0.82fr) minmax(360px, 1fr);
-    gap: 56px;
-    align-items: start;
-    padding: 64px 0 42px;
+    grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
+    gap: 64px;
+    align-items: center;
+    min-height: calc(100dvh - 78px);
+    padding: 40px 0;
   }
 
   .intro {
-    max-width: 860px;
-    padding-top: 8px;
+    max-width: 620px;
   }
 
-  .intro p,
-  .section-heading p {
-    margin: 0 0 10px;
-    color: var(--color-positive);
+  .kicker {
+    margin: 0 0 22px;
+    color: var(--color-muted);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .kicker span {
+    color: var(--color-faint);
   }
 
   .intro h1 {
     margin: 0;
-    max-width: 13ch;
-    font-size: clamp(38px, 5.8vw, 68px);
-    line-height: 1.08;
-    letter-spacing: 0;
+    max-width: 18em;
+    color: var(--color-text);
+    font-family: var(--font-kr);
+    font-size: 33px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.5;
+    word-break: keep-all;
+    overflow-wrap: normal;
   }
 
-  .intro span {
-    display: block;
-    max-width: 640px;
+  .support {
+    max-width: 25em;
     margin-top: 22px;
     color: var(--color-muted);
-    font-size: 18px;
-    line-height: 1.75;
+    font-family: var(--font-kr);
+    font-size: 15.5px;
+    font-weight: 400;
+    line-height: 1.78;
+    word-break: keep-all;
   }
 
-  .intro dl {
+  .meta {
     display: flex;
-    flex-wrap: wrap;
-    gap: 18px;
-    margin: 24px 0 0;
+    flex-direction: column;
+    gap: 9px;
+    margin: 34px 0 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--color-border);
   }
 
-  .intro dl div {
+  .meta div {
     display: flex;
-    gap: 7px;
+    gap: 12px;
     align-items: baseline;
     color: var(--color-text);
     font-family: var(--font-mono);
@@ -125,36 +104,19 @@ const projectPostCounts = posts.reduce<Record<string, number>>((counts, post) =>
 
   .intro dt {
     color: var(--color-faint);
+    min-width: 62px;
   }
 
   .intro dd {
     margin: 0;
   }
 
-  .section {
-    margin-top: 60px;
-  }
-
-  .section-heading {
-    margin-bottom: 18px;
-  }
-
-  .section-heading h2 {
-    margin: 0;
-    font-size: 26px;
-    letter-spacing: 0;
-  }
-
-  .project-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 16px;
-  }
-
   @media (max-width: 920px) {
     .home-hero {
       grid-template-columns: 1fr;
       gap: 32px;
+      min-height: auto;
+      padding: 30px 0;
     }
 
     .intro h1 {
@@ -162,13 +124,30 @@ const projectPostCounts = posts.reduce<Record<string, number>>((counts, post) =>
     }
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 860px) {
     .home-hero {
-      padding-top: 36px;
+      padding: 30px 6px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .kicker {
+      margin-bottom: 16px;
     }
 
-    .intro span {
-      font-size: 16px;
+    .intro h1 {
+      font-size: 25px;
+      line-height: 1.48;
+    }
+
+    .support {
+      margin-top: 16px;
+      font-size: 14.5px;
+    }
+
+    .meta {
+      margin-top: 24px;
+      padding-top: 18px;
     }
   }
 </style>

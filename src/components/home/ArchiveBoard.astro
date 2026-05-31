@@ -1,244 +1,335 @@
 ---
 import type { Project } from "../../data/projects";
 import type { BlogPost } from "../../utils/posts";
-import { formatDate } from "../../utils/dates";
 
 type Props = {
   projects: Project[];
-  latestPost?: BlogPost;
-  validationPost?: BlogPost;
-  projectPostCounts: Record<string, number>;
+  posts: BlogPost[];
 };
 
-const { projects, latestPost, validationPost, projectPostCounts } = Astro.props;
-const sigak = projects.find((project) => project.slug === "sigak") ?? projects[0];
+const { projects, posts } = Astro.props;
 const projectCount = projects.length;
-const postCount = Object.values(projectPostCounts).reduce((total, count) => total + count, 0);
-const sigakCount = sigak ? projectPostCounts[sigak.slug] ?? 0 : 0;
-const latestDate = latestPost ? formatDate(latestPost.data.date) : "";
-const validationDate = validationPost ? formatDate(validationPost.data.date) : "";
+const postCount = posts.length;
+const projectPreviewItems = projects.slice(0, 4);
+const blogPreviewItems = posts.slice(0, 4);
+
+const projectStatusLabels: Record<Project["status"], string> = {
+  active: "Active",
+  paused: "Paused",
+  complete: "Live",
+};
+
+function formatShortDate(date: Date): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Seoul",
+  })
+    .format(date)
+    .replace(/\.$/, "")
+    .replaceAll(" ", "");
+}
 ---
 
 <section class="archive-board" aria-label="Archive quick access">
-  <div class="board-label">Archive board</div>
+  <article class="fold">
+    <a class="fhead" href="/projects" aria-label={`Projects folder, ${projectCount} items`}>
+      <span>
+        <span class="fcap">Folder · {projectCount} {projectCount === 1 ? "item" : "items"}</span>
+        <strong class="fname">Projects</strong>
+      </span>
+      <span class="fgo" aria-hidden="true">
+        /projects
+        <svg class="arrow" width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7h8M7 3l4 4-4 4"></path>
+        </svg>
+      </span>
+    </a>
+    <div class="drawer">
+      <div class="drawer-in">
+        <p class="prev-head">Inside this folder</p>
+        {
+          projectPreviewItems.map((project) => (
+            <a class="prevrow" href={`/projects/${project.slug}`}>
+              <span class="pd">{projectStatusLabels[project.status]}</span>
+              <span class="pt">{project.name}</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </article>
 
-  <a class="folder" href="/projects">
-    <span class="object-label">Folder</span>
-    <strong>Projects</strong>
-    <span>{projectCount} case studies -></span>
-  </a>
-
-  <a class="folder" href="/blog">
-    <span class="object-label">Folder</span>
-    <strong>Blog</strong>
-    <span>{postCount} notes & logs -></span>
-  </a>
-
-  {
-    sigak && (
-      <a class="note note-yellow" href={`/projects/${sigak.slug}`}>
-        <span class="object-label">Memo · Current</span>
-        <strong>{sigak.name}</strong>
-        <span>{sigakCount} related notes · in progress</span>
-      </a>
-    )
-  }
-
-  <a class="note note-cyan" href="/about">
-    <span class="object-label">Note</span>
-    <strong>About me</strong>
-    <span>background · resume</span>
-  </a>
-
-  {
-    latestPost && (
-      <a class="slip" href={latestPost.href}>
-        <span class="slip-head">
-          <span>Latest writing</span>
-          <time datetime={latestPost.data.date.toISOString()}>{latestDate}</time>
-        </span>
-        <strong>{latestPost.data.title}</strong>
-        <span>{latestPost.data.summary}</span>
-      </a>
-    )
-  }
-
-  {
-    validationPost && (
-      <a class="slip" href={validationPost.href}>
-        <span class="slip-head">
-          <span>Validation log</span>
-          <time datetime={validationPost.data.date.toISOString()}>{validationDate}</time>
-        </span>
-        <strong>{validationPost.data.title}</strong>
-      </a>
-    )
-  }
+  <article class="fold">
+    <a class="fhead" href="/blog" aria-label={`Blog folder, ${postCount} notes and logs`}>
+      <span>
+        <span class="fcap">Folder · {postCount} notes &amp; logs</span>
+        <strong class="fname">Blog</strong>
+      </span>
+      <span class="fgo" aria-hidden="true">
+        /blog
+        <svg class="arrow" width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7h8M7 3l4 4-4 4"></path>
+        </svg>
+      </span>
+    </a>
+    <div class="drawer">
+      <div class="drawer-in">
+        <p class="prev-head">Recent writing</p>
+        {
+          blogPreviewItems.map((post) => (
+            <a class="prevrow" href={post.href}>
+              <span class="pd">{formatShortDate(post.data.date)}</span>
+              <span class="pt">{post.data.title}</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </article>
 </section>
 
 <style>
   .archive-board {
     position: relative;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 18px;
-    padding: 28px;
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
-    background: var(--color-surface);
-    box-shadow: var(--shadow-soft);
+    width: 100%;
+    min-width: 0;
   }
 
-  .board-label {
-    position: absolute;
-    top: 12px;
-    right: 16px;
-    color: var(--color-faint);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-  }
-
-  .folder,
-  .note,
-  .slip {
-    color: var(--color-text);
-    text-decoration: none;
-  }
-
-  .folder,
-  .note {
-    display: grid;
-    gap: 7px;
-    min-height: 116px;
-    padding: 18px;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  }
-
-  .folder {
+  .fold {
     position: relative;
-    margin-top: 8px;
-    border: 1px solid var(--color-folder-edge);
-    border-radius: 7px;
-    background: var(--color-folder);
-    box-shadow: var(--shadow-soft);
+    display: block;
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-object);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-rest);
+    color: var(--color-text);
+    transition: border-color 0.22s ease, box-shadow 0.26s cubic-bezier(0.2, 0.7, 0.3, 1), transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
-  .folder::before {
+  .fold::before {
     content: "";
     position: absolute;
     top: -9px;
-    left: 16px;
-    width: 84px;
+    left: 24px;
+    width: 80px;
     height: 11px;
-    border: 1px solid var(--color-folder-edge);
+    border: 1px solid var(--color-border);
     border-bottom: 0;
     border-radius: 5px 5px 0 0;
-    background: var(--color-folder);
+    background: var(--color-surface);
+    transition: border-color 0.22s ease;
   }
 
-  .note {
-    border: 1px solid transparent;
-    border-radius: 4px;
-    box-shadow: var(--shadow-object);
-  }
-
-  .note-yellow {
-    background: var(--color-note-yellow);
-  }
-
-  .note-cyan {
-    background: var(--color-note-cyan);
-  }
-
-  .slip {
-    grid-column: 1 / -1;
-    display: grid;
-    gap: 9px;
-    padding: 16px 18px;
-    border: 1px solid var(--color-border);
-    border-radius: 7px;
-    background: var(--color-paper);
-    box-shadow: var(--shadow-soft);
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  }
-
-  .folder:hover,
-  .note:hover,
-  .slip:hover,
-  .folder:focus-visible,
-  .note:focus-visible,
-  .slip:focus-visible {
+  .fold:hover,
+  .fold:focus-within {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-pop);
     transform: translateY(-3px);
-    box-shadow: var(--shadow-object);
   }
 
-  .slip:hover,
-  .slip:focus-visible {
+  .fold:hover::before,
+  .fold:focus-within::before {
     border-color: var(--color-border-strong);
   }
 
-  .object-label,
-  .slip-head span {
-    color: var(--color-accent-strong);
+  .fold:focus-within {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+  }
+
+  .fhead {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .fhead > span:first-child {
+    min-width: 0;
+  }
+
+  .fcap {
+    display: block;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .fname {
+    display: block;
+    margin-top: 5px;
+    color: var(--color-text);
+    font-family: var(--font-serif);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: 1.18;
+    transition: color 0.18s ease;
+  }
+
+  .fgo {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    align-items: center;
+    color: var(--color-faint);
     font-family: var(--font-mono);
     font-size: 11px;
+    transition: color 0.18s ease;
+    white-space: nowrap;
+  }
+
+  .arrow {
+    color: var(--color-accent);
+    transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .fold:hover .fname,
+  .fold:focus-within .fname {
+    color: var(--color-accent-strong);
+  }
+
+  .fold:hover .fgo,
+  .fold:focus-within .fgo {
+    color: var(--color-accent);
+  }
+
+  .fold:hover .arrow,
+  .fold:focus-within .arrow {
+    transform: translateX(3px);
+  }
+
+  .drawer {
+    max-height: 0;
+    overflow: hidden;
+    border-radius: 0 0 calc(var(--radius-object) - 1px) calc(var(--radius-object) - 1px);
+    background: var(--color-inset);
+    opacity: 0;
+    transition: max-height 0.34s cubic-bezier(0.2, 0.7, 0.3, 1), opacity 0.28s ease;
+  }
+
+  .fold:hover .drawer,
+  .fold:focus-within .drawer {
+    max-height: 300px;
+    opacity: 1;
+  }
+
+  .drawer-in {
+    padding: 13px 14px 12px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .prev-head {
+    margin: 0;
+    padding: 2px 10px 8px;
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
   }
 
-  .folder strong,
-  .note strong,
-  .slip strong {
-    font-size: 20px;
-    line-height: 1.25;
-  }
-
-  .folder span:last-child,
-  .note span:last-child,
-  .slip > span:last-child {
-    color: var(--color-muted);
-    font-size: 13px;
-    line-height: 1.45;
-  }
-
-  .slip-head {
+  .prevrow {
     display: flex;
-    justify-content: space-between;
-    gap: 16px;
+    gap: 12px;
+    align-items: baseline;
+    padding: 7px 10px;
+    border-radius: 7px;
+    color: var(--color-muted);
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease;
   }
 
-  .slip-head time {
+  .prevrow:hover,
+  .prevrow:focus-visible {
+    background: var(--color-accent-soft);
+    color: var(--color-text);
+  }
+
+  .pd {
+    flex: 0 0 auto;
+    width: 46px;
     color: var(--color-faint);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 10.5px;
     white-space: nowrap;
   }
 
-  @media (max-width: 720px) {
+  .pt {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-text);
+    font-family: var(--font-serif);
+    font-size: 14px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 860px) {
     .archive-board {
-      grid-template-columns: 1fr;
-      gap: 12px;
-      padding: 18px;
+      gap: 16px;
+      margin-top: 4px;
     }
 
-    .board-label {
-      position: static;
-      margin-bottom: 2px;
+    .fhead {
+      padding: 18px 22px;
     }
 
-    .folder,
-    .note,
-    .slip {
-      grid-column: auto;
-      min-height: 0;
-      margin-top: 0;
-      padding: 16px;
+    .fcap,
+    .fname,
+    .fgo {
+      white-space: nowrap;
     }
 
-    .folder::before {
-      display: none;
+    .drawer {
+      max-height: 300px;
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .fhead {
+      gap: 16px;
+    }
+
+    .fname {
+      font-size: 22px;
+    }
+
+    .drawer-in {
+      padding: 12px 10px;
+    }
+
+    .pd {
+      width: 44px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fold,
+    .fold::before,
+    .fname,
+    .fgo,
+    .arrow,
+    .drawer,
+    .prevrow {
+      transition: none;
+    }
+
+    .fold:hover,
+    .fold:focus-within {
+      transform: none;
     }
   }
 </style>

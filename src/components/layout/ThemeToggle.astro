@@ -22,24 +22,26 @@
 <style>
   .theme-toggle {
     display: inline-flex;
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     align-items: center;
     justify-content: center;
     border: 1px solid var(--color-border);
-    border-radius: 999px;
+    border-radius: 8px;
     background: var(--color-surface);
-    color: var(--color-text);
+    box-shadow: var(--shadow-rest);
+    color: var(--color-muted);
+    transition: border-color 0.18s ease, color 0.18s ease;
   }
 
   .theme-toggle:hover {
-    border-color: var(--color-accent);
+    border-color: var(--color-border-strong);
     color: var(--color-accent);
   }
 
   .theme-icon {
-    width: 18px;
-    height: 18px;
+    width: 15px;
+    height: 15px;
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -54,5 +56,18 @@
 
   [data-theme="dark"] .theme-icon-dark {
     display: block;
+  }
+
+  @media (max-width: 860px) {
+    .theme-toggle {
+      width: 28px;
+      height: 28px;
+      flex: 0 0 auto;
+    }
+
+    .theme-icon {
+      width: 14px;
+      height: 14px;
+    }
   }
 </style>

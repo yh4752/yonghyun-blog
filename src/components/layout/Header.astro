@@ -35,18 +35,22 @@ function isActive(href: string) {
   .site-header {
     display: grid;
     grid-template-columns: 1fr auto auto;
-    gap: 18px;
+    gap: 22px;
     align-items: center;
-    width: min(var(--content-width), calc(100vw - 32px));
-    margin: 0 auto;
-    padding: 22px 0;
+    width: 100%;
+    padding: 24px max(22px, calc((100vw - var(--content-width)) / 2)) 22px;
+    border-bottom: 1px solid var(--color-border);
   }
 
   .brand {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: baseline;
-    font-weight: 750;
+    color: var(--color-text);
+    font-family: var(--font-serif);
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
     text-decoration: none;
   }
 
@@ -55,37 +59,91 @@ function isActive(href: string) {
     font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 400;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
   }
 
   .nav {
     display: flex;
-    gap: 16px;
+    gap: 26px;
     align-items: center;
-    color: var(--color-muted);
-    font-size: 14px;
   }
 
   .nav a {
+    position: relative;
+    padding-bottom: 3px;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
     text-decoration: none;
+  }
+
+  .nav a::after {
+    content: "";
+    position: absolute;
+    right: 100%;
+    bottom: 0;
+    left: 0;
+    height: 1.5px;
+    background: var(--color-accent);
+    transition: right 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .nav a:hover,
+  .nav a:focus-visible {
+    color: var(--color-text);
+  }
+
+  .nav a:hover::after,
+  .nav a:focus-visible::after,
+  .nav a[aria-current="page"]::after {
+    right: 0;
   }
 
   .nav a[aria-current="page"] {
     color: var(--color-text);
-    font-weight: 650;
   }
 
-  @media (max-width: 520px) {
+  @media (max-width: 860px) {
     .site-header {
-      grid-template-columns: 1fr auto;
+      display: flex;
       gap: 12px;
+      justify-content: space-between;
+      padding: 20px 22px 16px;
+    }
+
+    .brand {
+      flex-shrink: 0;
+      gap: 9px;
+      font-size: 19px;
+      white-space: nowrap;
+    }
+
+    .brand small {
+      display: none;
     }
 
     .nav {
-      grid-column: 1 / -1;
-      grid-row: 2;
-      justify-content: space-between;
-      width: 100%;
+      gap: 14px;
+      margin-left: auto;
+    }
+
+    .nav a {
+      font-size: 11.5px;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .site-header {
+      padding-right: 18px;
+      padding-left: 18px;
+    }
+
+    .nav {
+      gap: 10px;
+    }
+
+    .nav a {
+      font-size: 11px;
     }
   }
 </style>
