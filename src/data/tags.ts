@@ -1,0 +1,27 @@
+export const allowedTags = [
+  "Backend",
+  "Frontend",
+  "Infra",
+  "Search",
+  "RAG",
+  "AI",
+  "Database",
+  "Testing",
+  "Observability",
+  "Architecture",
+  "Debugging",
+  "Performance",
+  "Documentation",
+  "Spring Boot",
+  "FastAPI",
+  "React",
+  "PostgreSQL",
+  "Flyway",
+  "SchemaSpy",
+  "Elasticsearch",
+  "Qdrant",
+  "Vector Search",
+  "Astro",
+] as const;
+
+export type AllowedTag = (typeof allowedTags)[number];
