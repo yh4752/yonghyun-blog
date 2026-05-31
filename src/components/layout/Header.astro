@@ -15,7 +15,10 @@ function isActive(href: string) {
 ---
 
 <header class="site-header">
-  <a class="brand" href="/" aria-label="Yonghyun Blog home">Yonghyun</a>
+  <a class="brand" href="/" aria-label="Yonghyun Blog home">
+    <span>Yonghyun</span>
+    <small>/ archive</small>
+  </a>
   <nav class="nav" aria-label="주요 메뉴">
     {
       links.map((link) => (
@@ -40,8 +43,19 @@ function isActive(href: string) {
   }
 
   .brand {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
     font-weight: 750;
     text-decoration: none;
+  }
+
+  .brand small {
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
   }
 
   .nav {

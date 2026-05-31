@@ -3,32 +3,86 @@ import type { Project } from "../../data/projects";
 
 type Props = {
   project: Project;
+  relatedPostCount?: number;
 };
 
-const { project } = Astro.props;
+const { project, relatedPostCount = 0 } = Astro.props;
+const statusLabel = {
+  active: "In progress",
+  paused: "Paused",
+  complete: "Complete",
+}[project.status];
 ---
 
 <article class="project-card">
-  <p>{project.status}</p>
-  <h2><a href={`/projects/${project.slug}`}>{project.name}</a></h2>
+  <span class="folder-label">Project</span>
+  <div class="project-top">
+    <h2><a href={`/projects/${project.slug}`}>{project.name}</a></h2>
+    <p class={`status status-${project.status}`}><span></span>{statusLabel}</p>
+  </div>
   <span>{project.description}</span>
   <ul aria-label={`${project.name} stack`}>
     {project.stack.map((item) => <li>{item}</li>)}
   </ul>
+  <div class="project-footer">
+    <span>{relatedPostCount > 0 ? `${relatedPostCount} related notes` : ""}</span>
+    <a href={`/projects/${project.slug}`}>Open folder -></a>
+  </div>
 </article>
 
 <style>
   .project-card {
+    position: relative;
     display: grid;
     gap: 12px;
     padding: 24px;
     border: 1px solid var(--color-border);
-    border-radius: 8px;
+    border-radius: 7px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  }
+
+  .project-card::before {
+    content: "";
+    position: absolute;
+    top: -8px;
+    left: 22px;
+    width: 92px;
+    height: 10px;
+    border: 1px solid var(--color-border);
+    border-bottom: 0;
+    border-radius: 5px 5px 0 0;
     background: var(--color-surface);
   }
 
+  .project-card:hover,
+  .project-card:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: var(--shadow-object);
+    transform: translateY(-2px);
+  }
+
+  .folder-label {
+    position: absolute;
+    top: -7px;
+    left: 30px;
+    color: var(--color-accent-strong);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .project-top {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
   .project-card p,
-  .project-card span {
+  .project-card > span {
     margin: 0;
     color: var(--color-muted);
   }
@@ -36,11 +90,40 @@ const { project } = Astro.props;
   .project-card h2 {
     margin: 0;
     font-size: 24px;
+    line-height: 1.25;
     letter-spacing: 0;
   }
 
   .project-card h2 a {
     text-decoration: none;
+  }
+
+  .project-card h2 a:hover {
+    color: var(--color-accent-strong);
+  }
+
+  .status {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .status span {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--color-accent);
+  }
+
+  .status-paused span {
+    background: var(--color-faint);
+  }
+
+  .status-complete span {
+    background: var(--color-positive);
   }
 
   .project-card ul {
@@ -53,10 +136,36 @@ const { project } = Astro.props;
   }
 
   .project-card li {
-    border-radius: 999px;
-    background: var(--color-code-bg);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 4px;
+    background: var(--color-paper);
     padding: 4px 9px;
     color: var(--color-muted);
+    font-family: var(--font-mono);
     font-size: 12px;
+  }
+
+  .project-footer {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .project-footer a {
+    color: var(--color-accent-strong);
+    text-decoration: none;
+  }
+
+  @media (max-width: 560px) {
+    .project-top,
+    .project-footer {
+      align-items: flex-start;
+      flex-direction: column;
+    }
   }
 </style>

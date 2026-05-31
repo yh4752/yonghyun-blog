@@ -1,20 +1,52 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import ArchiveBoard from "../components/home/ArchiveBoard.astro";
 import PostList from "../components/blog/PostList.astro";
 import ProjectCard from "../components/project/ProjectCard.astro";
 import { getPublishedPosts } from "../utils/posts";
 import { getFeaturedProjects } from "../utils/projects";
+import { projects as allProjects } from "../data/projects";
 
 const posts = await getPublishedPosts();
 const featuredPosts = posts.filter((post) => post.data.featured).slice(0, 4);
 const projects = getFeaturedProjects();
+const latestPost = posts[0];
+const validationPost =
+  posts.find((post) => post.project === "yonghyun-blog" && post.data.type === "deep-dive") ??
+  posts.find((post) => post.project === "yonghyun-blog");
+const projectPostCounts = posts.reduce<Record<string, number>>((counts, post) => {
+  counts[post.project] = (counts[post.project] ?? 0) + 1;
+  return counts;
+}, {});
 ---
 
 <BaseLayout>
-  <section class="intro">
-    <p>Portfolio Blog</p>
-    <h1>개발 과정에서 내린 판단을 기록합니다.</h1>
-    <span>설계, 디버깅, 성능, 검색/RAG 실험을 이력서보다 더 구체적인 맥락으로 남기는 공간입니다.</span>
+  <section class="home-hero">
+    <div class="intro">
+      <p>Personal Archive · est. 2026</p>
+      <h1>검색, RAG, 아키텍처를 만들며 내린 판단을 보관합니다.</h1>
+      <span>결과물만 나열하지 않고, 어떤 문제를 봤고 왜 그 설계를 선택했는지 폴더, 노트, 로그처럼 정리하는 기술 아카이브입니다.</span>
+      <dl>
+        <div>
+          <dt>Now</dt>
+          <dd>building Sigak</dd>
+        </div>
+        <div>
+          <dt>Writes</dt>
+          <dd>dev logs & deep dives</dd>
+        </div>
+        <div>
+          <dt>Focus</dt>
+          <dd>retrieval · systems</dd>
+        </div>
+      </dl>
+    </div>
+    <ArchiveBoard
+      projects={allProjects}
+      latestPost={latestPost}
+      validationPost={validationPost}
+      projectPostCounts={projectPostCounts}
+    />
   </section>
 
   <section class="section" aria-labelledby="current-project-title">
@@ -23,7 +55,7 @@ const projects = getFeaturedProjects();
       <h2 id="current-project-title">진행 중인 프로젝트</h2>
     </div>
     <div class="project-grid">
-      {projects.map((project) => <ProjectCard project={project} />)}
+      {projects.map((project) => <ProjectCard project={project} relatedPostCount={projectPostCounts[project.slug] ?? 0} />)}
     </div>
   </section>
 
@@ -37,9 +69,17 @@ const projects = getFeaturedProjects();
 </BaseLayout>
 
 <style>
+  .home-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 0.82fr) minmax(360px, 1fr);
+    gap: 56px;
+    align-items: start;
+    padding: 64px 0 42px;
+  }
+
   .intro {
     max-width: 860px;
-    padding: 84px 0 48px;
+    padding-top: 8px;
   }
 
   .intro p,
@@ -52,8 +92,9 @@ const projects = getFeaturedProjects();
 
   .intro h1 {
     margin: 0;
-    font-size: clamp(40px, 7vw, 82px);
-    line-height: 1.04;
+    max-width: 13ch;
+    font-size: clamp(38px, 5.8vw, 68px);
+    line-height: 1.08;
     letter-spacing: 0;
   }
 
@@ -64,6 +105,30 @@ const projects = getFeaturedProjects();
     color: var(--color-muted);
     font-size: 18px;
     line-height: 1.75;
+  }
+
+  .intro dl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin: 24px 0 0;
+  }
+
+  .intro dl div {
+    display: flex;
+    gap: 7px;
+    align-items: baseline;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .intro dt {
+    color: var(--color-faint);
+  }
+
+  .intro dd {
+    margin: 0;
   }
 
   .section {
@@ -84,5 +149,26 @@ const projects = getFeaturedProjects();
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 16px;
+  }
+
+  @media (max-width: 920px) {
+    .home-hero {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+
+    .intro h1 {
+      max-width: 18ch;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .home-hero {
+      padding-top: 36px;
+    }
+
+    .intro span {
+      font-size: 16px;
+    }
   }
 </style>

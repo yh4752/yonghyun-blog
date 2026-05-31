@@ -2,30 +2,40 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import ProjectCard from "../../components/project/ProjectCard.astro";
 import { projects } from "../../data/projects";
+import { getPublishedPosts } from "../../utils/posts";
+
+const posts = await getPublishedPosts();
+const projectPostCounts = posts.reduce<Record<string, number>>((counts, post) => {
+  counts[post.project] = (counts[post.project] ?? 0) + 1;
+  return counts;
+}, {});
 ---
 
 <BaseLayout title="Projects" description="프로젝트 포트폴리오" canonicalPath="/projects">
   <section class="page-header">
-    <p>Portfolio</p>
+    <p>Project Archive</p>
     <h1>프로젝트</h1>
     <span>각 프로젝트의 목표, 기술 스택, 개발 기록을 한 곳에서 확인할 수 있게 정리합니다.</span>
   </section>
   <div class="project-grid">
-    {projects.map((project) => <ProjectCard project={project} />)}
+    {projects.map((project) => <ProjectCard project={project} relatedPostCount={projectPostCounts[project.slug] ?? 0} />)}
   </div>
 </BaseLayout>
 
 <style>
   .page-header {
     max-width: 760px;
-    padding: 64px 0 28px;
+    padding: 64px 0 30px;
+    border-bottom: 1px solid var(--color-border);
   }
 
   .page-header p {
     margin: 0 0 10px;
-    color: var(--color-positive);
+    color: var(--color-accent-strong);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
   }
 
   .page-header h1 {

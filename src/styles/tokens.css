@@ -16,32 +16,55 @@
 
 :root {
   color-scheme: light;
-  --color-bg: #fafafa;
-  --color-surface: #ffffff;
-  --color-text: #111827;
-  --color-muted: #6b7280;
-  --color-border: #e5e7eb;
-  --color-code-bg: #f3f4f6;
-  --color-accent: #2563eb;
-  --color-accent-soft: #dbeafe;
-  --color-positive: #0f766e;
-  --color-warm: #b45309;
+  --color-bg: #f3f1ea;
+  --color-surface: #fbfaf6;
+  --color-paper: #ffffff;
+  --color-text: #1f2024;
+  --color-muted: #71747b;
+  --color-faint: #9a9ca2;
+  --color-border: #e4e1d8;
+  --color-border-strong: #d6d2c7;
+  --color-code-bg: #f7f5ef;
+  --color-accent: #2f7d83;
+  --color-accent-strong: #235f64;
+  --color-accent-soft: #e7f1f1;
+  --color-note-yellow: #f4ecb4;
+  --color-note-cyan: #cfeef0;
+  --color-note-green: #dcedde;
+  --color-folder: #c9e4ef;
+  --color-folder-edge: #aed4e2;
+  --color-positive: #235f64;
+  --color-warm: #9a7b3f;
+  --shadow-object: 0 12px 28px rgb(31 32 36 / 0.09), 0 2px 5px rgb(31 32 36 / 0.05);
+  --shadow-soft: 0 1px 2px rgb(31 32 36 / 0.05);
   --font-sans: "Pretendard", "Geist Sans", system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-editorial: Georgia, "Times New Roman", "AppleMyungjo", serif;
   --content-width: 1120px;
   --prose-width: 720px;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #111111;
-  --color-surface: #18181b;
-  --color-text: #f1f5f9;
-  --color-muted: #a1a1aa;
-  --color-border: #27272a;
-  --color-code-bg: #1f2937;
-  --color-accent: #60a5fa;
-  --color-accent-soft: #1e3a5f;
-  --color-positive: #5eead4;
-  --color-warm: #fbbf24;
+  --color-bg: #161618;
+  --color-surface: #1c1c1f;
+  --color-paper: #202023;
+  --color-text: #ededed;
+  --color-muted: #9a9da4;
+  --color-faint: #6d7077;
+  --color-border: #2c2c30;
+  --color-border-strong: #3a3a3f;
+  --color-code-bg: #202023;
+  --color-accent: #5fb6bc;
+  --color-accent-strong: #7fc8cd;
+  --color-accent-soft: #1d3437;
+  --color-note-yellow: #4a4421;
+  --color-note-cyan: #1f4548;
+  --color-note-green: #243f2a;
+  --color-folder: #21465b;
+  --color-folder-edge: #2d5972;
+  --color-positive: #7fc8cd;
+  --color-warm: #cbb07a;
+  --shadow-object: 0 16px 34px rgb(0 0 0 / 0.32), 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.22);
 }

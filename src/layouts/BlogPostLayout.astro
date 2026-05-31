@@ -29,10 +29,12 @@ const { post, Content, headings, previous, next } = Astro.props;
       <PostMeta date={post.data.date} project={post.project} type={post.data.type} />
       <h1>{post.data.title}</h1>
       <p>{post.data.summary}</p>
-      <ul class="tags" aria-label="태그">
-        {post.data.tags.map((tag) => <li>{tag}</li>)}
-      </ul>
-      <button class="copy-link" type="button" data-copy-link>링크 복사</button>
+      <div class="post-tools">
+        <ul class="tags" aria-label="태그">
+          {post.data.tags.map((tag) => <li>{tag}</li>)}
+        </ul>
+        <button class="copy-link" type="button" data-copy-link>Copy link</button>
+      </div>
     </header>
 
     <div class="mobile-toc">
@@ -69,9 +71,9 @@ const { post, Content, headings, previous, next } = Astro.props;
       const button = document.querySelector<HTMLButtonElement>("[data-copy-link]");
       if (!button) return;
       await navigator.clipboard.writeText(window.location.href);
-      button.textContent = "복사됨";
+      button.textContent = "Copied";
       window.setTimeout(() => {
-        button.textContent = "링크 복사";
+        button.textContent = "Copy link";
       }, 1400);
     });
   </script>
@@ -88,13 +90,13 @@ const { post, Content, headings, previous, next } = Astro.props;
   }
 
   .post-shell {
-    padding-top: 42px;
+    padding-top: 44px;
   }
 
   .post-header {
     display: grid;
     gap: 14px;
-    max-width: var(--prose-width);
+    max-width: 820px;
   }
 
   .post-header h1 {
@@ -102,6 +104,7 @@ const { post, Content, headings, previous, next } = Astro.props;
     font-size: clamp(34px, 5vw, 58px);
     line-height: 1.12;
     letter-spacing: 0;
+    text-wrap: balance;
   }
 
   .post-header p {
@@ -109,6 +112,14 @@ const { post, Content, headings, previous, next } = Astro.props;
     color: var(--color-muted);
     font-size: 18px;
     line-height: 1.7;
+  }
+
+  .post-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    margin-top: 4px;
   }
 
   .tags {
@@ -121,20 +132,29 @@ const { post, Content, headings, previous, next } = Astro.props;
   }
 
   .tags li {
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    padding: 4px 9px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 4px;
+    background: var(--color-paper);
+    padding: 3px 8px;
     color: var(--color-muted);
-    font-size: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
   }
 
   .copy-link {
     width: fit-content;
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    padding: 7px 12px;
-    background: var(--color-surface);
-    color: var(--color-text);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 5px;
+    padding: 6px 10px;
+    background: var(--color-paper);
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .copy-link:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent-strong);
   }
 
   .post-grid {
@@ -155,9 +175,6 @@ const { post, Content, headings, previous, next } = Astro.props;
   .mobile-toc {
     display: none;
     margin-top: 28px;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    padding: 16px;
   }
 
   .post-nav {
