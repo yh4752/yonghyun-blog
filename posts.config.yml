@@ -1,0 +1,13 @@
+site:
+  type: astro
+  contentDir: src/content/blog
+
+sources:
+  - project: sigak
+    label: Sigak
+    path: ${HOME}/my-projects/sigak/docs/blog
+    include:
+      - "*.md"
+    exclude:
+      - README.md
+      - topic-queue.md
