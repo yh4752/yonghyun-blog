@@ -1,0 +1,64 @@
+---
+type Heading = {
+  depth: number;
+  slug: string;
+  text: string;
+};
+
+type Props = {
+  headings?: Heading[];
+};
+
+const headings = (Astro.props.headings ?? []).filter((heading) => heading.depth >= 2 && heading.depth <= 3);
+---
+
+<aside class="toc" aria-label="목차">
+  <p>목차</p>
+  {
+    headings.length > 0 ? (
+      <ol>
+        {headings.map((heading) => (
+          <li class={`depth-${heading.depth}`}>
+            <a href={`#${heading.slug}`}>{heading.text}</a>
+          </li>
+        ))}
+      </ol>
+    ) : (
+      <span>섹션 목차가 없습니다.</span>
+    )
+  }
+</aside>
+
+<style>
+  .toc {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+
+  .toc p {
+    margin: 0 0 10px;
+    color: var(--color-text);
+    font-weight: 700;
+  }
+
+  .toc ol {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .toc a {
+    text-decoration: none;
+  }
+
+  .toc .depth-3 {
+    padding-left: 12px;
+  }
+
+  .toc span {
+    display: block;
+    color: var(--color-muted);
+  }
+</style>

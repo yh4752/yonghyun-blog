@@ -1,0 +1,45 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PostList from "../../components/blog/PostList.astro";
+import { getPublishedPosts } from "../../utils/posts";
+
+const posts = await getPublishedPosts();
+---
+
+<BaseLayout title="블로그" description="공개된 개발 로그와 기술 딥다이브 글" canonicalPath="/blog">
+  <section class="page-header">
+    <p>Writing</p>
+    <h1>블로그</h1>
+    <span>개발하면서 남긴 기록과 깊게 파고든 기술적 판단을 모았습니다.</span>
+  </section>
+  <PostList posts={posts} />
+</BaseLayout>
+
+<style>
+  .page-header {
+    max-width: 760px;
+    padding: 64px 0 28px;
+  }
+
+  .page-header p {
+    margin: 0 0 10px;
+    color: var(--color-positive);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  .page-header h1 {
+    margin: 0;
+    font-size: clamp(38px, 6vw, 72px);
+    line-height: 1.08;
+    letter-spacing: 0;
+  }
+
+  .page-header span {
+    display: block;
+    margin-top: 16px;
+    color: var(--color-muted);
+    font-size: 18px;
+    line-height: 1.7;
+  }
+</style>

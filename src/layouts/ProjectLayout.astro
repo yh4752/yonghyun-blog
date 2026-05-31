@@ -1,0 +1,70 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import type { Project } from "../data/projects";
+
+type Props = {
+  project: Project;
+};
+
+const { project } = Astro.props;
+---
+
+<BaseLayout title={project.name} description={project.description} canonicalPath={`/projects/${project.slug}`}>
+  <section class="project-hero">
+    <p>{project.status}</p>
+    <h1>{project.name}</h1>
+    <span>{project.description}</span>
+    <ul aria-label={`${project.name} stack`}>
+      {project.stack.map((item) => <li>{item}</li>)}
+    </ul>
+    <div class="links">
+      {project.repositoryUrl && <a href={project.repositoryUrl}>Repository</a>}
+      {project.demoUrl && <a href={project.demoUrl}>Demo</a>}
+    </div>
+  </section>
+  <slot />
+</BaseLayout>
+
+<style>
+  .project-hero {
+    display: grid;
+    gap: 14px;
+    max-width: 780px;
+    padding-top: 56px;
+  }
+
+  .project-hero p,
+  .project-hero span {
+    margin: 0;
+    color: var(--color-muted);
+  }
+
+  .project-hero h1 {
+    margin: 0;
+    font-size: clamp(38px, 6vw, 72px);
+    line-height: 1.05;
+    letter-spacing: 0;
+  }
+
+  .project-hero ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .project-hero li {
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 5px 10px;
+    color: var(--color-muted);
+    font-size: 13px;
+  }
+
+  .links {
+    display: flex;
+    gap: 12px;
+  }
+</style>

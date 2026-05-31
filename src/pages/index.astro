@@ -1,0 +1,88 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PostList from "../components/blog/PostList.astro";
+import ProjectCard from "../components/project/ProjectCard.astro";
+import { getPublishedPosts } from "../utils/posts";
+import { getFeaturedProjects } from "../utils/projects";
+
+const posts = await getPublishedPosts();
+const featuredPosts = posts.filter((post) => post.data.featured).slice(0, 4);
+const projects = getFeaturedProjects();
+---
+
+<BaseLayout>
+  <section class="intro">
+    <p>Portfolio Blog</p>
+    <h1>개발 과정에서 내린 판단을 기록합니다.</h1>
+    <span>설계, 디버깅, 성능, 검색/RAG 실험을 이력서보다 더 구체적인 맥락으로 남기는 공간입니다.</span>
+  </section>
+
+  <section class="section" aria-labelledby="current-project-title">
+    <div class="section-heading">
+      <p>Current Project</p>
+      <h2 id="current-project-title">진행 중인 프로젝트</h2>
+    </div>
+    <div class="project-grid">
+      {projects.map((project) => <ProjectCard project={project} />)}
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="featured-posts-title">
+    <div class="section-heading">
+      <p>Featured Writing</p>
+      <h2 id="featured-posts-title">대표 글</h2>
+    </div>
+    <PostList posts={featuredPosts} />
+  </section>
+</BaseLayout>
+
+<style>
+  .intro {
+    max-width: 860px;
+    padding: 84px 0 48px;
+  }
+
+  .intro p,
+  .section-heading p {
+    margin: 0 0 10px;
+    color: var(--color-positive);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  .intro h1 {
+    margin: 0;
+    font-size: clamp(40px, 7vw, 82px);
+    line-height: 1.04;
+    letter-spacing: 0;
+  }
+
+  .intro span {
+    display: block;
+    max-width: 640px;
+    margin-top: 22px;
+    color: var(--color-muted);
+    font-size: 18px;
+    line-height: 1.75;
+  }
+
+  .section {
+    margin-top: 60px;
+  }
+
+  .section-heading {
+    margin-bottom: 18px;
+  }
+
+  .section-heading h2 {
+    margin: 0;
+    font-size: 26px;
+    letter-spacing: 0;
+  }
+
+  .project-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+</style>

@@ -1,0 +1,27 @@
+---
+import PostList from "../blog/PostList.astro";
+import type { BlogPost } from "../../utils/posts";
+
+type Props = {
+  posts: BlogPost[];
+};
+
+const { posts } = Astro.props;
+---
+
+<section class="project-posts" aria-labelledby="project-posts-title">
+  <h2 id="project-posts-title">관련 글</h2>
+  <PostList posts={posts} emptyLabel="이 프로젝트에 공개된 글이 아직 없습니다." />
+</section>
+
+<style>
+  .project-posts {
+    margin-top: 48px;
+  }
+
+  .project-posts h2 {
+    margin: 0 0 12px;
+    font-size: 22px;
+    letter-spacing: 0;
+  }
+</style>

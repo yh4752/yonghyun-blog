@@ -1,0 +1,35 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="404" description="페이지를 찾을 수 없습니다." canonicalPath="/404">
+  <section class="not-found">
+    <p>404</p>
+    <h1>페이지를 찾을 수 없습니다.</h1>
+    <a href="/blog">블로그로 이동</a>
+  </section>
+</BaseLayout>
+
+<style>
+  .not-found {
+    display: grid;
+    gap: 16px;
+    max-width: 640px;
+    padding-top: 96px;
+  }
+
+  .not-found p,
+  .not-found h1 {
+    margin: 0;
+  }
+
+  .not-found p {
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+  }
+
+  .not-found h1 {
+    font-size: clamp(34px, 6vw, 64px);
+    letter-spacing: 0;
+  }
+</style>

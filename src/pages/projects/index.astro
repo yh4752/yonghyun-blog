@@ -1,0 +1,51 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import ProjectCard from "../../components/project/ProjectCard.astro";
+import { projects } from "../../data/projects";
+---
+
+<BaseLayout title="Projects" description="프로젝트 포트폴리오" canonicalPath="/projects">
+  <section class="page-header">
+    <p>Portfolio</p>
+    <h1>프로젝트</h1>
+    <span>각 프로젝트의 목표, 기술 스택, 개발 기록을 한 곳에서 확인할 수 있게 정리합니다.</span>
+  </section>
+  <div class="project-grid">
+    {projects.map((project) => <ProjectCard project={project} />)}
+  </div>
+</BaseLayout>
+
+<style>
+  .page-header {
+    max-width: 760px;
+    padding: 64px 0 28px;
+  }
+
+  .page-header p {
+    margin: 0 0 10px;
+    color: var(--color-positive);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  .page-header h1 {
+    margin: 0;
+    font-size: clamp(38px, 6vw, 72px);
+    line-height: 1.08;
+    letter-spacing: 0;
+  }
+
+  .page-header span {
+    display: block;
+    margin-top: 16px;
+    color: var(--color-muted);
+    font-size: 18px;
+    line-height: 1.7;
+  }
+
+  .project-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+</style>

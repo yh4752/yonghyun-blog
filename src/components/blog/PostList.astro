@@ -1,0 +1,32 @@
+---
+import PostCard from "./PostCard.astro";
+import type { BlogPost } from "../../utils/posts";
+
+type Props = {
+  posts: BlogPost[];
+  emptyLabel?: string;
+};
+
+const { posts, emptyLabel = "아직 공개된 글이 없습니다." } = Astro.props;
+---
+
+{
+  posts.length > 0 ? (
+    <div class="post-list">
+      {posts.map((post) => <PostCard post={post} />)}
+    </div>
+  ) : (
+    <p class="empty">{emptyLabel}</p>
+  )
+}
+
+<style>
+  .post-list {
+    display: grid;
+  }
+
+  .empty {
+    margin: 32px 0 0;
+    color: var(--color-muted);
+  }
+</style>

@@ -1,0 +1,63 @@
+---
+import PostMeta from "./PostMeta.astro";
+import type { BlogPost } from "../../utils/posts";
+
+type Props = {
+  post: BlogPost;
+};
+
+const { post } = Astro.props;
+---
+
+<article class="post-card">
+  <PostMeta date={post.data.date} project={post.project} type={post.data.type} />
+  <h2><a href={post.href}>{post.data.title}</a></h2>
+  <p>{post.data.summary}</p>
+  <ul class="tags" aria-label="태그">
+    {post.data.tags.map((tag) => <li>{tag}</li>)}
+  </ul>
+</article>
+
+<style>
+  .post-card {
+    display: grid;
+    gap: 10px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .post-card h2 {
+    margin: 0;
+    font-size: clamp(20px, 2vw, 26px);
+    line-height: 1.35;
+    letter-spacing: 0;
+  }
+
+  .post-card h2 a {
+    text-decoration: none;
+  }
+
+  .post-card p {
+    max-width: 760px;
+    margin: 0;
+    color: var(--color-muted);
+    line-height: 1.7;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tags li {
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 3px 9px;
+    color: var(--color-muted);
+    font-size: 12px;
+  }
+</style>
