@@ -1,7 +1,10 @@
 .prose {
+  width: 100%;
   max-width: var(--prose-width);
+  min-width: 0;
   font-size: 17px;
   line-height: 1.8;
+  overflow-wrap: break-word;
 }
 
 .prose h1,
@@ -9,6 +12,10 @@
 .prose h3 {
   line-height: 1.35;
   letter-spacing: 0;
+}
+
+.prose > h1:first-child {
+  display: none;
 }
 
 .prose h2 {
