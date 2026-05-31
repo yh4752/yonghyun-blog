@@ -1,0 +1,22 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <p>© {year} Yonghyun. Engineering notes and portfolio writing.</p>
+</footer>
+
+<style>
+  .site-footer {
+    width: min(var(--content-width), calc(100vw - 32px));
+    margin: 72px auto 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+
+  .site-footer p {
+    margin: 0;
+  }
+</style>

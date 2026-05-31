@@ -1,0 +1,29 @@
+---
+type Props = {
+  type: "info" | "warning" | "tip";
+};
+
+const { type } = Astro.props;
+---
+
+<aside class={`callout ${type}`}>
+  <slot />
+</aside>
+
+<style>
+  .callout {
+    margin: 24px 0;
+    border-left: 3px solid var(--color-accent);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    background: var(--color-code-bg);
+  }
+
+  .callout.warning {
+    border-left-color: var(--color-warm);
+  }
+
+  .callout.tip {
+    border-left-color: var(--color-positive);
+  }
+</style>

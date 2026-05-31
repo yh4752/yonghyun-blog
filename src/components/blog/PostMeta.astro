@@ -1,0 +1,40 @@
+---
+import { formatDate } from "../../utils/dates";
+
+type Props = {
+  date: Date;
+  project: string;
+  type: string;
+};
+
+const { date, project, type } = Astro.props;
+---
+
+<p class="post-meta">
+  <time datetime={date.toISOString()}>{formatDate(date)}</time>
+  <span>{project}</span>
+  <span>{type}</span>
+</p>
+
+<style>
+  .post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin: 0;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+
+  .post-meta span::before {
+    content: "/";
+    margin-right: 12px;
+    color: var(--color-faint);
+  }
+
+  .post-meta span:last-child {
+    color: var(--color-accent-strong);
+  }
+</style>

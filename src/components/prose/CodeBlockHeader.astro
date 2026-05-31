@@ -1,0 +1,23 @@
+---
+type Props = {
+  filename?: string;
+};
+
+const { filename } = Astro.props;
+---
+
+{filename && <div class="code-block-header">{filename}</div>}
+
+<style>
+  .code-block-header {
+    max-width: var(--prose-width);
+    border: 1px solid var(--color-border);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    padding: 8px 12px;
+    background: var(--color-code-bg);
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+</style>

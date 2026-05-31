@@ -1,0 +1,32 @@
+[
+  {
+    "slug": "sigak",
+    "name": "Sigak",
+    "description": "AI-powered tech news insight platform focused on backend architecture, search projections, and RAG experimentation.",
+    "stack": [
+      "Spring Boot",
+      "FastAPI",
+      "React",
+      "PostgreSQL",
+      "Elasticsearch",
+      "Qdrant"
+    ],
+    "status": "active",
+    "featured": true,
+    "repositoryUrl": null,
+    "demoUrl": null
+  },
+  {
+    "slug": "yonghyun-blog",
+    "name": "Yonghyun Blog",
+    "description": "Astro-based personal tech blog and portfolio with a one-way content sync pipeline that publishes posts authored in each project's own repository.",
+    "stack": [
+      "Astro",
+      "TypeScript"
+    ],
+    "status": "active",
+    "featured": false,
+    "repositoryUrl": null,
+    "demoUrl": null
+  }
+]

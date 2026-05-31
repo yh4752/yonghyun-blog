@@ -1,0 +1,153 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import ArchiveBoard from "../components/home/ArchiveBoard.astro";
+import { getPublishedPosts } from "../utils/posts";
+import { projects as allProjects } from "../data/projects";
+
+const posts = await getPublishedPosts();
+---
+
+<BaseLayout hideFooter>
+  <section class="home-hero">
+    <div class="intro">
+      <p class="kicker">Personal Archive <span>· est. 2026</span></p>
+      <h1>검색, RAG, 아키텍처를 만들며<br />내린 판단을 보관합니다.</h1>
+      <p class="support">결과물만 나열하지 않고, 어떤 문제를 봤고 왜 그 설계를 선택했는지 폴더, 노트, 로그처럼 정리하는 기술 아카이브입니다.</p>
+      <dl class="meta">
+        <div>
+          <dt>Now</dt>
+          <dd>building Sigak</dd>
+        </div>
+        <div>
+          <dt>Writes</dt>
+          <dd>dev logs & deep dives</dd>
+        </div>
+        <div>
+          <dt>Focus</dt>
+          <dd>retrieval · systems</dd>
+        </div>
+      </dl>
+    </div>
+    <ArchiveBoard projects={allProjects} posts={posts} />
+  </section>
+</BaseLayout>
+
+<style>
+  .home-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
+    gap: 64px;
+    align-items: center;
+    min-height: calc(100dvh - 78px);
+    padding: 40px 0;
+  }
+
+  .intro {
+    max-width: 620px;
+  }
+
+  .kicker {
+    margin: 0 0 22px;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .kicker span {
+    color: var(--color-faint);
+  }
+
+  .intro h1 {
+    margin: 0;
+    max-width: 18em;
+    color: var(--color-text);
+    font-family: var(--font-kr);
+    font-size: 33px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.5;
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .support {
+    max-width: 25em;
+    margin-top: 22px;
+    color: var(--color-muted);
+    font-family: var(--font-kr);
+    font-size: 15.5px;
+    font-weight: 400;
+    line-height: 1.78;
+    word-break: keep-all;
+  }
+
+  .meta {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin: 34px 0 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .meta div {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .intro dt {
+    color: var(--color-faint);
+    min-width: 62px;
+  }
+
+  .intro dd {
+    margin: 0;
+  }
+
+  @media (max-width: 920px) {
+    .home-hero {
+      grid-template-columns: 1fr;
+      gap: 32px;
+      min-height: auto;
+      padding: 30px 0;
+    }
+
+    .intro h1 {
+      max-width: 18ch;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .home-hero {
+      padding: 30px 6px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .kicker {
+      margin-bottom: 16px;
+    }
+
+    .intro h1 {
+      font-size: 25px;
+      line-height: 1.48;
+    }
+
+    .support {
+      margin-top: 16px;
+      font-size: 14.5px;
+    }
+
+    .meta {
+      margin-top: 24px;
+      padding-top: 18px;
+    }
+  }
+</style>

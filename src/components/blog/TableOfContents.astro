@@ -1,0 +1,108 @@
+---
+type Heading = {
+  depth: number;
+  slug: string;
+  text: string;
+};
+
+type Props = {
+  headings?: Heading[];
+};
+
+const headings = (Astro.props.headings ?? []).filter((heading) => heading.depth >= 2 && heading.depth <= 3);
+---
+
+<aside class="toc" aria-label="목차">
+  <p>목차</p>
+  {
+    headings.length > 0 ? (
+      <ol>
+        {headings.map((heading) => (
+          <li class={`depth-${heading.depth}`}>
+            <a href={`#${heading.slug}`}>{heading.text}</a>
+          </li>
+        ))}
+      </ol>
+    ) : (
+      <span>섹션 목차가 없습니다.</span>
+    )
+  }
+</aside>
+
+<style>
+  .toc {
+    position: relative;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: var(--color-paper);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-soft);
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+
+  .toc::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 14px;
+    height: 14px;
+    border-top: 1px solid var(--color-border-strong);
+    border-right: 1px solid var(--color-border-strong);
+  }
+
+  .toc p {
+    margin: 0 0 14px;
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .toc ol {
+    display: grid;
+    gap: 0;
+    counter-reset: toc;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .toc li {
+    counter-increment: toc;
+  }
+
+  .toc a {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    color: var(--color-muted);
+    line-height: 1.35;
+    text-decoration: none;
+  }
+
+  .toc a::before {
+    content: counter(toc, decimal-leading-zero);
+    flex: 0 0 auto;
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding-top: 1px;
+  }
+
+  .toc a:hover {
+    color: var(--color-accent-strong);
+  }
+
+  .toc .depth-3 {
+    padding-left: 14px;
+  }
+
+  .toc span {
+    display: block;
+    color: var(--color-muted);
+  }
+</style>

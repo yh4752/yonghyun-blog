@@ -1,0 +1,22 @@
+site:
+  type: astro
+  contentDir: src/content/blog
+
+sources:
+  - project: sigak
+    label: Sigak
+    path: ${HOME}/my-projects/sigak/docs/blog
+    include:
+      - "*.md"
+    exclude:
+      - README.md
+      - WRITING_GUIDE.ko.md
+      - topic-queue.md
+  - project: yonghyun-blog
+    label: yonghyun-blog
+    path: docs/blog
+    include:
+      - "*.md"
+    exclude:
+      - README.md
+      - topic-queue.md
