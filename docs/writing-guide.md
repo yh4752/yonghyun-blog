@@ -80,3 +80,13 @@ npm run build
 ```
 
 `--source` 검증은 `draft: true` 초안까지 검사한다. 기본 `validate:posts`는 `src/content/blog`에 동기화된 발행본만 검사한다.
+
+## 5. 글 발행 후 학습 노트
+
+설계나 검증을 다룬 글은 발행 후 `면접에서 설명할 수 있어야 할 질문`을 기준으로 개인 답변 노트를 만든다.
+
+- 공개 글에는 질문과 코드에서 다시 볼 지점을 남긴다.
+- 개인 답변은 `docs/interview-notes/private/`에 작성한다.
+- 작성 방식은 `docs/interview-notes/README.md`와 `docs/interview-notes/templates/article-answer-note.md`를 따른다.
+
+이 노트는 블로그 콘텐츠가 아니라 학습 도구다. 답을 바로 공개 문장으로 다듬기보다, 먼저 내가 어디까지 이해했는지 드러내는 데 집중한다.
