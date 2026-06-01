@@ -1,423 +1,958 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 
-const capabilities = [
+type StackItem = {
+  label: string;
+  key?: boolean;
+};
+
+type StackGroup = {
+  name: string;
+  tag: string;
+  wide?: boolean;
+  items: StackItem[];
+};
+
+const facts = [
   {
-    label: "Backend",
-    value: "Kotlin Spring Boot, Python FastAPI, REST API, JPA, KotlinJDSL, JWT",
+    label: "Role",
+    value: "AI Backend Engineer 지망 · Search/RAG Systems Engineer 지향",
   },
   {
-    label: "Search / Retrieval",
-    value: "Elasticsearch, BM25, nori analyzer, Qdrant, dense vector search, Hybrid Retrieval, RRF",
+    label: "Focus",
+    value: "Search/RAG Reliability · Hybrid Retrieval · Backend Architecture",
   },
   {
-    label: "RAG / LLM Systems",
-    value: "GraphRAG, async LLM pipeline, Pydantic schema validation, SSE token streaming",
+    label: "Research",
+    value: "IDEAL Lab URP 예정 · retrieval failure detection · uncertainty-aware RAG",
   },
   {
-    label: "Data / Infra",
-    value: "PostgreSQL, Oracle, Neo4j, Airflow, Docker, MinIO, event-driven indexing",
-  },
-  {
-    label: "Frontend",
-    value: "React, TypeScript, Vite, Axios, Zod, D3.js",
+    label: "Language",
+    value: "한국어 native · English working proficiency · 일본어 JLPT N2 학습 중",
   },
 ];
 
-const highlights = [
-  "운영 환경에서 Hybrid Retrieval, GraphRAG, Airflow 증분 ETL, 검색 인덱싱 파이프라인을 엔드투엔드로 설계하고 구현했습니다.",
-  "PostgreSQL 같은 source of truth와 Elasticsearch/Qdrant 같은 projection store를 분리해, 검색 인프라 장애가 핵심 데이터 경로로 전파되지 않도록 설계합니다.",
-  "짧은 한국어 다의어 query에서 semantic mismatch와 retrieval failure를 경험했고, 이를 검색 신뢰도 평가 문제로 확장해 탐구하고 있습니다.",
+const workNotes = [
+  {
+    number: "note 01",
+    meta: "retrieval quality",
+    title: "검색 품질은 운영 트래픽에서 결정된다",
+    body: "오프라인 지표가 좋아도 실제 질의에서는 어긋납니다. 그래서 평균 점수보다 failure case 하나하나를 추적합니다. 어떤 질의에서, 왜 틀린 문서를 가져왔는가를 기록하고, semantic mismatch와 retrieval failure를 detection 신호로 바꾸는 방향을 탐구하고 있습니다.",
+    code: "failure case",
+  },
+  {
+    number: "note 02",
+    meta: "system of record",
+    title: "source of truth와 projection store를 분리한다",
+    body: "RDB를 진실의 원천으로 두고, 검색 인덱스와 벡터 저장소는 거기서 파생된 projection으로 다룹니다. 두 저장소가 조용히 어긋나지 않도록 Airflow 기반 증분 ETL로 동기화하고, 재처리와 backfill이 가능한 구조를 우선합니다.",
+    code: "projection",
+  },
+  {
+    number: "note 03",
+    meta: "uncertainty",
+    title: "모르는 것을 모른다고 말하게 만든다",
+    body: "RAG가 확신에 차서 틀리는 순간이 가장 위험합니다. retrieval이 약할 때를 시스템 스스로 알아채도록 uncertainty-aware 설계를 지향합니다. 신뢰도가 낮으면 답을 보류하거나 근거를 드러내는 쪽으로 판단의 흐름을 설계합니다.",
+    code: "uncertainty-aware",
+  },
+];
+
+const stackGroups: StackGroup[] = [
+  {
+    name: "Backend",
+    tag: "core",
+    items: [
+      { label: "Kotlin Spring Boot", key: true },
+      { label: "Python FastAPI", key: true },
+      { label: "REST API" },
+      { label: "JPA" },
+      { label: "KotlinJDSL" },
+      { label: "JWT" },
+    ],
+  },
+  {
+    name: "Search / Retrieval",
+    tag: "focus",
+    items: [
+      { label: "Hybrid Retrieval", key: true },
+      { label: "Elasticsearch", key: true },
+      { label: "Qdrant" },
+      { label: "BM25" },
+      { label: "Dense Vector Search" },
+      { label: "RRF" },
+    ],
+  },
+  {
+    name: "RAG / LLM Systems",
+    tag: "focus",
+    items: [
+      { label: "GraphRAG", key: true },
+      { label: "Async LLM Pipeline" },
+      { label: "Pydantic Schema Validation" },
+      { label: "SSE Token Streaming" },
+      { label: "Prompt / Eval" },
+    ],
+  },
+  {
+    name: "Data / Infra",
+    tag: "ops",
+    items: [
+      { label: "PostgreSQL", key: true },
+      { label: "Oracle" },
+      { label: "Neo4j" },
+      { label: "Airflow", key: true },
+      { label: "Docker" },
+      { label: "MinIO" },
+    ],
+  },
+  {
+    name: "Frontend",
+    tag: "supporting",
+    wide: true,
+    items: [
+      { label: "React" },
+      { label: "TypeScript" },
+      { label: "Vite" },
+      { label: "Axios" },
+      { label: "Zod" },
+      { label: "D3.js" },
+    ],
+  },
 ];
 
 const projects = [
   {
     name: "Sigak",
     href: "/projects/sigak",
-    meta: "AI 기술 뉴스 Search/RAG Reliability Platform",
-    body: "AI·소프트웨어 기술 뉴스를 수집하고, 검색·요약·관련 개념 탐색을 제공하는 공개 포트폴리오 프로젝트입니다. 검색 projection, RAG 실험, DB 문서화, 평가 흐름을 계속 쌓고 있습니다.",
+    cap: "Folder · platform",
+    status: "In progress",
+    statusTone: "progress",
+    body: "AI 기술 뉴스를 다루는 Search/RAG Reliability Platform. 하이브리드 검색과 RAG를 운영 환경에서 굴리면서, 검색이 틀리는 순간을 감지하고 신뢰도를 평가하는 구조를 실험하는 메인 프로젝트입니다.",
+    tags: ["Hybrid Retrieval", "GraphRAG", "Airflow ETL", "Reliability"],
+    linkLabel: "Open Sigak folder",
   },
   {
     name: "Yonghyun Blog",
     href: "/projects/yonghyun-blog",
-    meta: "Search/RAG/Architecture Technical Archive",
-    body: "결과물만 나열하지 않고, 왜 그 설계를 선택했는지와 어떤 검증을 했는지를 dev-log와 deep-dive로 남기는 기술 아카이브입니다.",
+    cap: "Folder · archive",
+    status: "Live",
+    statusTone: "live",
+    body: "설계 판단, dev-log, deep-dive를 기록하는 기술 아카이브. 결정의 이유와 검증 과정을 남기는, 이 About 페이지가 속한 사이트 그 자체입니다.",
+    tags: ["Design notes", "Dev log", "Deep dive"],
+    linkLabel: "Open blog folder",
   },
 ];
 
-const links = [
+const contactLinks = [
   { label: "Email", href: "mailto:yh47529722@gmail.com", value: "yh47529722@gmail.com" },
-  { label: "GitHub", href: "https://github.com/yh4752", value: "github.com/yh4752" },
-  { label: "LinkedIn", href: "https://linkedin.com/in/yh4752", value: "linkedin.com/in/yh4752" },
+  { label: "GitHub", href: "https://github.com/yh4752", value: "github.com/yh4752", external: true },
+  {
+    label: "LinkedIn",
+    href: "https://www.linkedin.com/in/yh4752/",
+    value: "linkedin.com/in/yh4752",
+    external: true,
+  },
 ];
 ---
 
 <BaseLayout
   title="About"
-  description="AI Backend, Search/RAG, Retrieval Reliability에 집중하는 Yonghyun의 소개"
+  description="검색과 RAG의 실패 지점을 추적하고 백엔드 구조로 검증 가능한 흐름을 만드는 Yonghyun의 소개"
   canonicalPath="/about"
+  hideFooter
 >
-  <section class="about-hero" aria-labelledby="about-title">
-    <p class="eyebrow">About · Profile</p>
-    <h1 id="about-title">Search/RAG 시스템의 실패 지점을 추적하고, 백엔드 구조로 검증 가능한 흐름을 만듭니다.</h1>
-    <p class="lead">
-      AI Backend Engineer 지망으로, 검색이 단순히 동작하는 것을 넘어 결과를 신뢰할 수 있는지
-      평가하고 개선하는 시스템에 관심이 있습니다.
-    </p>
-  </section>
+  <div class="about-shell">
+    <div class="crumb" aria-label="현재 위치">
+      <span class="seg">archive</span><span class="slash">/</span><span class="cur">about</span>
+    </div>
 
-  <section class="about-grid" aria-label="Profile summary">
-    <div class="intro">
-      <p>
-        군 복무 중 운영 환경에서 Hybrid Retrieval, GraphRAG, Airflow 기반 증분 ETL, RDB와 검색/벡터
-        저장소 동기화 구조를 설계하고 구현했습니다. 지금은 Sigak과 Yonghyun Blog를 통해 Search/RAG
-        Reliability, source of truth와 projection store 분리, 검증 가능한 발행 흐름을 공개 기록으로
-        확장하고 있습니다.
+    <section class="hero" aria-labelledby="about-title">
+      <p class="kicker">About · Profile <span>· 약 30초</span></p>
+      <h1 id="about-title">
+        검색과 RAG가 <span>언제 틀리는지</span>를 보고,<br />
+        그 판단을 설계로 남깁니다.
+      </h1>
+      <p class="lede">
+        AI 백엔드와 Search/RAG 시스템을 만드는 엔지니어입니다. 결과물을 나열하기보다, 어떤 문제를 봤고
+        왜 그 구조를 선택했는지 - 설계 판단과 검증 과정을 기록하는 쪽에 가깝습니다.
       </p>
-      <p>
-        장기적으로는 Hybrid Retrieval의 failure case, 한국어 semantic mismatch, uncertainty-aware RAG,
-        anomaly detection 기반 검색 신뢰도 평가를 연구와 제품 경험 사이에서 연결하고 싶습니다.
-      </p>
-    </div>
+    </section>
 
-    <dl class="quick-facts">
-      <div>
-        <dt>Role</dt>
-        <dd>AI Backend Engineer · Search/RAG Systems Engineer</dd>
+    <section class="sec" aria-labelledby="profile-title">
+      <div class="sec-head">
+        <span class="idx">01</span>
+        <h2 id="profile-title">Profile</h2>
+        <span class="meta">who · what</span>
       </div>
-      <div>
-        <dt>Focus</dt>
-        <dd>Search/RAG Reliability · Hybrid Retrieval · Backend Architecture</dd>
+      <div class="prose">
+        <p>
+          주로 다루는 문제는 <strong>검색의 신뢰도</strong>입니다. RAG와 검색 시스템이 그럴듯하지만
+          틀린 답을 낼 때, 그게 어디서 어긋났는지 추적하고 운영 환경에서 검색 품질을 측정 가능한
+          형태로 만드는 일에 관심이 있습니다.
+        </p>
+        <p>
+          현재 <strong>군 복무 중 운영 환경</strong>에서 Hybrid Retrieval, GraphRAG, Airflow 기반
+          증분 ETL, 그리고 RDB와 검색·벡터 저장소를 동기화하는 구조를 직접 설계·구현하고 있습니다.
+          작은 데모가 아니라 계속 도는 시스템 위에서 검색 품질과 백엔드 아키텍처를 함께 고민합니다.
+        </p>
       </div>
-      <div>
-        <dt>Research</dt>
-        <dd>IDEAL Lab URP 예정 · retrieval failure detection · semantic mismatch</dd>
+      <div class="facts">
+        {
+          facts.map((fact) => (
+            <div class="fact">
+              <span>{fact.label}</span>
+              <p>{fact.value}</p>
+            </div>
+          ))
+        }
       </div>
-      <div>
-        <dt>Language</dt>
-        <dd>한국어 · English working proficiency · 일본어 JLPT N2 학습 중</dd>
+    </section>
+
+    <section class="sec" aria-labelledby="work-title">
+      <div class="sec-head">
+        <span class="idx">02</span>
+        <h2 id="work-title">How I Work</h2>
+        <span class="meta">3 notes</span>
       </div>
-    </dl>
-  </section>
+      <div class="notes">
+        {
+          workNotes.map((note) => (
+            <article class="note">
+              <p class="note-meta"><strong>{note.number}</strong> · {note.meta}</p>
+              <h3>{note.title}</h3>
+              <p>
+                {note.body.split(note.code)[0]}
+                <code>{note.code}</code>
+                {note.body.split(note.code).slice(1).join(note.code)}
+              </p>
+            </article>
+          ))
+        }
+      </div>
+    </section>
 
-  <section class="section-block" aria-labelledby="work-title">
-    <p class="section-label">How I Work</p>
-    <h2 id="work-title">관심사는 검색 품질이고, 강점은 끝까지 추적하는 구현입니다.</h2>
-    <div class="highlight-list">
-      {highlights.map((item) => <p>{item}</p>)}
-    </div>
-  </section>
+    <section class="sec" aria-labelledby="stack-title">
+      <div class="sec-head">
+        <span class="idx">03</span>
+        <h2 id="stack-title">Stack</h2>
+        <span class="meta">tools in use</span>
+      </div>
+      <div class="stack">
+        {
+          stackGroups.map((group) => (
+            <section class:list={["stack-card", group.wide && "wide"]}>
+              <div class="stack-card-head">
+                <h3>{group.name}</h3>
+                <span>{group.tag}</span>
+              </div>
+              <ul>
+                {
+                  group.items.map((item) => (
+                    <li class:list={[item.key && "key"]}>{item.label}</li>
+                  ))
+                }
+              </ul>
+            </section>
+          ))
+        }
+      </div>
+      <p class="stack-note"><span>●</span> 실제 운영 경험과 현재 포트폴리오 프로젝트에서 다루는 도구를 중심으로 정리했습니다.</p>
+    </section>
 
-  <section class="section-block" aria-labelledby="stack-title">
-    <p class="section-label">Stack</p>
-    <h2 id="stack-title">주로 다루는 기술</h2>
-    <div class="capability-list">
-      {
-        capabilities.map((capability) => (
-          <div>
-            <h3>{capability.label}</h3>
-            <p>{capability.value}</p>
-          </div>
-        ))
-      }
-    </div>
-  </section>
-
-  <section class="section-block" aria-labelledby="projects-title">
-    <p class="section-label">Current Projects</p>
-    <h2 id="projects-title">지금 공개적으로 쌓고 있는 것</h2>
-    <div class="project-list">
-      {
-        projects.map((project) => (
-          <article>
-            <p>{project.meta}</p>
-            <h3><a href={project.href}>{project.name}</a></h3>
-            <span>{project.body}</span>
-            <a class="text-link" href={project.href}>Open folder -&gt;</a>
-          </article>
-        ))
-      }
-    </div>
-  </section>
-
-  <section class="section-block contact-block" aria-labelledby="contact-title">
-    <div>
-      <p class="section-label">Contact</p>
-      <h2 id="contact-title">연락과 기록</h2>
-      <p>
-        채용, 협업, 프로젝트 피드백은 아래 링크로 연락할 수 있습니다. 이 블로그에는 구현 결과보다
-        설계 판단과 검증 과정을 더 많이 남기려 합니다.
-      </p>
-    </div>
-    <ul>
-      {
-        links.map((link) => (
-          <li>
-            <span>{link.label}</span>
-            <a href={link.href} target={link.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
-              {link.value}
+    <section class="sec" aria-labelledby="projects-title">
+      <div class="sec-head">
+        <span class="idx">04</span>
+        <h2 id="projects-title">Current Projects</h2>
+        <span class="meta">2 items</span>
+      </div>
+      <div class="projects">
+        {
+          projects.map((project) => (
+            <a class="project-folder" href={project.href} aria-label={project.linkLabel}>
+              <div class="project-top">
+                <span>{project.cap}</span>
+                <em class={project.statusTone}>{project.status}</em>
+              </div>
+              <h3>{project.name}</h3>
+              <p>{project.body}</p>
+              <ul>
+                {project.tags.map((tag) => <li>{tag}</li>)}
+              </ul>
+              <span class="go">Open folder <span aria-hidden="true">-&gt;</span></span>
             </a>
-          </li>
-        ))
-      }
-    </ul>
-  </section>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="sec" aria-labelledby="contact-title">
+      <div class="sec-head">
+        <span class="idx">05</span>
+        <h2 id="contact-title">Contact</h2>
+        <span class="meta">say hello</span>
+      </div>
+      <div class="contact-rows">
+        {
+          contactLinks.map((link) => (
+            <a
+              class="contact-row"
+              href={link.href}
+              target={link.external ? "_blank" : undefined}
+              rel={link.external ? "noopener noreferrer" : undefined}
+            >
+              <span>{link.label}</span>
+              <strong>{link.value}</strong>
+              <em aria-hidden="true">-&gt;</em>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+  </div>
+
+  <footer class="about-footer">
+    <div>
+      <span>Yonghyun / archive · 김용현 · Yonghyun Kim</span>
+      <nav aria-label="About footer links">
+        <a href="https://github.com/yh4752" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://www.linkedin.com/in/yh4752/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+        <a href="mailto:yh47529722@gmail.com">Email</a>
+      </nav>
+    </div>
+  </footer>
 </BaseLayout>
 
 <style>
-  .about-hero {
-    max-width: 940px;
-    padding: 70px 0 42px;
-    border-bottom: 1px solid var(--color-border);
+  .about-shell {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 24px;
   }
 
-  .eyebrow,
-  .section-label {
-    margin: 0;
-    color: var(--color-accent-strong);
+  .crumb {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding-top: 20px;
+    color: var(--color-faint);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .crumb .seg {
+    color: var(--color-muted);
+  }
+
+  .crumb .cur {
+    color: var(--color-text);
+  }
+
+  .hero {
+    padding: 46px 0 18px;
+  }
+
+  .kicker,
+  .meta,
+  .idx,
+  .fact span,
+  .note-meta,
+  .stack-card-head span,
+  .project-top span,
+  .project-folder li,
+  .go,
+  .contact-row span,
+  .about-footer {
+    font-family: var(--font-mono);
     letter-spacing: 0;
+  }
+
+  .kicker {
+    margin: 0 0 24px;
+    color: var(--color-muted);
+    font-size: 11px;
+    font-weight: 500;
     text-transform: uppercase;
   }
 
-  .about-hero h1 {
-    max-width: 900px;
-    margin: 14px 0 0;
-    font-size: 64px;
-    line-height: 1.12;
-    letter-spacing: 0;
-  }
-
-  .lead {
-    max-width: 720px;
-    margin: 24px 0 0;
-    color: var(--color-muted);
-    font-size: 19px;
-    line-height: 1.8;
-  }
-
-  .about-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
-    gap: 42px;
-    padding: 42px 0 26px;
-  }
-
-  .intro {
-    display: grid;
-    gap: 16px;
-    color: var(--color-muted);
-    font-size: 17px;
-    line-height: 1.85;
-  }
-
-  .intro p,
-  .highlight-list p,
-  .contact-block p,
-  .capability-list p,
-  .project-list p,
-  .project-list span {
-    margin: 0;
-  }
-
-  .quick-facts {
-    display: grid;
-    gap: 0;
-    margin: 0;
-  }
-
-  .quick-facts div,
-  .capability-list div {
-    display: grid;
-    gap: 8px;
-    border-top: 1px solid var(--color-border);
-    padding: 18px 0;
-  }
-
-  .quick-facts dt,
-  .contact-block li span {
+  .kicker span {
     color: var(--color-faint);
-    font-family: var(--font-mono);
+  }
+
+  .hero h1 {
+    max-width: 680px;
+    margin: 0;
+    color: var(--color-text);
+    font-family: var(--font-kr);
+    font-size: 46px;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.36;
+    word-break: keep-all;
+  }
+
+  .hero h1 span {
+    color: var(--color-accent-strong);
+  }
+
+  .lede {
+    max-width: 580px;
+    margin: 26px 0 0;
+    color: var(--color-muted);
+    font-family: var(--font-kr);
+    font-size: 17px;
+    line-height: 1.82;
+    word-break: keep-all;
+  }
+
+  .sec {
+    border-top: 1px solid var(--color-border);
+    padding: 54px 0;
+  }
+
+  .sec-head {
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+    margin-bottom: 30px;
+  }
+
+  .idx {
+    color: var(--color-faint);
     font-size: 12px;
   }
 
-  .quick-facts dd {
+  .sec-head h2 {
     margin: 0;
-    line-height: 1.7;
-  }
-
-  .section-block {
-    padding: 52px 0 0;
-  }
-
-  .section-block h2 {
-    max-width: 760px;
-    margin: 12px 0 24px;
-    font-size: 42px;
-    line-height: 1.22;
+    color: var(--color-text);
+    font-family: var(--font-serif);
+    font-size: 21px;
+    font-weight: 600;
     letter-spacing: 0;
   }
 
-  .highlight-list {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
+  .meta {
+    margin-left: auto;
+    color: var(--color-faint);
+    font-size: 10.5px;
+    text-transform: uppercase;
   }
 
-  .highlight-list p,
-  .project-list article {
+  .prose p {
+    max-width: 660px;
+    margin: 0 0 16px;
+    color: var(--color-muted);
+    font-family: var(--font-kr);
+    font-size: 15.5px;
+    line-height: 1.85;
+    word-break: keep-all;
+  }
+
+  .prose p:last-child {
+    margin-bottom: 0;
+  }
+
+  .prose strong {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    margin-top: 30px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-object);
+    background: var(--color-border);
+    box-shadow: 0 1px 2px rgb(22 28 45 / 0.05);
+  }
+
+  .fact {
+    min-width: 0;
+    background: var(--color-surface);
+    padding: 16px 18px;
+  }
+
+  .fact span {
+    color: var(--color-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  .fact p {
+    margin: 7px 0 0;
+    color: var(--color-text);
+    font-family: var(--font-kr);
+    font-size: 13.5px;
+    line-height: 1.5;
+    word-break: keep-all;
+  }
+
+  .notes,
+  .projects {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .note {
     position: relative;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-object);
     background: var(--color-surface);
     box-shadow: var(--shadow-rest);
-    padding: 22px;
-    color: var(--color-muted);
-    line-height: 1.75;
+    padding: 22px 24px 22px 26px;
+    transition:
+      border-color 0.22s,
+      box-shadow 0.26s cubic-bezier(0.2, 0.7, 0.3, 1),
+      transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
-  .capability-list {
-    display: grid;
-    gap: 0;
-  }
-
-  .capability-list div {
-    grid-template-columns: 210px 1fr;
-    align-items: baseline;
-  }
-
-  .capability-list h3,
-  .project-list h3 {
-    margin: 0;
-    font-size: 21px;
-    line-height: 1.35;
-    letter-spacing: 0;
-  }
-
-  .capability-list p,
-  .project-list span,
-  .contact-block p {
-    color: var(--color-muted);
-    line-height: 1.75;
-  }
-
-  .project-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
-
-  .project-list article {
-    display: grid;
-    gap: 12px;
-  }
-
-  .project-list article::before {
-    content: "";
+  .note::after {
     position: absolute;
-    top: -8px;
-    left: 22px;
-    width: 92px;
-    height: 10px;
-    border: 1px solid var(--color-border);
-    border-bottom: 0;
-    border-radius: 5px 5px 0 0;
-    background: var(--color-surface);
+    top: 18px;
+    bottom: 18px;
+    left: 0;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--color-accent);
+    content: "";
+    opacity: 0.55;
   }
 
-  .project-list p {
-    color: var(--color-accent-strong);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0;
+  .note:hover {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-pop);
+    transform: translateY(-2px);
+  }
+
+  .note-meta {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 10.5px;
     text-transform: uppercase;
   }
 
-  .project-list h3 a {
-    text-decoration: none;
+  .note-meta strong {
+    color: var(--color-accent-strong);
+    font-weight: 600;
   }
 
-  .text-link {
+  .note h3 {
+    margin: 11px 0 9px;
+    color: var(--color-text);
+    font-family: var(--font-kr);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.45;
+    word-break: keep-all;
+  }
+
+  .note p:not(.note-meta) {
+    max-width: 720px;
+    margin: 0;
+    color: var(--color-muted);
+    font-family: var(--font-kr);
+    font-size: 14px;
+    line-height: 1.78;
+    word-break: keep-all;
+  }
+
+  .note code {
+    border-radius: 5px;
+    background: var(--color-accent-soft);
     color: var(--color-accent-strong);
     font-family: var(--font-mono);
-    font-size: 13px;
-    text-decoration: none;
+    font-size: 12.5px;
+    padding: 1px 6px;
   }
 
-  .contact-block {
+  .stack {
     display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(280px, 1fr);
-    gap: 42px;
-    padding-bottom: 80px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
   }
 
-  .contact-block ul {
-    display: grid;
-    gap: 0;
+  .stack-card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-object);
+    background: var(--color-surface);
+    box-shadow: 0 1px 2px rgb(22 28 45 / 0.05);
+    padding: 20px 22px;
+  }
+
+  .stack-card.wide {
+    grid-column: 1 / -1;
+  }
+
+  .stack-card-head {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 13px;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 13px;
+  }
+
+  .stack-card h3 {
+    margin: 0;
+    color: var(--color-text);
+    font-family: var(--font-serif);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .stack-card-head span {
+    color: var(--color-faint);
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  .stack-card ul,
+  .project-folder ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px 8px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .contact-block li {
-    display: grid;
-    grid-template-columns: 90px minmax(0, 1fr);
+  .stack-card li,
+  .project-folder li {
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: var(--color-inset);
+    color: var(--color-muted);
+    font-size: 12px;
+    line-height: 1.3;
+    padding: 4px 9px;
+  }
+
+  .stack-card li.key {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent-strong);
+  }
+
+  .stack-note {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0 0;
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .stack-note span {
+    color: var(--color-accent);
+  }
+
+  .project-folder {
+    position: relative;
+    display: block;
+    overflow: visible;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-object);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-rest);
+    padding: 24px 26px;
+    text-decoration: none;
+    transition:
+      border-color 0.22s,
+      box-shadow 0.26s cubic-bezier(0.2, 0.7, 0.3, 1),
+      transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .project-folder::before {
+    position: absolute;
+    top: -9px;
+    left: 26px;
+    width: 78px;
+    height: 11px;
+    border: 1px solid var(--color-border);
+    border-bottom: 0;
+    border-radius: 5px 5px 0 0;
+    background: var(--color-surface);
+    content: "";
+    transition: border-color 0.22s;
+  }
+
+  .project-folder:hover,
+  .project-folder:focus-visible {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-pop);
+    color: inherit;
+    transform: translateY(-3px);
+  }
+
+  .project-folder:hover::before,
+  .project-folder:focus-visible::before {
+    border-color: var(--color-border-strong);
+  }
+
+  .project-top {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .project-top span {
+    color: var(--color-muted);
+    font-size: 10.5px;
+    text-transform: uppercase;
+  }
+
+  .project-top em {
+    border: 1px solid var(--color-border-strong);
+    border-radius: 20px;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-style: normal;
+    line-height: 1.2;
+    padding: 3px 9px;
+    text-transform: uppercase;
+  }
+
+  .project-top em.live {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent-strong);
+  }
+
+  .project-top em.progress {
+    border-color: #e59700;
+    background: rgb(229 151 0 / 0.12);
+    color: #9a5c00;
+  }
+
+  [data-theme="dark"] .project-top em.progress {
+    color: #f0b650;
+  }
+
+  .project-folder h3 {
+    margin: 12px 0 0;
+    color: var(--color-text);
+    font-family: var(--font-serif);
+    font-size: 23px;
+    font-weight: 600;
+    letter-spacing: 0;
+    transition: color 0.18s;
+  }
+
+  .project-folder:hover h3,
+  .project-folder:focus-visible h3 {
+    color: var(--color-accent-strong);
+  }
+
+  .project-folder p {
+    max-width: 720px;
+    margin: 11px 0 0;
+    color: var(--color-muted);
+    font-family: var(--font-kr);
+    font-size: 14px;
+    line-height: 1.74;
+    word-break: keep-all;
+  }
+
+  .project-folder ul {
+    margin-top: 16px;
+  }
+
+  .go {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 16px;
+    color: var(--color-faint);
+    font-size: 11px;
+    transition: color 0.18s;
+  }
+
+  .project-folder:hover .go,
+  .project-folder:focus-visible .go {
+    color: var(--color-accent);
+  }
+
+  .go span,
+  .contact-row em {
+    transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .project-folder:hover .go span,
+  .project-folder:focus-visible .go span,
+  .contact-row:hover em,
+  .contact-row:focus-visible em {
+    transform: translateX(3px);
+  }
+
+  .contact-rows {
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-object);
+    background: var(--color-surface);
+    box-shadow: 0 1px 2px rgb(22 28 45 / 0.05);
+  }
+
+  .contact-row {
+    display: flex;
     gap: 18px;
+    align-items: center;
     border-top: 1px solid var(--color-border);
-    padding: 16px 0;
+    padding: 17px 22px;
+    text-decoration: none;
+    transition: background 0.15s;
   }
 
-  .contact-block a {
+  .contact-row:first-child {
+    border-top: 0;
+  }
+
+  .contact-row:hover,
+  .contact-row:focus-visible {
+    background: var(--color-inset);
+    color: inherit;
+  }
+
+  .contact-row span {
+    flex: 0 0 84px;
+    color: var(--color-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+
+  .contact-row strong {
+    min-width: 0;
+    flex: 1 1 auto;
     overflow-wrap: anywhere;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 500;
   }
 
-  @media (max-width: 860px) {
-    .about-hero {
-      padding-top: 42px;
+  .contact-row:hover strong,
+  .contact-row:focus-visible strong {
+    color: var(--color-accent-strong);
+  }
+
+  .contact-row em {
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-style: normal;
+  }
+
+  .contact-row:hover em,
+  .contact-row:focus-visible em {
+    color: var(--color-accent);
+  }
+
+  .about-footer {
+    margin-top: 30px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .about-footer > div {
+    display: flex;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 24px 24px 40px;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--color-faint);
+    font-size: 11px;
+  }
+
+  .about-footer nav {
+    display: flex;
+    gap: 18px;
+  }
+
+  .about-footer a {
+    text-decoration: none;
+  }
+
+  @media (max-width: 720px) {
+    .about-shell {
+      padding: 0 22px;
     }
 
-    .about-hero h1 {
-      font-size: 46px;
+    .hero {
+      padding: 34px 0 12px;
     }
 
-    .section-block h2 {
+    .hero h1 {
       font-size: 34px;
     }
 
-    .about-grid,
-    .contact-block,
-    .highlight-list,
-    .project-list {
+    .lede,
+    .prose p {
+      font-size: 15px;
+    }
+
+    .sec {
+      padding: 42px 0;
+    }
+
+    .facts,
+    .stack {
       grid-template-columns: 1fr;
     }
 
-    .capability-list div {
-      grid-template-columns: 1fr;
+    .stack-card.wide {
+      grid-column: auto;
     }
   }
 
-  @media (max-width: 560px) {
-    .about-hero h1 {
-      font-size: 32px;
+  @media (max-width: 520px) {
+    .about-shell {
+      padding: 0 18px;
     }
 
-    .section-block h2 {
-      font-size: 28px;
+    .hero h1 {
+      font-size: 29px;
+      line-height: 1.42;
     }
 
-    .lead,
-    .intro {
-      font-size: 15.5px;
+    .sec-head {
+      flex-wrap: wrap;
+      gap: 8px 12px;
     }
 
-    .section-block {
-      padding-top: 42px;
+    .meta {
+      width: 100%;
+      margin-left: 0;
     }
 
-    .contact-block li {
-      grid-template-columns: 1fr;
-      gap: 6px;
+    .note,
+    .project-folder {
+      padding: 20px;
+    }
+
+    .contact-row {
+      flex-wrap: wrap;
+      gap: 6px 18px;
+    }
+
+    .contact-row span {
+      flex-basis: auto;
+    }
+
+    .about-footer > div {
+      align-items: flex-start;
+      flex-direction: column;
+      padding-right: 18px;
+      padding-left: 18px;
     }
   }
 </style>
