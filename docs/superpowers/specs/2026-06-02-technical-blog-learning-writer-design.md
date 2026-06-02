@@ -1,7 +1,7 @@
 # Technical Blog Learning Writer Skill Design
 
 Date: 2026-06-02
-Status: proposed
+Status: implemented
 
 ## Goal
 
@@ -307,15 +307,15 @@ Expected behavior:
 
 ## Implementation Plan Preview
 
-After this design is approved, implementation should proceed in this order:
+Implementation proceeded in this order:
 
-1. Create `/Users/yonghyun/.codex/skills/technical-blog-learning-writer/`.
-2. Write concise `SKILL.md` with trigger, workflow, safeguards, and reference navigation.
-3. Add `references/blog-learning-pattern.md`.
-4. Add `references/interview-note-template.md`.
-5. Run the skill creator validation script if available.
-6. Test against one `yonghyun-blog` post and one `sigak` post.
-7. Update `docs/next-actions.md` only after validation confirms the skill behaves as intended.
+1. Created `/Users/yonghyun/.codex/skills/technical-blog-learning-writer/`.
+2. Wrote concise `SKILL.md` with trigger, workflow, safeguards, and reference navigation.
+3. Added `references/blog-learning-pattern.md`.
+4. Added `references/interview-note-template.md`.
+5. Ran the skill creator validation script in a temporary Python virtual environment.
+6. Left live validation against one `yonghyun-blog` post and one `sigak` post as the next step.
+7. Updated `docs/next-actions.md` to track implementation and remaining validation separately.
 
 ## Risks And Mitigations
 
