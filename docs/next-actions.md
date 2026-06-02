@@ -18,7 +18,7 @@
 - [x] Sigak Flyway 개인 답변 1차 작성
 - [ ] Sigak Flyway 검색/RAG 연결 1회 복습
 - [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
-- [ ] 두 프로젝트의 공통 블로그 작성 패턴 정리
+- [x] 두 프로젝트의 공통 블로그 작성 패턴 정리
 - [ ] project-agnostic 블로그 작성 스킬 설계
 - [ ] `technical-blog-learning-writer` 스킬 구현
 - [ ] `yonghyun-blog` 글 1개와 `sigak` 글 1개로 스킬 검증
@@ -63,6 +63,8 @@
 
 이 스킬은 글을 대신 써주는 도구가 아니라, 내가 설계를 이해하고 설명할 수 있게 만드는 작성 루프가 되어야 한다.
 
+공통 작성 패턴은 `docs/blog-learning-pattern.md`에 정리한다.
+
 ### 입력
 
 - `project`: 글이 속한 프로젝트 slug
@@ -90,7 +92,7 @@
 
 - [x] `yonghyun-blog` 글 2개 이상에 학습형/면접 질문 세트 패턴을 적용했다.
 - [x] `sigak` 글 1개 이상에 같은 패턴을 적용했다.
-- [ ] 프로젝트별로 달라지는 값과 공통으로 유지할 구조를 구분했다.
+- [x] 프로젝트별로 달라지는 값과 공통으로 유지할 구조를 구분했다.
 - [x] 개인 답변 노트가 `docs/interview-notes/private/<project>/` 구조로 유지되는지 확인했다.
 
 스킬 검증은 아래 조건을 만족할 때 완료로 본다.

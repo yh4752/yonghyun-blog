@@ -90,3 +90,5 @@ npm run build
 - 작성 방식은 `docs/interview-notes/README.md`와 `docs/interview-notes/templates/article-answer-note.md`를 따른다.
 
 이 노트는 블로그 콘텐츠가 아니라 학습 도구다. 답을 바로 공개 문장으로 다듬기보다, 먼저 내가 어디까지 이해했는지 드러내는 데 집중한다.
+
+학습, 포트폴리오, 면접 대비를 함께 고려하는 deep-dive 글은 `docs/blog-learning-pattern.md`의 공통 패턴을 따른다.
