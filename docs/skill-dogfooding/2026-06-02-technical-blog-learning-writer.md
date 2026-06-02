@@ -127,20 +127,31 @@ npm run validate:posts -- --source --project sigak
 결과:
 
 ```txt
+Error: ../../../sigak/docs/blog/2026-05-31-collection-failure-evidence.md: 허용되지 않은 tag 'Collection'가 있습니다.
+Error: ../../../sigak/docs/blog/2026-05-31-collection-to-projection-demo-flow.md: 허용되지 않은 tag 'Collection'가 있습니다.
+Error: ../../../sigak/docs/blog/2026-05-31-collection-to-projection-demo-flow.md: 허용되지 않은 tag 'Demo'가 있습니다.
 Error: ../../../sigak/docs/blog/2026-06-01-dev-log.md: 허용되지 않은 tag 'Evaluation'가 있습니다.
 Error: ../../../sigak/docs/blog/2026-06-01-dev-log.md: 허용되지 않은 tag 'Tooling'가 있습니다.
 Error: ../../../sigak/docs/blog/2026-06-02-dev-log.md: 허용되지 않은 tag 'Evaluation'가 있습니다.
 Error: ../../../sigak/docs/blog/2026-06-02-dev-log.md: 허용되지 않은 tag 'Tooling'가 있습니다.
 ```
 
-이 문제는 글 내용이 아니라 블로그 허브의 tag policy 문제다. 선택지는 둘이다.
+이 문제는 글 내용이 아니라 블로그 허브의 tag policy 문제다. 선택지는 셋이다.
 
 | 선택지 | 장점 | 한계 |
 | --- | --- | --- |
-| `Evaluation`, `Tooling`을 허용 태그에 추가 | Sigak 검색 평가 글을 정확히 표현할 수 있다 | tag policy 문서도 함께 갱신해야 한다 |
+| 모든 새 tag를 허용 | source validation은 빠르게 통과한다 | `Demo`, `Experiment`, `Tool`처럼 상황성 tag가 계속 늘어날 수 있다 |
+| durable tag만 허용하고 나머지는 치환 | 분류 체계를 장기적으로 유지하기 쉽다 | 새 tag 판단 기준이 필요하다 |
 | 기존 태그로 치환 | 별도 정책 변경이 없다 | 검색 평가/도구 성격이 덜 선명해진다 |
 
-현재 흐름에서는 `Evaluation`, `Tooling`을 허용 태그에 추가하는 편이 더 자연스럽다. Sigak의 검색 평가 글이 앞으로도 계속 나올 가능성이 높기 때문이다.
+현재 흐름에서는 durable tag만 허용하는 편이 가장 자연스럽다. `Collection`, `Evaluation`, `Tooling`은 Sigak과 이후 프로젝트에서 반복될 수 있는 범주라 허용하고, `Demo`는 특정 글의 상황 표현에 가까워 `Testing`으로 치환했다.
+
+이후부터는 허용되지 않은 tag가 나오면 아래 intake 질문을 먼저 통과시킨다.
+
+- 앞으로 2개 이상의 글이나 프로젝트에서 반복될까?
+- 독자가 이 tag로 글을 찾아볼 이유가 있을까?
+- 기존 tag와 의미가 겹치지 않을까?
+- 특정 글의 상황 표현이 아니라 지속 가능한 주제일까?
 
 3. relatedPosts가 아직 발행되지 않은 글을 가리킨다.
    - `relatedPosts: ["sigak/2026-06-01-dev-log"]`
@@ -158,6 +169,7 @@ Error: ../../../sigak/docs/blog/2026-06-02-dev-log.md: 허용되지 않은 tag '
 1. **Validation awareness**
    - 글을 다듬기 전에 `validate:posts -- --source --project <project>`를 실행하거나, 최소한 실행을 제안한다.
    - 태그/summary/type 같은 발행 전 오류를 글쓰기 과정에서 함께 잡는다.
+   - 허용되지 않은 tag가 나오면 바로 추가하지 않고 tag intake 기준으로 허용/치환/보류를 나눈다.
 
 2. **Oversized dev-log splitter**
    - dev-log가 여러 독립 주제를 포함하면, "오늘 로그는 유지하되 deep-dive 후보를 분리하자"고 제안한다.

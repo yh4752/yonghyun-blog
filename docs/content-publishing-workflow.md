@@ -113,9 +113,12 @@ v1 허용 태그:
 - `Database`
 - `Testing`
 - `Observability`
+- `Collection`
+- `Evaluation`
 - `Architecture`
 - `Debugging`
 - `Performance`
+- `Tooling`
 - `Documentation`
 - `Spring Boot`
 - `FastAPI`
@@ -128,7 +131,34 @@ v1 허용 태그:
 - `Vector Search`
 - `Astro`
 
-새 태그가 필요하면 먼저 `src/data/tags.json`과 문서를 함께 수정한다.
+새 태그가 필요하면 먼저 아래 intake 기준을 통과한 뒤 `src/data/tags.json`과 문서를 함께 수정한다.
+
+### Tag Intake Protocol
+
+허용되지 않은 tag가 나오면 바로 추가하지 않는다. 태그는 본문 키워드가 아니라 공개 블로그의 분류 체계이므로, 오래 유지할 수 있는 값만 허용 목록에 넣는다.
+
+새 후보 tag는 아래 질문을 통과해야 한다.
+
+1. 앞으로 2개 이상의 글이나 2개 이상의 프로젝트에서 반복될 가능성이 있는가?
+2. 독자가 이 tag로 글을 찾아볼 이유가 있는가?
+3. 기존 tag와 의미가 겹치지 않는가?
+4. 특정 글의 상황 표현이 아니라 지속 가능한 주제인가?
+
+처리 기준:
+
+| 후보 성격 | 처리 |
+| --- | --- |
+| 반복되는 도메인/기술/작업 범주 | 허용 tag로 추가 |
+| 기존 tag와 같은 의미 | 기존 tag로 치환 |
+| 한 글의 상황 설명 | 제목이나 본문에 두고 tag로 추가하지 않음 |
+| 너무 세부적인 구현명 | 핵심 스택이면 추가하고, 아니면 넓은 tag로 흡수 |
+
+예시:
+
+- `Collection`: Sigak의 반복 도메인 흐름이므로 허용한다.
+- `Evaluation`: 검색/RAG 품질 평가를 나타내는 반복 주제이므로 허용한다.
+- `Tooling`: 라벨링 도구와 자동화 스크립트처럼 개발 보조 도구를 묶을 수 있으므로 허용한다.
+- `Demo`: 특정 글의 상황 표현에 가까우므로 허용하지 않고 `Testing`이나 `Documentation`으로 치환한다.
 
 `featured`:
 

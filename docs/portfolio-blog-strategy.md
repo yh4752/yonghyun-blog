@@ -84,7 +84,7 @@ Sigak은 PostgreSQL, Flyway, SchemaSpy, Elasticsearch, Qdrant, FastAPI, AI bound
 - 하루에 같은 유형의 글 파일이 이미 있으면 자동 suffix를 붙이지 않고 명령을 실패시킨다.
 - asset은 원본 `docs/blog/assets/<post-slug>`에서 발행본 `src/content/blog/<project>/assets/<post-slug>`로 복사한다.
 - 기존 Sigak 글은 dev-log 4개와 Flyway/SchemaSpy 딥다이브 2개를 우선 공개 대상으로 이관한다.
-- 태그는 v1에서 닫힌 목록으로 관리하고, 허용 목록은 `src/data/tags.ts`, [구현 블루프린트](implementation-blueprint.md), [콘텐츠 발행 워크플로우](content-publishing-workflow.md)에 동일하게 둔다.
+- 태그는 v1에서 닫힌 목록으로 관리하고, 허용 목록은 `src/data/tags.json`, [구현 블루프린트](implementation-blueprint.md), [콘텐츠 발행 워크플로우](content-publishing-workflow.md)에 동일하게 둔다.
 - v1에서는 analytics를 넣지 않는다. 성능 확인은 PageSpeed Insights 같은 수동 체크로 시작한다.
 - sitemap은 v1에 포함하고, RSS는 v1.2에서 추가한다.
 - 상세 발행 흐름은 [콘텐츠 발행 워크플로우](content-publishing-workflow.md)를 따른다.
