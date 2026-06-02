@@ -65,6 +65,20 @@ docs/blog/2026-06-02-init-project-automation-skill-dogfooding.md
 - 어떤 파일을 읽었고, 어떤 질문을 만들었고, 어떤 검증에서 막혔는지 별도 기록하는 루틴이 더 필요하다.
 - dev-log와 deep-dive 사이의 중간 글에 대한 기준이 아직 약하다.
 
+### 사용자 검토 후 보강한 점
+
+사용자가 글을 읽고 아래 두 가지를 아쉬운 점으로 짚었다.
+
+1. 스킬이 스스로 평가 기록까지 자동으로 남기지 않는다.
+2. 개발 로그와 심층 분석 사이에 해당하는 중간 글의 기준이 불명확하다.
+
+이 피드백을 반영해 스킬에는 두 가지 규칙을 추가했다.
+
+- **Evaluation trace**: 스킬 dogfooding이나 스킬 개선 작업에서는 어떤 파일을 읽고, 어떤 질문을 했고, 어떤 검증을 했고, 무엇을 놓쳤는지 `docs/skill-dogfooding/`에 기록한다.
+- **Article scope**: 글을 쓰기 전에 `dev-log`, `decision-note`, `learning-note`, `deep-dive` 중 어디에 가까운지 먼저 판단한다.
+
+이렇게 해야 스킬이 단순히 글을 만들어주는 도구가 아니라, 글쓰기 루틴 자체를 검증하고 개선하는 도구가 된다.
+
 ## 적용 2: Sigak 2026-06-02 dev-log
 
 대상:
@@ -152,10 +166,16 @@ Error: ../../../sigak/docs/blog/2026-06-02-dev-log.md: 허용되지 않은 tag '
 3. **Dogfooding report mode**
    - 스킬을 적용한 방식 자체를 기록하는 mode가 있으면 좋다.
    - 입력 파일, 추출한 skeleton, 발견한 validation 문제, 다음 스킬 개선 항목을 남긴다.
+   - 이번 피드백을 반영해 `evaluation trace` 규칙으로 스킬에 추가했다.
 
 4. **Open-source readiness checklist**
    - skill bundle에 포함할 reference와 제외할 개인 경로를 구분한다.
    - repo-specific 경로, 개인 답변 노트, private workflow가 섞이지 않도록 점검한다.
+
+5. **Intermediate article classifier**
+   - dev-log와 deep-dive 사이에 `decision-note`, `learning-note` 기준을 둔다.
+   - 하루 기록 안에 여러 주제가 있을 때는 dev-log를 유지하되, 별도 글 후보를 뽑는다.
+   - 이번 피드백을 반영해 `article scope` 규칙으로 스킬에 추가했다.
 
 ## 오픈소스화 판단
 
