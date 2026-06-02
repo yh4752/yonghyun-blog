@@ -3,6 +3,7 @@
 이 문서는 이 블로그에 실리는 모든 글의 단일 기준이다. sigak 저장소의
 `docs/blog/WRITING_GUIDE.ko.md`를 블로그 생태계 전체(여러 프로젝트가 글의 출처가 되는 구조)에
 맞게 각색한 것이다. 글의 작성·동기화·발행 절차는 `docs/content-publishing-workflow.md`를 따른다.
+Sigak이나 다른 프로젝트에 같은 루틴을 적용할 때는 `docs/blog-writing-scenarios-cheatsheet.md`를 함께 본다.
 
 다루는 글 유형은 두 가지다.
 
