@@ -113,9 +113,12 @@ v1 허용 태그:
 - `Database`
 - `Testing`
 - `Observability`
+- `Collection`
+- `Evaluation`
 - `Architecture`
 - `Debugging`
 - `Performance`
+- `Tooling`
 - `Documentation`
 - `Spring Boot`
 - `FastAPI`

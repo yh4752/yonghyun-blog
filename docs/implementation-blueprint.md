@@ -264,9 +264,12 @@ v1 허용 태그:
 - `Database`
 - `Testing`
 - `Observability`
+- `Collection`
+- `Evaluation`
 - `Architecture`
 - `Debugging`
 - `Performance`
+- `Tooling`
 - `Documentation`
 - `Spring Boot`
 - `FastAPI`
@@ -279,9 +282,9 @@ v1 허용 태그:
 - `Vector Search`
 - `Astro`
 
-태그 목록은 `src/data/tags.ts`에서 관리한다.
+태그 목록은 `src/data/tags.json`에서 관리하고, `src/data/tags.ts`는 이 목록을 타입으로 노출한다.
 
-`validate:posts`는 `draft: false` 글에서 허용되지 않은 태그가 있으면 error로 처리한다. 새 태그가 필요하면 먼저 `src/data/tags.ts`에 추가한다.
+`validate:posts`는 `draft: false` 글에서 허용되지 않은 태그가 있으면 error로 처리한다. 새 태그가 필요하면 먼저 `src/data/tags.json`에 추가한다.
 
 ## 기존 Sigak 글 Frontmatter 이관
 
