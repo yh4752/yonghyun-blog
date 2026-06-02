@@ -21,7 +21,7 @@
 - [x] 두 프로젝트의 공통 블로그 작성 패턴 정리
 - [x] project-agnostic 블로그 작성 스킬 설계
 - [x] `technical-blog-learning-writer` 스킬 구현
-- [ ] `yonghyun-blog` 글 1개와 `sigak` 글 1개로 스킬 검증
+- [x] `yonghyun-blog` 글 1개와 `sigak` 글 1개로 스킬 검증
 
 ## 프로젝트별 큐
 
@@ -36,6 +36,10 @@
 - [x] frontmatter validation 개인 답변 노트 생성
 - [x] frontmatter validation 개인 답변 1차 작성
 - [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
+- [x] technical-blog-learning-writer 글 초안 생성
+- [x] technical-blog-learning-writer 면접 질문 세트 생성
+- [x] technical-blog-learning-writer 개인 답변 노트 생성
+- [ ] technical-blog-learning-writer 개인 답변 1차 작성
 - [ ] 블로그 스캐폴딩 글 재구성 검토
 - [ ] 발행본 직접 수정 방지 글 재구성 검토
 
@@ -100,7 +104,7 @@
 스킬 검증은 아래 조건을 만족할 때 완료로 본다.
 
 - [x] 스킬 기본 구조가 `quick_validate.py`를 통과했다.
-- [ ] `yonghyun-blog` 글 1개에 스킬을 적용해 글 구조가 개선됐다.
-- [ ] `sigak` 글 1개에 스킬을 적용해 프로젝트 맥락이 유지됐다.
-- [ ] 두 결과 모두 면접 질문 세트가 생성됐다.
-- [ ] 두 결과 모두 개인 답변 노트로 이어질 수 있다.
+- [x] `yonghyun-blog` 글 1개에 스킬을 적용해 글 구조가 개선됐다. (`2026-06-02-technical-blog-learning-writer` 초안)
+- [x] `sigak` 글 1개에 스킬을 적용해 프로젝트 맥락이 유지됐다. (사용자 확인)
+- [x] 두 결과 모두 면접 질문 세트가 생성됐다.
+- [x] 두 결과 모두 개인 답변 노트로 이어질 수 있다.
