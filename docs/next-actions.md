@@ -14,8 +14,9 @@
 ## 현재 우선순위
 
 - [x] CI/CD 답변 노트 1회 소리 내어 복습
+- [x] Sigak 글 1개를 같은 방식으로 면접 질문 세트화
+- [ ] Sigak Flyway 개인 답변 1차 작성
 - [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
-- [ ] Sigak 글 1개를 같은 방식으로 면접 질문 세트화
 - [ ] 두 프로젝트의 공통 블로그 작성 패턴 정리
 - [ ] project-agnostic 블로그 작성 스킬 설계
 - [ ] `technical-blog-learning-writer` 스킬 구현
@@ -39,10 +40,11 @@
 
 ### sigak
 
-- [ ] Flyway adoption 글 학습형/포트폴리오형 재구성 후보 검토
+- [x] Flyway adoption 글 학습형/포트폴리오형 재구성 후보 검토
 - [ ] SchemaSpy adoption 글 학습형/포트폴리오형 재구성 후보 검토
-- [ ] Sigak 글 1개 면접 질문 세트 생성
-- [ ] Sigak 개인 답변 노트 생성
+- [x] Sigak 글 1개 면접 질문 세트 생성
+- [x] Sigak 개인 답변 노트 생성
+- [ ] Sigak Flyway 개인 답변 1차 작성
 - [ ] Sigak 글에서 프로젝트 맥락, 설계 결정, 검증 근거가 충분한지 점검
 
 ### future projects
@@ -85,9 +87,9 @@
 스킬 구현은 아래 조건을 만족할 때 시작한다.
 
 - [x] `yonghyun-blog` 글 2개 이상에 학습형/면접 질문 세트 패턴을 적용했다.
-- [ ] `sigak` 글 1개 이상에 같은 패턴을 적용했다.
+- [x] `sigak` 글 1개 이상에 같은 패턴을 적용했다.
 - [ ] 프로젝트별로 달라지는 값과 공통으로 유지할 구조를 구분했다.
-- [ ] 개인 답변 노트가 `docs/interview-notes/private/<project>/` 구조로 유지되는지 확인했다.
+- [x] 개인 답변 노트가 `docs/interview-notes/private/<project>/` 구조로 유지되는지 확인했다.
 
 스킬 검증은 아래 조건을 만족할 때 완료로 본다.
 
