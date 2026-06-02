@@ -1,0 +1,22 @@
+---
+import type { GetStaticPaths } from "astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PostList from "../../components/blog/PostList.astro";
+import PageHeader from "../../components/layout/PageHeader.astro";
+import { postTypePages } from "../../data/postTypes";
+import { filterPostsByType, getPublishedPosts } from "../../utils/posts";
+
+export const getStaticPaths = (() =>
+  postTypePages.map((page) => ({
+    params: { type: page.type },
+    props: { page },
+  }))) satisfies GetStaticPaths;
+
+const { page } = Astro.props;
+const posts = filterPostsByType(await getPublishedPosts(), page.type);
+---
+
+<BaseLayout title={page.title} description={page.description} canonicalPath={page.path}>
+  <PageHeader eyebrow={page.eyebrow} title={page.heading} description={page.summary} />
+  <PostList posts={posts} />
+</BaseLayout>

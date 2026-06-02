@@ -1,6 +1,7 @@
 ---
 import type { Project } from "../../data/projects";
 import type { BlogPost } from "../../utils/posts";
+import { formatShortDate } from "../../utils/dates";
 
 type Props = {
   projects: Project[];
@@ -18,17 +19,6 @@ const projectStatusLabels: Record<Project["status"], string> = {
   paused: "Paused",
   complete: "Live",
 };
-
-function formatShortDate(date: Date): string {
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "Asia/Seoul",
-  })
-    .format(date)
-    .replace(/\.$/, "")
-    .replaceAll(" ", "");
-}
 ---
 
 <section class="archive-board" aria-label="Archive quick access">

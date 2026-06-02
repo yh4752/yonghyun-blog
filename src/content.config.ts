@@ -1,15 +1,11 @@
 import { defineCollection } from "astro:content";
 import { glob } from "astro/loaders";
 import { z } from "astro/zod";
+import { postTypes } from "./data/postTypes";
+import { allowedTags } from "./data/tags";
 
-const postTypeSchema = z.enum([
-  "dev-log",
-  "deep-dive",
-  "debugging",
-  "architecture",
-  "performance",
-  "research",
-]);
+const postTypeSchema = z.enum(postTypes);
+const tagSchema = z.enum(allowedTags);
 
 const blog = defineCollection({
   loader: glob({
@@ -21,7 +17,7 @@ const blog = defineCollection({
     date: z.coerce.date(),
     type: postTypeSchema,
     project: z.string().min(1),
-    tags: z.array(z.string()).min(1),
+    tags: z.array(tagSchema).min(1),
     summary: z.string().min(1),
     draft: z.boolean().default(true),
     slug: z.string().optional(),

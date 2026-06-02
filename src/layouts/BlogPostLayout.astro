@@ -1,20 +1,16 @@
 ---
+import type { MarkdownHeading } from "astro";
+import type { AstroComponentFactory } from "astro/runtime/server/index.js";
 import BaseLayout from "./BaseLayout.astro";
 import TableOfContents from "../components/blog/TableOfContents.astro";
 import PostMeta from "../components/blog/PostMeta.astro";
 import "../styles/prose.css";
 import type { BlogPost } from "../utils/posts";
 
-type Heading = {
-  depth: number;
-  slug: string;
-  text: string;
-};
-
 type Props = {
   post: BlogPost;
-  Content: any;
-  headings: Heading[];
+  Content: AstroComponentFactory;
+  headings: MarkdownHeading[];
   previous?: BlogPost;
   next?: BlogPost;
 };

@@ -7,7 +7,3 @@ export function slugFromId(id: string): string {
 export function projectFromId(id: string): string {
   return id.split("/")[0] ?? "";
 }
-
-export function postRoute(project: string, slug: string): string {
-  return `/blog/${project}/${slug}`;
-}
