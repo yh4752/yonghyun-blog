@@ -135,6 +135,23 @@ dry-run 이후 `practice-project/docs/blog`가 실제로 생성되지 않은 것
 
 이 피드백을 바탕으로 스킬에는 두 가지를 보강했다. 첫째, 스킬을 dogfooding하거나 개선할 때는 `evaluation trace`를 남겨서 읽은 파일, 질문, 검증, 놓친 점을 기록한다. 둘째, 글을 쓰기 전에 `dev-log`, `decision-note`, `learning-note`, `deep-dive` 중 어디에 가까운지 먼저 판단한다. 그래야 하루 기록과 깊은 분석 사이에 있는 글도 억지로 한쪽에 끼워 넣지 않을 수 있다.
 
+## 태그 정책 dogfooding
+
+Sigak 글을 더 가져오려고 하자 `validate:posts -- --source --project sigak`에서 허용되지 않은 tag error가 났다. 처음에는 `Collection`, `Evaluation`, `Tooling`, `Demo`를 모두 허용하면 해결되는 것처럼 보였다.
+
+하지만 태그는 본문 키워드가 아니라 블로그의 분류 체계다. 모든 새 단어를 허용하면 나중에 `Demo`, `Experiment`, `Tool`, `Tooling`처럼 비슷한 값이 갈라지고, 글을 찾기 위한 필터로서 의미가 약해진다.
+
+그래서 이번에는 tag intake 기준을 만들었다.
+
+- 앞으로 반복될 도메인이나 작업 범주인가?
+- 독자가 그 tag로 글을 찾아볼 이유가 있는가?
+- 기존 tag와 의미가 겹치지 않는가?
+- 특정 글의 상황 표현이 아니라 오래 유지할 수 있는 주제인가?
+
+이 기준으로 `Collection`, `Evaluation`, `Tooling`은 허용했고, `Demo`는 허용하지 않았다. `Demo`는 특정 글의 상황 표현에 가까워 `Testing`이나 `Documentation`으로 치환하는 편이 낫다고 봤다.
+
+이 경험은 `technical-blog-learning-writer` 스킬에도 반영할 필요가 있다. 글을 다듬을 때 본문뿐 아니라 frontmatter와 tag가 글의 분류 의도를 제대로 표현하는지 확인해야 하기 때문이다.
+
 ## Codex에게 맡긴 것과 내가 검토한 것
 
 Codex에게는 스크립트 구현, 테스트 작성, 문서 반영을 맡겼다. 하지만 바로 진행하지 않고 설계 문서를 먼저 만들고, 피드백을 받아 slug 검증, 경로 경고, 템플릿 유연성 같은 결정을 보강했다.
@@ -145,6 +162,7 @@ Codex에게는 스크립트 구현, 테스트 작성, 문서 반영을 맡겼다
 - `--write` 없이 파일이 바뀌지 않는가?
 - 잘못된 slug나 경로를 사용자가 이해할 수 있게 알려주는가?
 - 나중에 오픈소스화할 수 있는 경계가 남아 있는가?
+- 새 tag를 추가할 때 분류 체계가 장기적으로 지저분해지지 않는가?
 
 ## 코드에서 다시 볼 지점
 
@@ -165,6 +183,7 @@ Codex에게는 스크립트 구현, 테스트 작성, 문서 반영을 맡겼다
 - slug 검증을 ASCII kebab-case로 제한한 이유는 무엇인가?
 - 이 스크립트를 오픈소스화하려면 어떤 부분을 repo-specific adapter로 분리해야 하는가?
 - `technical-blog-learning-writer` 스킬은 이 글을 작성할 때 어떤 도움을 줬고, 어떤 점이 아직 부족했는가?
+- 허용되지 않은 tag가 나왔을 때 바로 추가하지 않고 intake 기준을 통과하게 만든 이유는 무엇인가?
 
 ## 다음 단계
 

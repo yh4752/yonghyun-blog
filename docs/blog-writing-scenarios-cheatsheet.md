@@ -408,13 +408,14 @@ npm run init:project -- \
 | `decision` | 설계 선택과 트레이드오프 기록 |
 | `learning` | 개념 학습과 면접 질문 중심 기록 |
 
-4. 필요한 tag가 없다면 `src/data/tags.json`에 추가한다.
+4. 필요한 tag가 없다면 먼저 tag intake 기준을 통과하는지 확인한다.
 
 주의:
 
 - 같은 의미의 tag를 중복해서 만들지 않는다.
 - `Backend`, `backend`, `BE`처럼 갈라지지 않게 한다.
-- 새 tag를 추가하면 문서도 함께 갱신한다.
+- 특정 글의 상황 표현은 tag로 만들지 않고 제목이나 본문에 둔다.
+- 새 tag를 추가하면 `src/data/tags.json`과 문서를 함께 갱신한다.
 
 5. source 검증으로 등록이 맞는지 확인한다.
 
@@ -617,8 +618,18 @@ dev-log는 매번 full deep-dive 구조를 쓰지 않아도 된다. 하지만 �
 처리:
 
 1. 기존 허용 tag로 바꿀 수 있는지 본다.
-2. 꼭 필요한 새 tag라면 `src/data/tags.json`에 추가한다.
-3. 문서의 허용 tag 목록도 갱신한다.
+2. 새 tag 후보라면 아래 질문을 확인한다.
+   - 앞으로 2개 이상의 글이나 프로젝트에서 반복될까?
+   - 독자가 이 tag로 글을 찾아볼 이유가 있을까?
+   - 기존 tag와 의미가 겹치지 않을까?
+   - 특정 글의 상황 표현이 아니라 지속 가능한 주제일까?
+3. 기준을 통과하면 `src/data/tags.json`에 추가한다.
+4. 문서의 허용 tag 목록과 tag intake 예시도 갱신한다.
+
+예시:
+
+- `Collection`, `Evaluation`, `Tooling`: 반복될 수 있는 범주라면 허용한다.
+- `Demo`: 상황 표현에 가까우므로 보통 `Testing`이나 `Documentation`으로 치환한다.
 
 ### project가 없다는 오류
 
