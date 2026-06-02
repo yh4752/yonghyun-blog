@@ -39,7 +39,8 @@
 - [x] technical-blog-learning-writer 글 초안 생성
 - [x] technical-blog-learning-writer 면접 질문 세트 생성
 - [x] technical-blog-learning-writer 개인 답변 노트 생성
-- [ ] technical-blog-learning-writer 개인 답변 1차 작성
+- [x] technical-blog-learning-writer 개인 답변 1차 작성
+- [x] technical-blog-learning-writer 글 발행 가능 상태로 다듬기
 - [ ] 블로그 스캐폴딩 글 재구성 검토
 - [ ] 발행본 직접 수정 방지 글 재구성 검토
 
