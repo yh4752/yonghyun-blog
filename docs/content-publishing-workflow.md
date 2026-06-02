@@ -216,6 +216,43 @@ npm run new:post -- --project sigak --type dev-log
 
 `--project` 값이 `posts.config.yml`의 `sources[].project`에 없으면 명령은 실패한다.
 
+## `init:project`
+
+새 프로젝트는 `posts.config.yml`과 `src/data/projects.json` 양쪽에 등록되어야 한다. 이를 수동으로 처리하면 `docs/blog` 생성, source 등록, 프로젝트 메타데이터 등록 중 하나를 빠뜨리기 쉽다.
+
+새 프로젝트를 블로그 생태계에 처음 연결할 때는 `init:project`를 사용한다.
+
+```bash
+npm run init:project -- \
+  --slug my-new-project \
+  --name "My New Project" \
+  --path "${HOME}/my-projects/my-new-project" \
+  --description "One sentence that explains the project and its technical focus." \
+  --stack "Spring Boot,PostgreSQL"
+```
+
+기본 실행은 dry-run이다. 실제 파일을 만들고 설정을 수정하려면 `--write`를 붙인다.
+
+```bash
+npm run init:project -- \
+  --slug my-new-project \
+  --name "My New Project" \
+  --path "${HOME}/my-projects/my-new-project" \
+  --description "One sentence that explains the project and its technical focus." \
+  --stack "Spring Boot,PostgreSQL" \
+  --write
+```
+
+역할 구분:
+
+- `init:project`: 프로젝트 단위의 블로그 작성 환경과 발행 허브 등록을 만든다.
+- `new:post`: 이미 등록된 프로젝트에 개별 글 초안을 만든다.
+- `sync:posts`: `draft: false`인 원본 글을 발행본으로 복사한다.
+
+`--slug`는 소문자 ASCII 케밥 케이스만 허용한다. 예를 들어 `my-new-project`는 허용되지만 `My_New Project`는 실패하고 추천 slug를 출력한다.
+
+프로젝트 경로가 `${HOME}` 밖에 있으면 명령은 경고를 출력한다. 다른 컴퓨터에서도 쉽게 재현하려면 프로젝트를 `${HOME}/my-projects` 아래에 두거나, 나중에 환경변수 기반 경로 정책을 추가하는 편이 낫다.
+
 ## Asset 정책
 
 원본 프로젝트의 asset 위치:

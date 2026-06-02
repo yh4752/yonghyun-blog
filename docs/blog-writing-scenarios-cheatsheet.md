@@ -344,40 +344,69 @@ npm run build
 /Users/yonghyun/my-projects/my-new-project
 ```
 
-1. 새 프로젝트에 원본 글 폴더를 만든다.
+1. 먼저 dry-run으로 무엇이 바뀌는지 확인한다.
 
 ```bash
-mkdir -p /Users/yonghyun/my-projects/my-new-project/docs/blog
+npm run init:project -- \
+  --slug my-new-project \
+  --name "My New Project" \
+  --path "${HOME}/my-projects/my-new-project" \
+  --description "One sentence that explains the project and its technical focus." \
+  --stack "Spring Boot,PostgreSQL"
 ```
 
-2. `posts.config.yml`에 source를 추가한다.
+확인할 것:
 
-```yaml
-sources:
-  - project: my-new-project
-    label: My New Project
-    path: ${HOME}/my-projects/my-new-project/docs/blog
-    include:
-      - "*.md"
-    exclude:
-      - README.md
-      - topic-queue.md
+- `docs/blog`를 만들 위치가 맞는가?
+- `posts.config.yml`에 들어갈 source path가 `${HOME}` 기반인가?
+- `src/data/projects.json`에 들어갈 description과 stack이 괜찮은가?
+- slug가 소문자 케밥 케이스인가? 예: `my-new-project`
+
+2. dry-run 출력이 맞으면 `--write`로 적용한다.
+
+```bash
+npm run init:project -- \
+  --slug my-new-project \
+  --name "My New Project" \
+  --path "${HOME}/my-projects/my-new-project" \
+  --description "One sentence that explains the project and its technical focus." \
+  --stack "Spring Boot,PostgreSQL" \
+  --write
 ```
 
-3. `src/data/projects.json`에 프로젝트 메타데이터를 추가한다.
+이 명령은 아래 작업을 한 번에 처리한다.
 
-```json
-{
-  "slug": "my-new-project",
-  "name": "My New Project",
-  "description": "One sentence that explains the project and its technical focus.",
-  "stack": ["Spring Boot", "PostgreSQL"],
-  "status": "active",
-  "featured": false,
-  "repositoryUrl": null,
-  "demoUrl": null
-}
+- 새 프로젝트의 `docs/blog` 생성
+- `docs/blog/README.md` 생성
+- `docs/blog/topic-queue.md` 생성
+- `posts.config.yml`에 source 추가
+- `src/data/projects.json`에 프로젝트 메타데이터 추가
+
+기존 `README.md`나 `topic-queue.md`가 파일로 있으면 덮어쓰지 않는다. 디렉터리로 있으면 파일을 만들 수 없으므로 실패한다.
+
+3. 첫 글까지 같이 만들고 싶으면 `--with-first-post`를 사용한다.
+
+```bash
+npm run init:project -- \
+  --slug my-new-project \
+  --name "My New Project" \
+  --path "${HOME}/my-projects/my-new-project" \
+  --description "One sentence that explains the project and its technical focus." \
+  --stack "Spring Boot,PostgreSQL" \
+  --with-first-post \
+  --template decision \
+  --post-type architecture \
+  --title "프로젝트 시작 구조를 이렇게 잡은 이유" \
+  --write
 ```
+
+템플릿은 세 가지다.
+
+| template | 용도 |
+| --- | --- |
+| `dev-log` | 하루 개발 기록 |
+| `decision` | 설계 선택과 트레이드오프 기록 |
+| `learning` | 개념 학습과 면접 질문 중심 기록 |
 
 4. 필요한 tag가 없다면 `src/data/tags.json`에 추가한다.
 
