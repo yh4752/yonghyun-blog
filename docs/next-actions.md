@@ -13,7 +13,7 @@
 
 ## 현재 우선순위
 
-- [ ] CI/CD 답변 노트 1회 소리 내어 복습
+- [x] CI/CD 답변 노트 1회 소리 내어 복습
 - [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
 - [ ] Sigak 글 1개를 같은 방식으로 면접 질문 세트화
 - [ ] 두 프로젝트의 공통 블로그 작성 패턴 정리
@@ -29,7 +29,7 @@
 - [x] CI/CD 면접 질문 세트 생성
 - [x] CI/CD 개인 답변 노트 생성
 - [x] CI/CD 개인 답변 1차 작성
-- [ ] CI/CD 답변 노트 1회 소리 내어 복습
+- [x] CI/CD 답변 노트 1회 소리 내어 복습
 - [x] frontmatter validation 면접 질문 세트 생성
 - [x] frontmatter validation 개인 답변 노트 생성
 - [x] frontmatter validation 개인 답변 1차 작성
