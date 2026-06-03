@@ -9,6 +9,7 @@ import { isIgnoredByGit } from "./blog-ops/ignore-rules.mjs";
 import { buildLearningState, createLearningAgentPrompt, hasQuestionSet } from "./blog-ops/learning-inventory.mjs";
 import { extractSection, readMarkdownFile } from "./blog-ops/markdown.mjs";
 import { buildBlogOpsInventory } from "./blog-ops/posts-inventory.mjs";
+import { hashText, readProgressManifest, resolveProgressState } from "./blog-ops/progress-manifest.mjs";
 import {
   getLearningStatus,
   getPublishStatus,
@@ -284,6 +285,71 @@ test("createLearningAgentPrompt includes paths and does not include private note
   assert.doesNotMatch(prompt, /잘 모르겠다/);
 });
 
+test("readProgressManifest reads private learning state without exposing answer content", () => {
+  const root = makeTempDir();
+  writeJson(path.join(root, ".local", "learning-progress.json"), {
+    "demo/post": {
+      status: "interview-ready",
+      lastReviewedAt: "2026-06-01",
+      nextReviewAt: "2026-06-15",
+      sourceHash: hashText("source"),
+      questionsHash: hashText("questions"),
+      firstAnswer: "이 값은 버려져야 한다",
+      weakConcepts: "이 값도 버려져야 한다",
+      interviewAnswer: "이 값도 버려져야 한다",
+    },
+  });
+
+  const manifest = readProgressManifest({ root });
+  const entry = manifest.entries["demo/post"];
+
+  assert.equal(entry.status, "interview-ready");
+  assert.equal(entry.lastReviewedAt, "2026-06-01");
+  assert.equal(entry.nextReviewAt, "2026-06-15");
+  assert.equal(entry.sourceHash, hashText("source"));
+  assert.equal(Object.hasOwn(entry, "firstAnswer"), false);
+  assert.equal(Object.hasOwn(entry, "weakConcepts"), false);
+  assert.equal(Object.hasOwn(entry, "interviewAnswer"), false);
+});
+
+test("resolveProgressState marks due reviews and stale hashes as needs-revisit", () => {
+  const sourceHash = hashText("old source");
+  const questionsHash = hashText("old questions");
+
+  const due = resolveProgressState({
+    fallbackStatus: "interview-ready",
+    entry: {
+      status: "interview-ready",
+      nextReviewAt: "2026-06-01",
+      sourceHash,
+      questionsHash,
+    },
+    currentSourceHash: sourceHash,
+    currentQuestionsHash: questionsHash,
+    today: "2026-06-03",
+  });
+
+  assert.equal(due.learningStatus, "needs-revisit");
+  assert.equal(due.learningStatusSource, "manifest");
+  assert.equal(due.learningWarnings.some((warning) => warning.code === "review-due"), true);
+
+  const stale = resolveProgressState({
+    fallbackStatus: "interview-ready",
+    entry: {
+      status: "interview-ready",
+      nextReviewAt: "2026-06-17",
+      sourceHash,
+      questionsHash,
+    },
+    currentSourceHash: hashText("new source"),
+    currentQuestionsHash: questionsHash,
+    today: "2026-06-03",
+  });
+
+  assert.equal(stale.learningStatus, "needs-revisit");
+  assert.equal(stale.learningWarnings.some((warning) => warning.code === "source-stale"), true);
+});
+
 function writeJson(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, "utf8");
@@ -385,6 +451,124 @@ sources:
   assert.equal(Object.hasOwn(post, "privateBody"), false);
   assert.equal(Object.hasOwn(post, "sourceBody"), false);
   assert.equal(Object.hasOwn(post, "publishedBody"), false);
+});
+
+test("buildBlogOpsInventory applies progress manifest without exposing source or private bodies", () => {
+  const root = makeTempDir();
+  const sourceDir = path.join(root, "external", "demo", "docs", "blog");
+  const contentDir = path.join(root, "src", "content", "blog");
+  fs.writeFileSync(
+    path.join(root, "posts.config.yml"),
+    `site:
+  type: astro
+  contentDir: src/content/blog
+sources:
+  - project: demo
+    label: Demo
+    path: external/demo/docs/blog
+    include:
+      - "*.md"
+    exclude: []
+`,
+    "utf8",
+  );
+  writeJson(path.join(root, "src", "data", "projects.json"), [{ slug: "demo", name: "Demo" }]);
+  writeJson(path.join(root, "src", "data", "tags.json"), ["Backend"]);
+  fs.writeFileSync(path.join(root, ".gitignore"), "docs/interview-notes/private/\n.local/\n", "utf8");
+
+  const body = `## 면접에서 설명할 수 있어야 할 질문
+
+- 왜 만들었나요?
+- 무엇을 검증했나요?
+- 어떤 한계가 있나요?
+`;
+  writePost(
+    path.join(sourceDir, "2026-06-03-post.md"),
+    {
+      title: "Demo Post",
+      date: "2026-06-03",
+      type: "deep-dive",
+      project: "demo",
+      tags: ["Backend"],
+      summary: "summary",
+      draft: false,
+      featured: false,
+    },
+    body,
+  );
+  writePost(
+    path.join(contentDir, "demo", "2026-06-03-post.md"),
+    {
+      title: "Demo Post",
+      date: "2026-06-03",
+      type: "deep-dive",
+      project: "demo",
+      tags: ["Backend"],
+      summary: "summary",
+      draft: false,
+      featured: false,
+    },
+    body,
+  );
+  fs.mkdirSync(path.join(root, "docs", "interview-notes", "private", "demo"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "docs", "interview-notes", "private", "demo", "2026-06-03-post.md"),
+    "## 첫 답변\n\n개인 답변",
+    "utf8",
+  );
+  writeJson(path.join(root, ".local", "learning-progress.json"), {
+    "demo/2026-06-03-post": {
+      status: "reviewed",
+      lastReviewedAt: "2026-05-20",
+      nextReviewAt: "2026-06-01",
+      sourceHash: hashText(body),
+      questionsHash: hashText(extractSection(body, "면접에서 설명할 수 있어야 할 질문")),
+      interviewAnswer: "API에 나오면 안 된다",
+    },
+  });
+
+  const inventory = buildBlogOpsInventory({
+    root,
+    env: { HOME: "/Users/tester", BLOG_OPS_TODAY: "2026-06-03" },
+  });
+  const post = inventory.posts.find((item) => item.id === "demo/2026-06-03-post");
+
+  assert.equal(post.learningStatus, "needs-revisit");
+  assert.equal(post.learningStatusSource, "manifest");
+  assert.equal(post.hasProgressManifest, true);
+  assert.equal(post.lastReviewedAt, "2026-05-20");
+  assert.equal(post.nextReviewAt, "2026-06-01");
+  assert.equal(post.learningWarnings.some((warning) => warning.code === "review-due"), true);
+  assert.equal(Object.hasOwn(post, "privateBody"), false);
+  assert.equal(Object.hasOwn(post, "sourceBody"), false);
+  assert.equal(Object.hasOwn(post, "publishedBody"), false);
+  assert.equal(JSON.stringify(post).includes("API에 나오면 안 된다"), false);
+});
+
+test("buildBlogOpsInventory warns when progress manifest is not ignored", () => {
+  const root = makeTempDir();
+  fs.writeFileSync(
+    path.join(root, "posts.config.yml"),
+    `site:
+  type: astro
+  contentDir: src/content/blog
+sources:
+  - project: demo
+    label: Demo
+    path: external/demo/docs/blog
+    include:
+      - "*.md"
+    exclude: []
+`,
+    "utf8",
+  );
+  writeJson(path.join(root, "src", "data", "projects.json"), [{ slug: "demo", name: "Demo" }]);
+  writeJson(path.join(root, "src", "data", "tags.json"), ["Backend"]);
+  writeJson(path.join(root, ".local", "learning-progress.json"), {});
+
+  const inventory = buildBlogOpsInventory({ root, env: { HOME: "/Users/tester" } });
+
+  assert.equal(inventory.warnings.some((warning) => warning.code === "progress-manifest-not-ignored"), true);
 });
 
 test("buildBlogOpsInventory includes archived notes only when private note has no post", () => {

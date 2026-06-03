@@ -4,7 +4,8 @@ import path from "node:path";
 import { loadBlogOpsConfig } from "./config.mjs";
 import { isIgnoredByGit } from "./ignore-rules.mjs";
 import { buildLearningState, createLearningAgentPrompt } from "./learning-inventory.mjs";
-import { readMarkdownFile } from "./markdown.mjs";
+import { extractSection, readMarkdownFile } from "./markdown.mjs";
+import { hashText, readProgressManifest, resolveProgressState } from "./progress-manifest.mjs";
 import { getPublishStatus, getQuickFixSuggestions, getTagStatus, POST_TYPES } from "./status-rules.mjs";
 
 function matchesInclude(filename, patterns = ["*.md"]) {
@@ -73,7 +74,12 @@ function emptyRecord(project, slug) {
     reviewed: false,
     interviewReady: false,
     needsRevisit: false,
+    hasProgressManifest: false,
+    learningStatusSource: "fallback",
     learningStatus: "not-started",
+    lastReviewedAt: undefined,
+    nextReviewAt: undefined,
+    learningWarnings: [],
     quickFixSuggestions: [],
     warnings: [],
   };
@@ -87,8 +93,21 @@ function upsert(records, project, slug) {
 
 export function buildBlogOpsInventory({ root = process.cwd(), env = process.env } = {}) {
   const config = loadBlogOpsConfig({ root, env });
+  const progressManifest = readProgressManifest({ root });
   const records = new Map();
-  const warnings = [...config.projectWarnings];
+  const warnings = [...config.projectWarnings, ...progressManifest.warnings];
+  if (progressManifest.exists) {
+    const progressIgnored = isIgnoredByGit({
+      root,
+      file: progressManifest.file,
+    });
+    if (!progressIgnored) {
+      warnings.push({
+        code: "progress-manifest-not-ignored",
+        message: `${progressManifest.file} is not ignored by git.`,
+      });
+    }
+  }
   const knownProjects = new Set([
     ...config.sources.map((source) => source.project),
     ...config.projects.map((project) => project.slug),
@@ -183,12 +202,20 @@ export function buildBlogOpsInventory({ root = process.cwd(), env = process.env 
     const privateBody = record.privateNotePath && fs.existsSync(record.privateNotePath)
       ? fs.readFileSync(record.privateNotePath, "utf8")
       : "";
+    const publicBody = record.sourceBody ?? record.publishedBody ?? "";
     const learning = buildLearningState({
-      publicBody: record.sourceBody ?? record.publishedBody ?? "",
+      publicBody,
       privateBody,
       hasPrivateNote: record.hasPrivateNote,
     });
-    Object.assign(record, learning);
+    const progress = resolveProgressState({
+      fallbackStatus: learning.learningStatus,
+      entry: progressManifest.entries[record.id],
+      currentSourceHash: hashText(publicBody),
+      currentQuestionsHash: hashText(extractSection(publicBody, "면접에서 설명할 수 있어야 할 질문")),
+      today: env.BLOG_OPS_TODAY ?? new Date().toISOString().slice(0, 10),
+    });
+    Object.assign(record, learning, progress);
 
     record.publishStatus = getPublishStatus({
       hasSource: Boolean(record.sourcePath),

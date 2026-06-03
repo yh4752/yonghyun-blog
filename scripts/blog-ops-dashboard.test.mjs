@@ -12,6 +12,15 @@ test("renderDashboardHtml includes Content Ops and Learning Ops tabs", () => {
   assert.match(html, /\/api\/inventory/);
 });
 
+test("renderDashboardHtml renders progress manifest learning columns", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /Next Review/);
+  assert.match(html, /Learning Warnings/);
+  assert.match(html, /learningStatusSource/);
+  assert.match(html, /learningWarnings/);
+});
+
 test("createDashboardServer serves inventory without private note content", async () => {
   const server = createDashboardServer({
     inventoryProvider: () => ({

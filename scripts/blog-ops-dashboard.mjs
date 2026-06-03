@@ -175,7 +175,10 @@ export function renderDashboardHtml() {
           .replaceAll("'", "&#39;");
       }
 
-      const statusClass = (value) => value === "interview-ready" ? "ready" : value === "needs-revisit" || value === "invalid" ? "warn" : "";
+      const statusClass = (value) => {
+        const warnValues = ["needs-revisit", "invalid", "review-due", "source-stale", "questions-stale"];
+        return value === "interview-ready" ? "ready" : warnValues.includes(value) ? "warn" : "";
+      };
       const badge = (value) => '<span class="badge ' + statusClass(value) + '">' + escapeHtml(value) + '</span>';
 
       function filteredPosts() {
@@ -189,7 +192,9 @@ export function renderDashboardHtml() {
           ["Pending Sync", posts.filter((post) => post.publishStatus === "pending-sync").length],
           ["Invalid Tags", posts.filter((post) => post.tagStatus === "invalid").length],
           ["Questions", posts.filter((post) => post.hasQuestions).length],
+          ["Manifest", posts.filter((post) => post.hasProgressManifest).length],
           ["Needs Revisit", posts.filter((post) => post.learningStatus === "needs-revisit").length],
+          ["Review Due", posts.filter((post) => (post.learningWarnings || []).some((warning) => warning.code === "review-due")).length],
         ];
         document.querySelector("#overview").innerHTML = metrics.map(([label, value]) =>
           '<div class="metric"><span>' + escapeHtml(label) + '</span><strong>' + value + '</strong></div>'
@@ -219,8 +224,8 @@ export function renderDashboardHtml() {
           return;
         }
 
-        const rows = sortLearning(posts).map((post) => '<tr><td>' + escapeHtml(post.project) + '</td><td>' + escapeHtml(post.title) + '<div class="path">' + escapeHtml(post.privateNotePath || "no private note") + '</div></td><td>' + badge(post.publishStatus) + '</td><td>' + (post.hasQuestions ? "yes" : "no") + '</td><td>' + (post.hasPrivateNote ? "yes" : "no") + '</td><td>' + badge(post.learningStatus) + '</td></tr>').join("");
-        document.querySelector("#table").innerHTML = '<table><thead><tr><th>Project</th><th>Post</th><th>Publish</th><th>Questions</th><th>Private Note</th><th>Learning</th></tr></thead><tbody>' + rows + '</tbody></table>';
+        const rows = sortLearning(posts).map((post) => '<tr><td>' + escapeHtml(post.project) + '</td><td>' + escapeHtml(post.title) + '<div class="path">' + escapeHtml(post.privateNotePath || "no private note") + '</div></td><td>' + badge(post.publishStatus) + '</td><td>' + (post.hasQuestions ? "yes" : "no") + '</td><td>' + (post.hasPrivateNote ? "yes" : "no") + '</td><td>' + badge(post.learningStatus) + '<div class="path">' + escapeHtml(post.learningStatusSource || "fallback") + '</div></td><td>' + escapeHtml(post.nextReviewAt || "-") + '</td><td>' + (post.learningWarnings || []).map((warning) => badge(warning.code || warning)).join(" ") + '</td></tr>').join("");
+        document.querySelector("#table").innerHTML = '<table><thead><tr><th>Project</th><th>Post</th><th>Publish</th><th>Questions</th><th>Private Note</th><th>Learning</th><th>Next Review</th><th>Learning Warnings</th></tr></thead><tbody>' + rows + '</tbody></table>';
       }
 
       function render() {
