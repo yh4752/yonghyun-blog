@@ -6,6 +6,7 @@ import test, { after } from "node:test";
 
 import { expandConfiguredPath, loadBlogOpsConfig } from "./blog-ops/config.mjs";
 import { isIgnoredByGit } from "./blog-ops/ignore-rules.mjs";
+import { buildLearningState, createLearningAgentPrompt, hasQuestionSet } from "./blog-ops/learning-inventory.mjs";
 import { extractSection, readMarkdownFile } from "./blog-ops/markdown.mjs";
 import {
   getLearningStatus,
@@ -221,4 +222,63 @@ test("isIgnoredByGit falls back to .gitignore parsing when git is unavailable", 
   });
 
   assert.equal(ignored, true);
+});
+
+test("hasQuestionSet requires at least three question lines", () => {
+  const body = `## 면접에서 설명할 수 있어야 할 질문
+
+- 왜 CI를 추가했나요?
+- branch protection은 왜 필요한가요?
+- Vercel과 GitHub Actions의 책임은 어떻게 나뉘나요?
+`;
+
+  assert.equal(hasQuestionSet(body), true);
+  assert.equal(hasQuestionSet("## 면접에서 설명할 수 있어야 할 질문\n\n- 하나만?"), false);
+});
+
+test("buildLearningState detects first answers, reviewed notes, and interview answers without exposing content", () => {
+  const publicBody = `## 면접에서 설명할 수 있어야 할 질문
+
+- 왜 도입했나요?
+- 무엇을 검증했나요?
+- 어떤 트레이드오프가 있나요?
+`;
+  const privateBody = `## 첫 답변
+
+잘 모르겠다
+
+## 부족한 개념
+
+CI/CD
+
+## 코드/문서 근거
+
+.github/workflows/ci.yml
+
+## 면접용 30-60초 답변
+
+배포 전에 실패를 알기 위해 GitHub Actions를 추가했습니다.
+`;
+
+  const state = buildLearningState({ publicBody, privateBody, hasPrivateNote: true });
+
+  assert.equal(state.hasQuestions, true);
+  assert.equal(state.hasFirstAnswer, true);
+  assert.equal(state.reviewed, true);
+  assert.equal(state.interviewReady, true);
+  assert.equal(state.learningStatus, "interview-ready");
+  assert.equal(Object.hasOwn(state, "privateBody"), false);
+});
+
+test("createLearningAgentPrompt includes paths and does not include private note content", () => {
+  const prompt = createLearningAgentPrompt({
+    project: "demo",
+    sourcePath: "/tmp/demo/docs/blog/post.md",
+    title: "Demo Post",
+  });
+
+  assert.match(prompt, /sourcePost:/);
+  assert.match(prompt, /\/tmp\/demo\/docs\/blog\/post\.md/);
+  assert.match(prompt, /먼저 완성 답변을 주지 말고/);
+  assert.doesNotMatch(prompt, /잘 모르겠다/);
 });
