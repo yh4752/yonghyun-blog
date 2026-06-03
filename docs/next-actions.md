@@ -16,7 +16,9 @@
 ## 현재 우선순위
 
 - [x] Blog Ops Dashboard 설계 문서 작성
-- [ ] Blog Ops Dashboard 설계 문서 리뷰
+- [x] Blog Ops Dashboard 설계 문서 리뷰
+- [x] Blog Ops Dashboard 구현 계획 작성
+- [ ] Blog Ops Dashboard 구현 계획 리뷰
 - [x] CI/CD 답변 노트 1회 소리 내어 복습
 - [x] Sigak 글 1개를 같은 방식으로 면접 질문 세트화
 - [x] Sigak Flyway 개인 답변 1차 작성
