@@ -21,7 +21,7 @@
 - [x] Blog Ops Dashboard 설계 문서 작성
 - [x] Blog Ops Dashboard 설계 문서 리뷰
 - [x] Blog Ops Dashboard 구현 계획 작성
-- [ ] Blog Ops Dashboard 구현 계획 리뷰
+- [x] Blog Ops Dashboard 구현 계획 리뷰
 - [ ] Learning Ops private progress manifest 초기 생성 흐름 설계
 - [ ] Sigak Flyway 검색/RAG 연결 1회 복습
 - [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
@@ -40,7 +40,7 @@ Blog Ops Dashboard가 구현되기 전까지는 아래 후보만 수동으로 �
 
 - [ ] `.local/learning-progress.json` manifest schema 확정
 - [ ] manifest가 답변 내용을 저장하지 않도록 테스트 fixture 설계
-- [ ] Learning Ops 기본 정렬과 `needs-revisit` 표시 정책을 구현 계획에 반영
+- [x] Learning Ops 기본 정렬과 `needs-revisit` 표시 정책을 구현 계획에 반영
 
 ## 블로그 작성 스킬 목표
 

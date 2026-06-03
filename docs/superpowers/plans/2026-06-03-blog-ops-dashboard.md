@@ -12,8 +12,9 @@
 
 - Git dependency:
   - Prefer `git check-ignore` when `git` is installed and the repository is available.
-  - Fall back to parsing `.gitignore` plus explicit fallback patterns when `git` is missing, the path is outside a Git worktree, or `git check-ignore` exits with an unexpected status.
+  - Fall back to parsing `.gitignore` when `git` is missing, the path is outside a Git worktree, or `git check-ignore` exits with an unexpected status.
   - Treat the fallback as a safety net, not as a full reimplementation of Git ignore semantics. v1 only needs directory and exact-file patterns used by `docs/interview-notes/private/` and `.local/`.
+  - If Git can authoritatively report that a path is not ignored, do not override that result with fallback patterns.
 - Path expansion:
   - Support `~`, `${HOME}`, `$HOME`, `${USERPROFILE}`, and `%USERPROFILE%`.
   - Support generic `${VAR}` and `$VAR` expansion only when the variable exists in the provided environment.
@@ -671,7 +672,6 @@ test("isIgnoredByGit returns true when a path is ignored", () => {
   const ignored = isIgnoredByGit({
     root,
     file: path.join(root, "private", "note.md"),
-    fallbackPatterns: ["private/"],
   });
 
   assert.equal(ignored, true);
@@ -685,7 +685,6 @@ test("isIgnoredByGit returns false when no ignore rule matches", () => {
   const ignored = isIgnoredByGit({
     root,
     file: path.join(root, "docs", "interview-notes", "private", "note.md"),
-    fallbackPatterns: ["docs/interview-notes/private/"],
   });
 
   assert.equal(ignored, false);
@@ -698,7 +697,6 @@ test("isIgnoredByGit falls back to .gitignore parsing when git is unavailable", 
   const ignored = isIgnoredByGit({
     root,
     file: path.join(root, "docs", "interview-notes", "private", "note.md"),
-    fallbackPatterns: [],
     gitCommand: "missing-git-command-for-test",
   });
 
@@ -712,7 +710,6 @@ test("isIgnoredByGit treats .local progress manifest as private when ignored", (
   const ignored = isIgnoredByGit({
     root,
     file: path.join(root, ".local", "learning-progress.json"),
-    fallbackPatterns: [],
     gitCommand: "missing-git-command-for-test",
   });
 
@@ -762,7 +759,7 @@ function readGitignorePatterns(root) {
     .filter((line) => line && !line.startsWith("#"));
 }
 
-export function isIgnoredByGit({ root, file, fallbackPatterns = [], gitCommand = "git" }) {
+export function isIgnoredByGit({ root, file, gitCommand = "git" }) {
   const result = spawnSync(gitCommand, ["check-ignore", "-q", file], {
     cwd: root,
     stdio: "ignore",
@@ -770,9 +767,9 @@ export function isIgnoredByGit({ root, file, fallbackPatterns = [], gitCommand =
 
   if (result.status === 0) return true;
   const patterns = readGitignorePatterns(root);
-  if (result.status === 1) return fallbackMatch({ root, file, patterns });
+  if (result.status === 1) return false;
   if (patterns.length > 0) return fallbackMatch({ root, file, patterns });
-  return fallbackMatch({ root, file, patterns: fallbackPatterns });
+  return false;
 }
 ```
 
@@ -1457,7 +1454,6 @@ export function buildBlogOpsInventory({ root = process.cwd(), env = process.env 
   const progressIgnored = isIgnoredByGit({
     root,
     file: progressManifest.file,
-    fallbackPatterns: [".local/"],
   });
   if (!progressIgnored) {
     warnings.push({
@@ -1526,7 +1522,6 @@ export function buildBlogOpsInventory({ root = process.cwd(), env = process.env 
     const ignored = isIgnoredByGit({
       root,
       file: note.file,
-      fallbackPatterns: ["docs/interview-notes/private/"],
     });
     record.privateNotePath = note.file;
     record.hasPrivateNote = true;
