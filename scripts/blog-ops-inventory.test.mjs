@@ -8,6 +8,7 @@ import { expandConfiguredPath, loadBlogOpsConfig } from "./blog-ops/config.mjs";
 import { isIgnoredByGit } from "./blog-ops/ignore-rules.mjs";
 import { buildLearningState, createLearningAgentPrompt, hasQuestionSet } from "./blog-ops/learning-inventory.mjs";
 import { extractSection, readMarkdownFile } from "./blog-ops/markdown.mjs";
+import { buildBlogOpsInventory } from "./blog-ops/posts-inventory.mjs";
 import {
   getLearningStatus,
   getPublishStatus,
@@ -281,4 +282,169 @@ test("createLearningAgentPrompt includes paths and does not include private note
   assert.match(prompt, /\/tmp\/demo\/docs\/blog\/post\.md/);
   assert.match(prompt, /먼저 완성 답변을 주지 말고/);
   assert.doesNotMatch(prompt, /잘 모르겠다/);
+});
+
+function writeJson(file, value) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function writePost(file, frontmatter, body = "") {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    `---
+${Object.entries(frontmatter)
+  .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+  .join("\n")}
+---
+
+${body}`,
+    "utf8",
+  );
+}
+
+test("buildBlogOpsInventory combines source, published, and private note state", () => {
+  const root = makeTempDir();
+  const sourceDir = path.join(root, "external", "demo", "docs", "blog");
+  const contentDir = path.join(root, "src", "content", "blog");
+  fs.writeFileSync(
+    path.join(root, "posts.config.yml"),
+    `site:
+  type: astro
+  contentDir: src/content/blog
+sources:
+  - project: demo
+    label: Demo
+    path: external/demo/docs/blog
+    include:
+      - "*.md"
+    exclude:
+      - README.md
+`,
+    "utf8",
+  );
+  writeJson(path.join(root, "src", "data", "projects.json"), [{ slug: "demo", name: "Demo" }]);
+  writeJson(path.join(root, "src", "data", "tags.json"), ["Backend", "PostgreSQL"]);
+  fs.writeFileSync(path.join(root, ".gitignore"), "docs/interview-notes/private/\n", "utf8");
+
+  writePost(
+    path.join(sourceDir, "2026-06-03-post.md"),
+    {
+      title: "Demo Post",
+      date: "2026-06-03",
+      type: "deep-dive",
+      project: "demo",
+      tags: ["backend", "postgres"],
+      summary: "",
+      draft: false,
+    },
+    `## 면접에서 설명할 수 있어야 할 질문
+
+- 왜 했나요?
+- 무엇을 검증했나요?
+- 어떤 비용이 있나요?
+`,
+  );
+  writePost(
+    path.join(contentDir, "demo", "2026-06-03-post.md"),
+    {
+      title: "Demo Post",
+      date: "2026-06-03",
+      type: "deep-dive",
+      project: "demo",
+      tags: ["Backend"],
+      summary: "published",
+      draft: false,
+    },
+    "",
+  );
+  fs.mkdirSync(path.join(root, "docs", "interview-notes", "private", "demo"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "docs", "interview-notes", "private", "demo", "2026-06-03-post.md"),
+    `## 첫 답변
+
+잘 모르겠다
+`,
+    "utf8",
+  );
+
+  const inventory = buildBlogOpsInventory({ root, env: { HOME: "/Users/tester" } });
+  const post = inventory.posts.find((item) => item.id === "demo/2026-06-03-post");
+
+  assert.equal(post.publishStatus, "published");
+  assert.equal(post.hasQuestions, true);
+  assert.equal(post.hasPrivateNote, true);
+  assert.equal(post.learningStatus, "needs-revisit");
+  assert.equal(post.tagStatus, "invalid");
+  assert.deepEqual(post.tagSuggestions, [
+    { tag: "backend", suggestion: "Backend" },
+    { tag: "postgres", suggestion: "PostgreSQL" },
+  ]);
+  assert.equal(post.quickFixSuggestions.some((item) => item.code === "missing-summary"), true);
+  assert.equal(Object.hasOwn(post, "privateBody"), false);
+  assert.equal(Object.hasOwn(post, "sourceBody"), false);
+  assert.equal(Object.hasOwn(post, "publishedBody"), false);
+});
+
+test("buildBlogOpsInventory includes archived notes only when private note has no post", () => {
+  const root = makeTempDir();
+  fs.writeFileSync(
+    path.join(root, "posts.config.yml"),
+    `site:
+  type: astro
+  contentDir: src/content/blog
+sources:
+  - project: demo
+    label: Demo
+    path: external/demo/docs/blog
+    include:
+      - "*.md"
+    exclude: []
+`,
+    "utf8",
+  );
+  writeJson(path.join(root, "src", "data", "projects.json"), [{ slug: "demo", name: "Demo" }]);
+  writeJson(path.join(root, "src", "data", "tags.json"), ["Backend"]);
+  fs.writeFileSync(path.join(root, ".gitignore"), "docs/interview-notes/private/\n", "utf8");
+  fs.mkdirSync(path.join(root, "docs", "interview-notes", "private", "demo"), { recursive: true });
+  fs.writeFileSync(path.join(root, "docs", "interview-notes", "private", "demo", "old-post.md"), "## 첫 답변\n\n기록", "utf8");
+
+  const inventory = buildBlogOpsInventory({ root, env: { HOME: "/Users/tester" } });
+  const archived = inventory.posts.find((item) => item.id === "demo/old-post");
+
+  assert.equal(archived.publishStatus, "archived-note");
+  assert.equal(archived.sourcePath, null);
+  assert.equal(archived.publishedPath, null);
+  assert.equal(archived.hasPrivateNote, true);
+  assert.equal(archived.tagStatus, "not-applicable");
+  assert.equal(Object.hasOwn(archived, "privateBody"), false);
+});
+
+test("buildBlogOpsInventory warns when private notes are not ignored", () => {
+  const root = makeTempDir();
+  fs.writeFileSync(
+    path.join(root, "posts.config.yml"),
+    `site:
+  type: astro
+  contentDir: src/content/blog
+sources:
+  - project: demo
+    label: Demo
+    path: external/demo/docs/blog
+    include:
+      - "*.md"
+    exclude: []
+`,
+    "utf8",
+  );
+  writeJson(path.join(root, "src", "data", "projects.json"), [{ slug: "demo", name: "Demo" }]);
+  writeJson(path.join(root, "src", "data", "tags.json"), ["Backend"]);
+  fs.mkdirSync(path.join(root, "docs", "interview-notes", "private", "demo"), { recursive: true });
+  fs.writeFileSync(path.join(root, "docs", "interview-notes", "private", "demo", "unsafe.md"), "## 첫 답변\n\n기록", "utf8");
+
+  const inventory = buildBlogOpsInventory({ root, env: { HOME: "/Users/tester" } });
+  const post = inventory.posts.find((item) => item.id === "demo/unsafe");
+
+  assert.equal(post.warnings.some((warning) => warning.code === "private-note-not-ignored"), true);
 });
