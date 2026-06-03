@@ -44,6 +44,8 @@ v1은 read-only inventory를 만든다.
 - draft, published, pending-sync, orphan-published, archived-note 상태 표시
 - tag 허용 목록과 글 tag 비교
 - frontmatter 오류 후보 표시
+- frontmatter quick fix suggestion 표시
+- invalid tag correction suggestion 표시
 - Learning Ops 상태 표시
 - 질문 세트와 개인 답변 노트 존재 여부 표시
 - 선택한 글을 학습/면접 에이전트로 넘길 프롬프트 생성
@@ -58,6 +60,7 @@ v1은 read-only inventory를 만든다.
 - DB 기반 CMS 도입
 - 자동 PR 생성
 - 자동 면접 답변 작성
+- v1 quick fix suggestion 자동 적용
 
 ## 설계 선택지
 
@@ -153,6 +156,7 @@ scripts/blog-ops/
   ├─ learning-inventory.mjs
   ├─ status-rules.mjs
   ├─ git-status.mjs
+  ├─ ignore-rules.mjs
   └─ command-runner.mjs
 ```
 
@@ -196,7 +200,7 @@ slug는 frontmatter의 `slug`가 있으면 그 값을 쓰고, 없으면 파일�
 - `needs-revisit` 후보 계산
 - agent prompt 생성에 필요한 값 제공
 
-상세 규칙은 [Learning Ops Dashboard](../../learning-ops-dashboard.md)를 따른다.
+상세 규칙은 [Learning Ops Dashboard](../../../learning-ops-dashboard.md)를 따른다.
 
 ### `status-rules.mjs`
 
@@ -217,6 +221,25 @@ publish status:
 | `orphan-published` | published post는 있지만 source post가 없다 |
 | `archived-note` | source/published post는 없지만 private note만 있다 |
 
+`archived-note`는 학습 기록을 보존하기 위한 상태다.
+
+발생 예시:
+
+- 공개 글을 삭제했지만, 과거 면접 대비 답변 노트는 남겨두고 싶은 경우
+- source post를 다른 글로 합쳤지만, 이전 글에 대한 첫 답변이나 복습 메모가 남아 있는 경우
+- 실험 글을 공개 목록에서 제외했지만, 배운 개념은 나중에 다시 보고 싶은 경우
+
+처리 정책:
+
+- 기본 Content Ops 목록에는 표시하지 않는다.
+- Learning Ops의 `Archived learning notes` 필터에서만 표시한다.
+- publish status는 `archived-note`로 표시한다.
+- source path와 published path는 `missing`으로 표시한다.
+- private note path와 마지막 수정일만 보여준다.
+- private note 내용은 표시하지 않는다.
+- v1에서는 삭제 버튼을 제공하지 않는다.
+- future phase에서 "archive note cleanup"을 만들더라도 기본 동작은 삭제가 아니라 파일 경로 안내로 둔다.
+
 ### `git-status.mjs`
 
 역할:
@@ -228,6 +251,23 @@ publish status:
 - PR assistant에서 커밋 경계 판단에 사용할 데이터 제공
 
 v1에서는 화면 표시만 한다.
+
+### `ignore-rules.mjs`
+
+역할:
+
+- `.gitignore`를 읽는다.
+- `docs/interview-notes/private/`가 ignore되는지 확인한다.
+- future manifest 경로인 `.local/`이 ignore되는지 확인한다.
+- private note path가 ignore 규칙 안에 있는지 확인한다.
+
+v1에서는 복잡한 gitignore 전체 문법을 직접 재구현하지 않는다. Node에서 아래 명령을 read-only로 호출해 판정한다.
+
+```bash
+git check-ignore -q <path>
+```
+
+판정 실패 시 `private-note-not-ignored` 또는 `local-progress-not-ignored` warning을 표시한다.
 
 ### `command-runner.mjs`
 
@@ -241,6 +281,7 @@ v1 허용 후보:
 
 ```txt
 git status --short --branch
+git check-ignore -q <path>
 npm run validate:posts -- --source --project <project>
 npm run validate:posts
 ```
@@ -297,9 +338,11 @@ Dashboard API는 위 데이터를 합쳐 `inventory`를 만든다.
   "draft": false,
   "tags": ["Backend", "PostgreSQL", "Flyway", "Testing"],
   "tagStatus": "valid",
+  "tagSuggestions": [],
   "hasQuestions": true,
   "hasPrivateNote": true,
   "hasFirstAnswer": true,
+  "quickFixSuggestions": [],
   "warnings": []
 }
 ```
@@ -336,6 +379,13 @@ private note의 내용은 API 응답에 넣지 않는다. v1에서는 경로와 
 4. draft
 5. published
 
+Content Ops의 기본 필터:
+
+- project: all
+- publish status: all except `archived-note`
+- validation: warnings first
+- sort: action required first
+
 컬럼:
 
 - project
@@ -348,12 +398,28 @@ private note의 내용은 API 응답에 넣지 않는다. v1에서는 경로와 
 - source
 - published
 - warnings
+- quick fix suggestions
 
 ### 3. Learning Ops Table
 
 학습/면접 상태를 보여준다.
 
-정렬과 상태 규칙은 [Learning Ops Dashboard](../../learning-ops-dashboard.md)를 따른다.
+정렬과 상태 규칙은 [Learning Ops Dashboard](../../../learning-ops-dashboard.md)를 따른다.
+
+Learning Ops 대상:
+
+- `published` 글은 기본 대상이다.
+- `draft` 글도 표시한다. 단, `Draft` badge를 붙이고 공개 대표 글 후보로 보지 않는다.
+- `pending-sync` 글도 표시한다. 학습은 가능하지만 `published copy missing` warning을 함께 보여준다.
+- `orphan-published` 글은 학습 상태를 계산하되, source가 없어 원본 수정이 불가능하다는 warning을 보여준다.
+- `archived-note`는 기본 목록에서 숨기고 `Archived learning notes` 필터에서만 보여준다.
+
+Learning Ops의 기본 필터:
+
+- project: all
+- publish status: `published`, `pending-sync`, `draft`
+- learning status: all
+- sort: learning action required first
 
 컬럼:
 
@@ -366,7 +432,35 @@ private note의 내용은 API 응답에 넣지 않는다. v1에서는 경로와 
 - learning status
 - next action
 
-### 4. Post Detail Panel
+### 4. Shared Filter Bar
+
+Content Ops와 Learning Ops는 같은 post inventory를 사용하지만, 기본 필터와 정렬은 다르게 둔다.
+
+공통 필터:
+
+- project
+- type
+- tag
+- publish status
+
+Content Ops 전용 필터:
+
+- has validation warning
+- has invalid tag
+- has frontmatter error
+- has pending sync
+
+Learning Ops 전용 필터:
+
+- has questions
+- has private note
+- learning status
+- needs revisit
+- archived learning notes
+
+탭을 전환해도 `project`, `type`, `tag` 필터는 유지한다. 하지만 정렬은 탭별 기본값으로 돌아간다. 이렇게 하면 같은 프로젝트를 보면서도 Content Ops와 Learning Ops의 우선순위를 다르게 볼 수 있다.
+
+### 5. Post Detail Panel
 
 글 하나를 선택했을 때 보여준다.
 
@@ -375,12 +469,14 @@ private note의 내용은 API 응답에 넣지 않는다. v1에서는 경로와 
 - private note path
 - current frontmatter
 - warnings
+- quick fix suggestions
+- tag suggestions
 - suggested commands
 - learning agent prompt
 
 private note content는 보여주지 않는다.
 
-### 5. Command Copy Panel
+### 6. Command Copy Panel
 
 v1에서는 명령 실행 대신 복사 가능한 명령을 제공한다.
 
@@ -428,6 +524,26 @@ npm run build
 - title은 파일명 fallback을 사용한다.
 - mutating action은 future phase에서도 막는다.
 
+### frontmatter quick fix suggestion
+
+v1은 파일을 수정하지 않지만, 간단한 오류에는 수정 제안을 보여준다.
+
+제안 후보:
+
+| 오류 | 제안 |
+| --- | --- |
+| `summary` 없음 | "80-160자 summary를 작성하세요" |
+| `tags` 빈 배열 | allowed tags 목록에서 1개 이상 선택하라고 안내 |
+| `draft` 누락 | `draft: true` 추가 제안 |
+| `featured` 누락 | `featured: false` 추가 제안 |
+| `date` 형식 오류 | `YYYY-MM-DD` 형식 예시 표시 |
+| `type` 오류 | 허용 type 목록 표시 |
+| `project` 오류 | `posts.config.yml`과 `projects.json`의 project slug 목록 표시 |
+
+v1 UI는 suggestion text와 관련 파일 경로만 보여준다. 실제 수정은 사용자가 에디터에서 한다.
+
+future Safe Frontmatter Editing phase에서만 suggestion을 patch로 적용한다.
+
 ### invalid tags
 
 처리:
@@ -437,6 +553,25 @@ npm run build
 - "기존 tag로 바꿀지, 새 tag로 도입할지 결정해야 한다"는 문구를 표시한다.
 - 자동으로 tag allow-list에 추가하지 않는다.
 
+### tag suggestion
+
+v1은 invalid tag를 자동 수정하지 않는다. 대신 추천 후보를 보여준다.
+
+추천 규칙:
+
+- 대소문자만 다른 경우 기존 tag를 추천한다.
+  - `backend` -> `Backend`
+- 공백, 하이픈, 언더스코어 차이만 있는 경우 기존 tag를 추천한다.
+  - `vector-search` -> `Vector Search`
+- 잘 알려진 alias는 문서화된 alias map으로 추천한다.
+  - `postgres` -> `PostgreSQL`
+  - `elastic` -> `Elasticsearch`
+- 추천 후보가 없으면 "새 tag 도입 여부를 검토"로 표시한다.
+
+alias map은 v1에서는 코드 상수로 시작한다. 오픈소스화 전에 설정 파일로 분리한다.
+
+자동 allow-list 추가는 하지 않는다. tag 정책 변경은 여전히 사람이 결정한다.
+
 ### private note 접근
 
 처리:
@@ -444,6 +579,13 @@ npm run build
 - private note 경로가 `.gitignore` 아래인지 확인한다.
 - ignored path가 아니면 `private-note-not-ignored` warning을 표시한다.
 - private note 내용은 API 응답과 화면에 넣지 않는다.
+
+검증 방식:
+
+- private note 파일이 있으면 `git check-ignore -q <private-note-path>`를 실행한다.
+- private note 파일이 아직 없으면 `docs/interview-notes/private/` 디렉터리를 대상으로 검사한다.
+- `.local/learning-progress.json`을 쓰기 시작하면 `.local/`도 같은 방식으로 검사한다.
+- 검사 실패는 warning으로 표시하고, v1에서는 자동으로 `.gitignore`를 수정하지 않는다.
 
 ### git dirty state
 
@@ -533,11 +675,15 @@ PR assistant는 git 작업을 도와준다.
 - `draft: true` source post를 `draft`로 표시한다.
 - `draft: false` source post without published post를 `pending-sync`로 표시한다.
 - published-only post를 `orphan-published`로 표시한다.
+- private-note-only fixture를 `archived-note`로 표시한다.
 - invalid tag를 warning으로 표시한다.
+- invalid tag suggestion이 대소문자, separator, alias를 처리한다.
+- frontmatter quick fix suggestion을 fixture별로 생성한다.
 - 질문 세트가 3개 이상이면 `questions-ready`로 표시한다.
 - private note 존재 여부만 표시하고 내용을 반환하지 않는다.
 - learning status 우선순위를 적용한다.
-- private note path가 `.gitignore`에 포함되어 있는지 확인한다.
+- private note path가 `git check-ignore` 결과로 안전하게 판정되는지 확인한다.
+- Content Ops와 Learning Ops가 같은 project filter를 공유하되 탭별 정렬을 유지한다.
 
 ### 검증 명령
 
