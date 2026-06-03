@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
 
+import { expandConfiguredPath, loadBlogOpsConfig } from "./blog-ops/config.mjs";
 import { extractSection, readMarkdownFile } from "./blog-ops/markdown.mjs";
 
 const tempDirs = [];
@@ -68,4 +69,55 @@ test("extractSection returns a final section when no next heading exists", () =>
 `;
 
   assert.equal(extractSection(body, "첫 답변"), "잘 모르겠다");
+});
+
+test("loadBlogOpsConfig reads sources, projects, tags, and expands paths", () => {
+  const root = makeTempDir();
+  fs.mkdirSync(path.join(root, "src", "data"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "posts.config.yml"),
+    `site:
+  type: astro
+  contentDir: src/content/blog
+sources:
+  - project: demo
+    label: Demo
+    path: ${"${HOME}"}/demo/docs/blog
+    include:
+      - "*.md"
+    exclude:
+      - README.md
+`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(root, "src", "data", "projects.json"),
+    JSON.stringify([{ slug: "demo", name: "Demo" }]),
+    "utf8",
+  );
+  fs.writeFileSync(path.join(root, "src", "data", "tags.json"), JSON.stringify(["Backend"]), "utf8");
+
+  const config = loadBlogOpsConfig({ root, env: { HOME: "/Users/tester" } });
+
+  assert.equal(config.contentDir, path.join(root, "src/content/blog"));
+  assert.equal(config.sources[0].project, "demo");
+  assert.equal(config.sources[0].expandedPath, "/Users/tester/demo/docs/blog");
+  assert.deepEqual([...config.allowedTags], ["Backend"]);
+  assert.deepEqual(config.projectWarnings, []);
+});
+
+test("expandConfiguredPath supports portable environment variables and relative paths", () => {
+  const root = makeTempDir();
+  const env = {
+    HOME: "/Users/tester",
+    USERPROFILE: "C:/Users/tester",
+    BLOG_ROOT: "workspace/blog-source",
+  };
+
+  assert.equal(expandConfiguredPath("~/docs/blog", { root, env }), "/Users/tester/docs/blog");
+  assert.equal(expandConfiguredPath("$HOME/docs/blog", { root, env }), "/Users/tester/docs/blog");
+  assert.equal(expandConfiguredPath("${BLOG_ROOT}/docs/blog", { root, env }), path.join(root, "workspace/blog-source/docs/blog"));
+  assert.equal(expandConfiguredPath("%USERPROFILE%/docs/blog", { root, env }), path.normalize("C:/Users/tester/docs/blog"));
+  assert.equal(expandConfiguredPath("docs/blog", { root, env }), path.join(root, "docs/blog"));
+  assert.throws(() => expandConfiguredPath("${MISSING}/docs/blog", { root, env }), /Unknown environment variable/);
 });
