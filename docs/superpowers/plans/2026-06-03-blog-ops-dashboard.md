@@ -13,7 +13,7 @@
 - Git dependency:
   - Prefer `git check-ignore` when `git` is installed and the repository is available.
   - Fall back to parsing `.gitignore` plus explicit fallback patterns when `git` is missing, the path is outside a Git worktree, or `git check-ignore` exits with an unexpected status.
-  - Treat the fallback as a safety net, not as a full reimplementation of Git ignore semantics. v1 only needs directory and exact-file patterns used by `docs/interview-notes/private/`.
+  - Treat the fallback as a safety net, not as a full reimplementation of Git ignore semantics. v1 only needs directory and exact-file patterns used by `docs/interview-notes/private/` and `.local/`.
 - Path expansion:
   - Support `~`, `${HOME}`, `$HOME`, `${USERPROFILE}`, and `%USERPROFILE%`.
   - Support generic `${VAR}` and `$VAR` expansion only when the variable exists in the provided environment.
@@ -25,7 +25,8 @@
   - Do not create temp fixtures under the repository root.
 - v1 extension boundary:
   - Inventory modules return state, warnings, quick fixes, and suggested commands only.
-  - No module writes blog posts, private notes, config, or git state in v1.
+  - No module writes blog posts, private notes, progress manifest, config, or git state in v1.
+  - v1 reads `.local/learning-progress.json` when it exists. Creating or editing that manifest belongs to a later explicit action module.
   - Future CRUD/PR support should add explicit action modules that consume the same inventory records instead of mixing mutations into scanners.
   - Stable record IDs use `project/slug` so future sync, edit, and PR flows can reuse the same identity.
 
@@ -34,6 +35,10 @@
 - `archived-note` means a private interview note exists but no matching source post or published post exists. This usually happens when a post was renamed, deleted, or intentionally retired while the private learning note remains.
 - `archived-note` appears in Content Ops as low-priority cleanup context. It is excluded from Learning Ops progression because there is no active article to study against.
 - `needs-revisit` overrides every other learning state. It means the post changed, the note is stale, or the user explicitly marked the material for another pass.
+- Manifest state wins over file-derived state when `.local/learning-progress.json` has an entry for the post.
+- If `nextReviewAt` is today or earlier, the effective learning state is `needs-revisit`.
+- If the manifest `sourceHash` or `questionsHash` no longer matches the current post, the effective learning state is `needs-revisit` and the record includes a stale warning.
+- The manifest stores only state metadata: status, review dates, and hashes. It must never store first answers, weak concepts, interview answers, or personal notes.
 - Learning state derivation order is: `needs-revisit` -> `interview-ready` -> `reviewed` -> `first-answer-written` -> `questions-ready` -> `not-started`.
 - Learning Ops sorting is action-oriented, not purely chronological: `needs-revisit`, `questions-ready`, `first-answer-written`, `reviewed`, `not-started`, then `interview-ready`.
 - Draft posts can appear in the inventory, but v1 should show their publish status clearly so the user does not mistake draft learning work for published portfolio content.
@@ -60,6 +65,8 @@ Create:
   - Calculate publish status, tag suggestions, quick fix suggestions, and learning status priority.
 - `scripts/blog-ops/ignore-rules.mjs`
   - Use `git check-ignore` to verify private paths are ignored, with `.gitignore` fallback when Git is unavailable.
+- `scripts/blog-ops/progress-manifest.mjs`
+  - Read `.local/learning-progress.json`, sanitize metadata, detect review due dates, and warn about stale hashes.
 - `scripts/blog-ops/learning-inventory.mjs`
   - Calculate question set, private note existence, first answer, reviewed, interview-ready, and agent prompt.
 - `scripts/blog-ops/posts-inventory.mjs`
@@ -82,6 +89,7 @@ Do not modify:
 
 - `src/content/blog/**` in this plan.
 - `docs/interview-notes/private/**` in this plan.
+- `.local/learning-progress.json` in this plan.
 - Production Astro routes.
 
 ---
@@ -685,11 +693,25 @@ test("isIgnoredByGit returns false when no ignore rule matches", () => {
 
 test("isIgnoredByGit falls back to .gitignore parsing when git is unavailable", () => {
   const root = makeTempDir();
-  fs.writeFileSync(path.join(root, ".gitignore"), "docs/interview-notes/private/\n", "utf8");
+  fs.writeFileSync(path.join(root, ".gitignore"), "docs/interview-notes/private/\n.local/\n", "utf8");
 
   const ignored = isIgnoredByGit({
     root,
     file: path.join(root, "docs", "interview-notes", "private", "note.md"),
+    fallbackPatterns: [],
+    gitCommand: "missing-git-command-for-test",
+  });
+
+  assert.equal(ignored, true);
+});
+
+test("isIgnoredByGit treats .local progress manifest as private when ignored", () => {
+  const root = makeTempDir();
+  fs.writeFileSync(path.join(root, ".gitignore"), ".local/\n", "utf8");
+
+  const ignored = isIgnoredByGit({
+    root,
+    file: path.join(root, ".local", "learning-progress.json"),
     fallbackPatterns: [],
     gitCommand: "missing-git-command-for-test",
   });
@@ -730,6 +752,16 @@ function fallbackMatch({ root, file, patterns }) {
   });
 }
 
+function readGitignorePatterns(root) {
+  const gitignore = path.join(root, ".gitignore");
+  if (!fs.existsSync(gitignore)) return [];
+  return fs
+    .readFileSync(gitignore, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+}
+
 export function isIgnoredByGit({ root, file, fallbackPatterns = [], gitCommand = "git" }) {
   const result = spawnSync(gitCommand, ["check-ignore", "-q", file], {
     cwd: root,
@@ -737,18 +769,10 @@ export function isIgnoredByGit({ root, file, fallbackPatterns = [], gitCommand =
   });
 
   if (result.status === 0) return true;
-  if (result.status === 1) return fallbackMatch({ root, file, patterns: fallbackPatterns });
-
-  const gitignore = path.join(root, ".gitignore");
-  if (!fs.existsSync(gitignore)) return fallbackMatch({ root, file, patterns: fallbackPatterns });
-
-  const patterns = fs
-    .readFileSync(gitignore, "utf8")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"));
-
-  return fallbackMatch({ root, file, patterns: [...patterns, ...fallbackPatterns] });
+  const patterns = readGitignorePatterns(root);
+  if (result.status === 1) return fallbackMatch({ root, file, patterns });
+  if (patterns.length > 0) return fallbackMatch({ root, file, patterns });
+  return fallbackMatch({ root, file, patterns: fallbackPatterns });
 }
 ```
 
@@ -766,7 +790,215 @@ Expected: PASS through ignore safety tests.
 
 ```bash
 git add scripts/blog-ops/ignore-rules.mjs scripts/blog-ops-inventory.test.mjs
-git commit -m "feat: verify private note ignore rules"
+git commit -m "feat: verify private blog ops paths"
+```
+
+---
+
+### Task 4.5: Progress Manifest Reader
+
+**Files:**
+- Create: `scripts/blog-ops/progress-manifest.mjs`
+- Modify: `scripts/blog-ops-inventory.test.mjs`
+
+- [ ] **Step 1: Add failing progress manifest tests**
+
+Append:
+
+```js
+import { hashText, readProgressManifest, resolveProgressState } from "./blog-ops/progress-manifest.mjs";
+
+test("readProgressManifest reads private learning state without exposing answer content", () => {
+  const root = makeTempDir();
+  fs.mkdirSync(path.join(root, ".local"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, ".local", "learning-progress.json"),
+    JSON.stringify({
+      "demo/post": {
+        status: "interview-ready",
+        lastReviewedAt: "2026-06-01",
+        nextReviewAt: "2026-06-17",
+        sourceHash: "sha256:source",
+        questionsHash: "sha256:questions",
+        interviewAnswer: "이 값은 무시되어야 한다"
+      }
+    }),
+    "utf8",
+  );
+
+  const manifest = readProgressManifest({ root });
+  const entry = manifest.entries["demo/post"];
+
+  assert.equal(entry.status, "interview-ready");
+  assert.equal(entry.lastReviewedAt, "2026-06-01");
+  assert.equal(Object.hasOwn(entry, "interviewAnswer"), false);
+});
+
+test("resolveProgressState marks due reviews and stale hashes as needs-revisit", () => {
+  const sourceHash = hashText("old source");
+  const questionsHash = hashText("old questions");
+
+  const due = resolveProgressState({
+    fallbackStatus: "interview-ready",
+    entry: {
+      status: "interview-ready",
+      nextReviewAt: "2026-06-01",
+      sourceHash,
+      questionsHash
+    },
+    currentSourceHash: sourceHash,
+    currentQuestionsHash: questionsHash,
+    today: "2026-06-03"
+  });
+
+  assert.equal(due.learningStatus, "needs-revisit");
+  assert.equal(due.learningStatusSource, "manifest");
+  assert.equal(due.learningWarnings.some((warning) => warning.code === "review-due"), true);
+
+  const stale = resolveProgressState({
+    fallbackStatus: "interview-ready",
+    entry: {
+      status: "interview-ready",
+      nextReviewAt: "2026-06-17",
+      sourceHash,
+      questionsHash
+    },
+    currentSourceHash: hashText("new source"),
+    currentQuestionsHash: questionsHash,
+    today: "2026-06-03"
+  });
+
+  assert.equal(stale.learningStatus, "needs-revisit");
+  assert.equal(stale.learningWarnings.some((warning) => warning.code === "source-stale"), true);
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run:
+
+```bash
+npm test -- scripts/blog-ops-inventory.test.mjs
+```
+
+Expected: FAIL with module not found for `./blog-ops/progress-manifest.mjs`.
+
+- [ ] **Step 3: Implement progress manifest reader**
+
+Create `scripts/blog-ops/progress-manifest.mjs`:
+
+```js
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+
+const ALLOWED_STATUSES = new Set([
+  "not-started",
+  "questions-ready",
+  "first-answer-written",
+  "reviewed",
+  "interview-ready",
+  "needs-revisit",
+]);
+
+export function hashText(value) {
+  return `sha256:${crypto.createHash("sha256").update(String(value ?? "")).digest("hex")}`;
+}
+
+function sanitizeEntry(entry = {}) {
+  const status = ALLOWED_STATUSES.has(entry.status) ? entry.status : undefined;
+  return {
+    ...(status ? { status } : {}),
+    ...(entry.lastReviewedAt ? { lastReviewedAt: entry.lastReviewedAt } : {}),
+    ...(entry.nextReviewAt ? { nextReviewAt: entry.nextReviewAt } : {}),
+    ...(entry.sourceHash ? { sourceHash: entry.sourceHash } : {}),
+    ...(entry.questionsHash ? { questionsHash: entry.questionsHash } : {}),
+  };
+}
+
+export function readProgressManifest({ root = process.cwd(), file = path.join(root, ".local", "learning-progress.json") } = {}) {
+  if (!fs.existsSync(file)) return { file, entries: {}, warnings: [] };
+
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+    const entries = Object.fromEntries(
+      Object.entries(raw ?? {}).map(([id, entry]) => [id, sanitizeEntry(entry)]),
+    );
+    return { file, entries, warnings: [] };
+  } catch (error) {
+    return {
+      file,
+      entries: {},
+      warnings: [{ code: "progress-manifest-invalid", message: error.message }],
+    };
+  }
+}
+
+function isDue(nextReviewAt, today) {
+  if (!nextReviewAt) return false;
+  return nextReviewAt <= today;
+}
+
+export function resolveProgressState({
+  fallbackStatus,
+  entry,
+  currentSourceHash,
+  currentQuestionsHash,
+  today = new Date().toISOString().slice(0, 10),
+}) {
+  const learningWarnings = [];
+  if (!entry) {
+    return {
+      hasProgressManifest: false,
+      learningStatusSource: "fallback",
+      learningStatus: fallbackStatus,
+      learningWarnings,
+    };
+  }
+
+  let learningStatus = entry.status ?? fallbackStatus;
+
+  if (isDue(entry.nextReviewAt, today)) {
+    learningStatus = "needs-revisit";
+    learningWarnings.push({ code: "review-due", nextReviewAt: entry.nextReviewAt });
+  }
+
+  if (entry.sourceHash && entry.sourceHash !== currentSourceHash) {
+    learningStatus = "needs-revisit";
+    learningWarnings.push({ code: "source-stale" });
+  }
+
+  if (entry.questionsHash && entry.questionsHash !== currentQuestionsHash) {
+    learningStatus = "needs-revisit";
+    learningWarnings.push({ code: "questions-stale" });
+  }
+
+  return {
+    hasProgressManifest: true,
+    learningStatusSource: "manifest",
+    learningStatus,
+    lastReviewedAt: entry.lastReviewedAt,
+    nextReviewAt: entry.nextReviewAt,
+    learningWarnings,
+  };
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run:
+
+```bash
+npm test -- scripts/blog-ops-inventory.test.mjs
+```
+
+Expected: PASS through progress manifest tests.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add scripts/blog-ops/progress-manifest.mjs scripts/blog-ops-inventory.test.mjs
+git commit -m "feat: read learning progress manifest"
 ```
 
 ---
@@ -1055,14 +1287,26 @@ sources:
 `,
     "utf8",
   );
+  fs.mkdirSync(path.join(root, ".local"), { recursive: true });
+  writeJson(path.join(root, ".local", "learning-progress.json"), {
+    "demo/2026-06-03-post": {
+      status: "reviewed",
+      lastReviewedAt: "2026-05-20",
+      nextReviewAt: "2026-06-01"
+    }
+  });
 
-  const inventory = buildBlogOpsInventory({ root, env: { HOME: "/Users/tester" } });
+  const inventory = buildBlogOpsInventory({ root, env: { HOME: "/Users/tester", BLOG_OPS_TODAY: "2026-06-03" } });
   const post = inventory.posts.find((item) => item.id === "demo/2026-06-03-post");
 
   assert.equal(post.publishStatus, "published");
   assert.equal(post.hasQuestions, true);
   assert.equal(post.hasPrivateNote, true);
   assert.equal(post.learningStatus, "needs-revisit");
+  assert.equal(post.learningStatusSource, "manifest");
+  assert.equal(post.hasProgressManifest, true);
+  assert.equal(post.nextReviewAt, "2026-06-01");
+  assert.equal(post.learningWarnings.some((item) => item.code === "review-due"), true);
   assert.equal(post.tagStatus, "invalid");
   assert.deepEqual(post.tagSuggestions, [
     { tag: "backend", suggestion: "Backend" },
@@ -1126,8 +1370,9 @@ import path from "node:path";
 
 import { loadBlogOpsConfig } from "./config.mjs";
 import { isIgnoredByGit } from "./ignore-rules.mjs";
-import { readMarkdownFile } from "./markdown.mjs";
+import { extractSection, readMarkdownFile } from "./markdown.mjs";
 import { buildLearningState, createLearningAgentPrompt } from "./learning-inventory.mjs";
+import { hashText, readProgressManifest, resolveProgressState } from "./progress-manifest.mjs";
 import { getPublishStatus, getQuickFixSuggestions, getTagStatus, POST_TYPES } from "./status-rules.mjs";
 
 function matchesInclude(filename, patterns = ["*.md"]) {
@@ -1206,8 +1451,20 @@ function upsert(records, project, slug) {
 
 export function buildBlogOpsInventory({ root = process.cwd(), env = process.env } = {}) {
   const config = loadBlogOpsConfig({ root, env });
+  const progressManifest = readProgressManifest({ root });
   const records = new Map();
-  const warnings = [...config.projectWarnings];
+  const warnings = [...config.projectWarnings, ...progressManifest.warnings];
+  const progressIgnored = isIgnoredByGit({
+    root,
+    file: progressManifest.file,
+    fallbackPatterns: [".local/"],
+  });
+  if (!progressIgnored) {
+    warnings.push({
+      code: "progress-manifest-not-ignored",
+      message: `${progressManifest.file} is not ignored by git.`,
+    });
+  }
   const knownProjects = new Set([
     ...config.sources.map((source) => source.project),
     ...config.projects.map((project) => project.slug),
@@ -1292,12 +1549,20 @@ export function buildBlogOpsInventory({ root = process.cwd(), env = process.env 
     const privateBody = record.privateNotePath && fs.existsSync(record.privateNotePath)
       ? fs.readFileSync(record.privateNotePath, "utf8")
       : "";
+    const publicBody = record.sourceBody ?? record.publishedBody ?? "";
     const learning = buildLearningState({
-      publicBody: record.sourceBody ?? record.publishedBody ?? "",
+      publicBody,
       privateBody,
       hasPrivateNote: record.hasPrivateNote,
     });
-    Object.assign(record, learning);
+    const progress = resolveProgressState({
+      fallbackStatus: learning.learningStatus,
+      entry: progressManifest.entries[record.id],
+      currentSourceHash: hashText(publicBody),
+      currentQuestionsHash: hashText(extractSection(publicBody, "면접에서 설명할 수 있어야 할 질문")),
+      today: env.BLOG_OPS_TODAY ?? new Date().toISOString().slice(0, 10),
+    });
+    Object.assign(record, learning, progress);
 
     record.publishStatus = getPublishStatus({
       hasSource: Boolean(record.sourcePath),
@@ -1606,8 +1871,8 @@ export function renderDashboardHtml() {
           document.querySelector("#table").innerHTML = '<table><thead><tr><th>Project</th><th>Post</th><th>Publish</th><th>Tags</th><th>Warnings</th></tr></thead><tbody>' + rows + '</tbody></table>';
           return;
         }
-        const rows = sortLearning(posts).map((post) => '<tr><td>' + post.project + '</td><td>' + post.title + '<div class="path">' + (post.privateNotePath || "no private note") + '</div></td><td>' + badge(post.publishStatus) + '</td><td>' + (post.hasQuestions ? "yes" : "no") + '</td><td>' + (post.hasPrivateNote ? "yes" : "no") + '</td><td>' + badge(post.learningStatus) + '</td></tr>').join("");
-        document.querySelector("#table").innerHTML = '<table><thead><tr><th>Project</th><th>Post</th><th>Publish</th><th>Questions</th><th>Private Note</th><th>Learning</th></tr></thead><tbody>' + rows + '</tbody></table>';
+        const rows = sortLearning(posts).map((post) => '<tr><td>' + post.project + '</td><td>' + post.title + '<div class="path">' + (post.privateNotePath || "no private note") + '</div></td><td>' + badge(post.publishStatus) + '</td><td>' + (post.hasQuestions ? "yes" : "no") + '</td><td>' + (post.hasPrivateNote ? "yes" : "no") + '</td><td>' + badge(post.learningStatus) + '<div class="path">' + (post.learningStatusSource || "fallback") + '</div></td><td>' + (post.nextReviewAt || "-") + '</td><td>' + (post.learningWarnings || []).map((warning) => badge(warning.code || warning)).join(" ") + '</td></tr>').join("");
+        document.querySelector("#table").innerHTML = '<table><thead><tr><th>Project</th><th>Post</th><th>Publish</th><th>Questions</th><th>Private Note</th><th>Learning</th><th>Next Review</th><th>Learning Warnings</th></tr></thead><tbody>' + rows + '</tbody></table>';
       }
 
       function render() {
@@ -1769,9 +2034,11 @@ Open `http://127.0.0.1:4317` and check:
 - Learning Ops tab renders.
 - Project filter works.
 - `privateBody` never appears in `/api/inventory`.
+- Manifest entries expose only status metadata, review dates, hashes, and warnings.
 - User can see source/published status differences.
 - User can see invalid tag and quick fix suggestion fields where applicable.
 - `archived-note` appears in Content Ops but not in Learning Ops.
+- Learning Ops shows `nextReviewAt` and review-due warnings when present.
 - Learning Ops sort order puts action-needed states before `interview-ready`.
 
 - [ ] **Step 4: Commit**
@@ -1788,8 +2055,9 @@ git commit -m "docs: update blog ops dashboard progress"
 - Spec coverage:
   - Read-only inventory is covered by Tasks 1-7.
   - Content Ops table is covered by Tasks 6-7.
-  - Learning Ops table and prompt generation are covered by Tasks 5-7.
+  - Learning Ops table and prompt generation are covered by Tasks 4.5-7.
   - Private note non-exposure is covered by Tasks 5-7.
+  - Progress manifest privacy and due-review handling are covered by Tasks 4.5, 6, and 7.
   - Tag suggestions and quick fix suggestions are covered by Tasks 3 and 6.
   - Ignore safety is covered by Task 4 and Task 6.
   - Git-unavailable fallback is covered by Task 4.
