@@ -4,12 +4,13 @@ import type { Project } from "../data/projects";
 
 type Props = {
   project: Project;
+  canonicalPath?: string;
 };
 
-const { project } = Astro.props;
+const { project, canonicalPath = `/projects/${project.slug}` } = Astro.props;
 ---
 
-<BaseLayout title={project.name} description={project.description} canonicalPath={`/projects/${project.slug}`}>
+<BaseLayout title={project.name} description={project.description} canonicalPath={canonicalPath}>
   <section class="project-hero">
     <p>{project.status}</p>
     <h1>{project.name}</h1>

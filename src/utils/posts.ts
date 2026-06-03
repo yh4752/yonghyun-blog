@@ -7,6 +7,12 @@ export type BlogPost = CollectionEntry<"blog"> & {
   href: string;
 };
 
+export type BlogPostFilters = {
+  project?: string;
+  type?: BlogPost["data"]["type"];
+  tags?: string[];
+};
+
 export async function getPublishedPosts(): Promise<BlogPost[]> {
   const posts = await getCollection("blog");
   return posts
@@ -24,10 +30,28 @@ export async function getPublishedPosts(): Promise<BlogPost[]> {
     .sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 }
 
+export function filterPosts(posts: BlogPost[], filters: BlogPostFilters): BlogPost[] {
+  return posts.filter((post) => {
+    if (filters.project && post.project !== filters.project) {
+      return false;
+    }
+
+    if (filters.type && post.data.type !== filters.type) {
+      return false;
+    }
+
+    if (filters.tags?.length && !filters.tags.every((tag) => post.data.tags.includes(tag))) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 export function filterPostsByType(posts: BlogPost[], type: BlogPost["data"]["type"]): BlogPost[] {
-  return posts.filter((post) => post.data.type === type);
+  return filterPosts(posts, { type });
 }
 
 export function filterPostsByProject(posts: BlogPost[], project: string): BlogPost[] {
-  return posts.filter((post) => post.project === project);
+  return filterPosts(posts, { project });
 }

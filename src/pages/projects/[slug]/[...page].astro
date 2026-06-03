@@ -1,0 +1,39 @@
+---
+import type { GetStaticPaths, Page } from "astro";
+import ProjectLayout from "../../../layouts/ProjectLayout.astro";
+import ProjectPostList from "../../../components/project/ProjectPostList.astro";
+import PaginationNav from "../../../components/layout/PaginationNav.astro";
+import { getProjectPostsPageSize } from "../../../data/pagination";
+import { projects, type Project } from "../../../data/projects";
+import { filterPostsByProject, getPublishedPosts, type BlogPost } from "../../../utils/posts";
+
+export const getStaticPaths = (async ({ paginate }) => {
+  const posts = await getPublishedPosts();
+
+  return projects.flatMap((project) => {
+    const projectPosts = filterPostsByProject(posts, project.slug);
+
+    return paginate(projectPosts, {
+      params: { slug: project.slug },
+      props: { project },
+      pageSize: getProjectPostsPageSize(project.slug),
+    });
+  });
+}) satisfies GetStaticPaths;
+
+const { project, page } = Astro.props as { project: Project; page: Page<BlogPost> };
+const canonicalPath = page.currentPage === 1 ? `/projects/${project.slug}` : `/projects/${project.slug}/${page.currentPage}`;
+---
+
+<ProjectLayout project={project} canonicalPath={canonicalPath}>
+  <ProjectPostList posts={page.data} projectName={project.name} />
+  <PaginationNav
+    currentPage={page.currentPage}
+    lastPage={page.lastPage}
+    firstUrl={page.url.first}
+    prevUrl={page.url.prev}
+    nextUrl={page.url.next}
+    lastUrl={page.url.last}
+    ariaLabel={`${project.name} 관련 글 페이지`}
+  />
+</ProjectLayout>

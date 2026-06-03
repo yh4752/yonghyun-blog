@@ -1,0 +1,92 @@
+---
+type Props = {
+  currentPage: number;
+  lastPage: number;
+  firstUrl?: string;
+  prevUrl?: string;
+  nextUrl?: string;
+  lastUrl?: string;
+  ariaLabel?: string;
+};
+
+const { currentPage, lastPage, firstUrl, prevUrl, nextUrl, lastUrl, ariaLabel = "페이지 이동" } = Astro.props;
+---
+
+{
+  lastPage > 1 && (
+    <nav class="pagination" aria-label={ariaLabel}>
+      {firstUrl ? (
+        <a class="page-link" href={firstUrl} rel="first">처음</a>
+      ) : (
+        <span class="page-link disabled" aria-disabled="true">처음</span>
+      )}
+      {prevUrl ? (
+        <a class="page-link" href={prevUrl} rel="prev">이전</a>
+      ) : (
+        <span class="page-link disabled" aria-disabled="true">이전</span>
+      )}
+      <span class="page-status" aria-current="page">
+        {currentPage} / {lastPage}
+      </span>
+      {nextUrl ? (
+        <a class="page-link" href={nextUrl} rel="next">다음</a>
+      ) : (
+        <span class="page-link disabled" aria-disabled="true">다음</span>
+      )}
+      {lastUrl ? (
+        <a class="page-link" href={lastUrl} rel="last">마지막</a>
+      ) : (
+        <span class="page-link disabled" aria-disabled="true">마지막</span>
+      )}
+    </nav>
+  )
+}
+
+<style>
+  .pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid var(--color-border);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .page-link,
+  .page-status {
+    min-height: 32px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 4px;
+    padding: 7px 10px;
+    background: var(--color-paper);
+  }
+
+  .page-link {
+    color: var(--color-accent-strong);
+    text-decoration: none;
+  }
+
+  .page-link:hover,
+  .page-link:focus-visible {
+    border-color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent-soft) 62%, transparent);
+  }
+
+  .page-link.disabled {
+    color: var(--color-faint);
+  }
+
+  .page-status {
+    color: var(--color-muted);
+  }
+
+  @media (max-width: 560px) {
+    .pagination {
+      justify-content: flex-start;
+    }
+  }
+</style>
