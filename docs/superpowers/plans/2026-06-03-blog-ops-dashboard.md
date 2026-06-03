@@ -8,6 +8,36 @@
 
 **Tech Stack:** Node.js ESM, `node:test`, built-in `fs/path/http/child_process`, existing `yaml` dependency, existing npm scripts.
 
+## Operational Policies
+
+- Git dependency:
+  - Prefer `git check-ignore` when `git` is installed and the repository is available.
+  - Fall back to parsing `.gitignore` plus explicit fallback patterns when `git` is missing, the path is outside a Git worktree, or `git check-ignore` exits with an unexpected status.
+  - Treat the fallback as a safety net, not as a full reimplementation of Git ignore semantics. v1 only needs directory and exact-file patterns used by `docs/interview-notes/private/`.
+- Path expansion:
+  - Support `~`, `${HOME}`, `$HOME`, `${USERPROFILE}`, and `%USERPROFILE%`.
+  - Support generic `${VAR}` and `$VAR` expansion only when the variable exists in the provided environment.
+  - Throw a clear error for unknown variables instead of silently resolving a machine-specific path.
+  - Resolve relative paths from the blog repository root.
+- Test filesystem hygiene:
+  - Tests must create temporary directories under `os.tmpdir()`.
+  - Tests must register temporary directories and remove them in a `node:test` `after()` hook.
+  - Do not create temp fixtures under the repository root.
+- v1 extension boundary:
+  - Inventory modules return state, warnings, quick fixes, and suggested commands only.
+  - No module writes blog posts, private notes, config, or git state in v1.
+  - Future CRUD/PR support should add explicit action modules that consume the same inventory records instead of mixing mutations into scanners.
+  - Stable record IDs use `project/slug` so future sync, edit, and PR flows can reuse the same identity.
+
+## Status Policy
+
+- `archived-note` means a private interview note exists but no matching source post or published post exists. This usually happens when a post was renamed, deleted, or intentionally retired while the private learning note remains.
+- `archived-note` appears in Content Ops as low-priority cleanup context. It is excluded from Learning Ops progression because there is no active article to study against.
+- `needs-revisit` overrides every other learning state. It means the post changed, the note is stale, or the user explicitly marked the material for another pass.
+- Learning state derivation order is: `needs-revisit` -> `interview-ready` -> `reviewed` -> `first-answer-written` -> `questions-ready` -> `not-started`.
+- Learning Ops sorting is action-oriented, not purely chronological: `needs-revisit`, `questions-ready`, `first-answer-written`, `reviewed`, `not-started`, then `interview-ready`.
+- Draft posts can appear in the inventory, but v1 should show their publish status clearly so the user does not mistake draft learning work for published portfolio content.
+
 ---
 
 ## Reference Documents
@@ -29,7 +59,7 @@ Create:
 - `scripts/blog-ops/status-rules.mjs`
   - Calculate publish status, tag suggestions, quick fix suggestions, and learning status priority.
 - `scripts/blog-ops/ignore-rules.mjs`
-  - Use `git check-ignore` to verify private paths are ignored.
+  - Use `git check-ignore` to verify private paths are ignored, with `.gitignore` fallback when Git is unavailable.
 - `scripts/blog-ops/learning-inventory.mjs`
   - Calculate question set, private note existence, first answer, reviewed, interview-ready, and agent prompt.
 - `scripts/blog-ops/posts-inventory.mjs`
@@ -71,13 +101,23 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 
 import { extractSection, readMarkdownFile } from "./blog-ops/markdown.mjs";
 
+const tempDirs = [];
+
 function makeTempDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "blog-ops-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "blog-ops-"));
+  tempDirs.push(dir);
+  return dir;
 }
+
+after(() => {
+  for (const dir of tempDirs.splice(0)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("readMarkdownFile parses YAML frontmatter and body", () => {
   const dir = makeTempDir();
@@ -216,7 +256,7 @@ git commit -m "test: add blog ops markdown utilities"
 Append:
 
 ```js
-import { loadBlogOpsConfig } from "./blog-ops/config.mjs";
+import { expandConfiguredPath, loadBlogOpsConfig } from "./blog-ops/config.mjs";
 
 test("loadBlogOpsConfig reads sources, projects, tags, and expands paths", () => {
   const root = makeTempDir();
@@ -252,6 +292,22 @@ sources:
   assert.deepEqual([...config.allowedTags], ["Backend"]);
   assert.deepEqual(config.projectWarnings, []);
 });
+
+test("expandConfiguredPath supports portable environment variables and relative paths", () => {
+  const root = makeTempDir();
+  const env = {
+    HOME: "/Users/tester",
+    USERPROFILE: "C:/Users/tester",
+    BLOG_ROOT: "workspace/blog-source",
+  };
+
+  assert.equal(expandConfiguredPath("~/docs/blog", { root, env }), "/Users/tester/docs/blog");
+  assert.equal(expandConfiguredPath("$HOME/docs/blog", { root, env }), "/Users/tester/docs/blog");
+  assert.equal(expandConfiguredPath("${BLOG_ROOT}/docs/blog", { root, env }), path.join(root, "workspace/blog-source/docs/blog"));
+  assert.equal(expandConfiguredPath("%USERPROFILE%/docs/blog", { root, env }), path.normalize("C:/Users/tester/docs/blog"));
+  assert.equal(expandConfiguredPath("docs/blog", { root, env }), path.join(root, "docs/blog"));
+  assert.throws(() => expandConfiguredPath("${MISSING}/docs/blog", { root, env }), /Unknown environment variable/);
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -273,15 +329,30 @@ import fs from "node:fs";
 import path from "node:path";
 import { parse } from "yaml";
 
+function isConfiguredAbsolutePath(value) {
+  return path.isAbsolute(value) || /^[A-Za-z]:[\\/]/.test(value);
+}
+
 export function expandConfiguredPath(value, { root, env = process.env }) {
-  const home = env.HOME;
-  if (!home) throw new Error("HOME environment variable is required.");
+  const home = env.HOME ?? env.USERPROFILE;
+  if (!home) throw new Error("HOME or USERPROFILE environment variable is required.");
 
   const expanded = String(value)
-    .replace(/^\~(?=\/|$)/, home)
-    .replace(/\$\{HOME\}/g, home);
+    .replace(/^\~(?=[/\\]|$)/, home)
+    .replace(/%([A-Za-z_][A-Za-z0-9_]*)%/g, (_, name) => {
+      if (env[name] === undefined) throw new Error(`Unknown environment variable: ${name}`);
+      return env[name];
+    })
+    .replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, name) => {
+      if (env[name] === undefined) throw new Error(`Unknown environment variable: ${name}`);
+      return env[name];
+    })
+    .replace(/\$([A-Za-z_][A-Za-z0-9_]*)/g, (_, name) => {
+      if (env[name] === undefined) throw new Error(`Unknown environment variable: ${name}`);
+      return env[name];
+    });
 
-  return path.isAbsolute(expanded) ? path.normalize(expanded) : path.resolve(root, expanded);
+  return isConfiguredAbsolutePath(expanded) ? path.normalize(expanded) : path.resolve(root, expanded);
 }
 
 export function readJson(file) {
@@ -371,6 +442,12 @@ test("getPublishStatus classifies file presence combinations", () => {
   assert.equal(getPublishStatus({ hasSource: true, hasPublished: false, hasPrivateNote: false, draft: false }), "pending-sync");
   assert.equal(getPublishStatus({ hasSource: true, hasPublished: false, hasPrivateNote: false, draft: true }), "draft");
   assert.equal(getPublishStatus({ hasSource: false, hasPublished: true, hasPrivateNote: false, draft: undefined }), "orphan-published");
+  assert.equal(getPublishStatus({ hasSource: false, hasPublished: false, hasPrivateNote: true, draft: undefined }), "archived-note");
+});
+
+test("archived-note is only for private notes without source or published files", () => {
+  assert.equal(getPublishStatus({ hasSource: true, hasPublished: false, hasPrivateNote: true, draft: false }), "pending-sync");
+  assert.equal(getPublishStatus({ hasSource: false, hasPublished: true, hasPrivateNote: true, draft: undefined }), "orphan-published");
   assert.equal(getPublishStatus({ hasSource: false, hasPublished: false, hasPrivateNote: true, draft: undefined }), "archived-note");
 });
 
@@ -466,6 +543,15 @@ export function getLearningStatus({
   if (questionsReady) return "questions-ready";
   return "not-started";
 }
+
+export const LEARNING_STATUS_DERIVATION_ORDER = [
+  "needs-revisit",
+  "interview-ready",
+  "reviewed",
+  "first-answer-written",
+  "questions-ready",
+  "not-started",
+];
 
 export function getTagSuggestions(tag, allowedTags) {
   const normalized = normalizeTag(tag);
@@ -596,6 +682,20 @@ test("isIgnoredByGit returns false when no ignore rule matches", () => {
 
   assert.equal(ignored, false);
 });
+
+test("isIgnoredByGit falls back to .gitignore parsing when git is unavailable", () => {
+  const root = makeTempDir();
+  fs.writeFileSync(path.join(root, ".gitignore"), "docs/interview-notes/private/\n", "utf8");
+
+  const ignored = isIgnoredByGit({
+    root,
+    file: path.join(root, "docs", "interview-notes", "private", "note.md"),
+    fallbackPatterns: [],
+    gitCommand: "missing-git-command-for-test",
+  });
+
+  assert.equal(ignored, true);
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -630,8 +730,8 @@ function fallbackMatch({ root, file, patterns }) {
   });
 }
 
-export function isIgnoredByGit({ root, file, fallbackPatterns = [] }) {
-  const result = spawnSync("git", ["check-ignore", "-q", file], {
+export function isIgnoredByGit({ root, file, fallbackPatterns = [], gitCommand = "git" }) {
+  const result = spawnSync(gitCommand, ["check-ignore", "-q", file], {
     cwd: root,
     stdio: "ignore",
   });
@@ -1002,6 +1102,7 @@ sources:
   assert.equal(archived.sourcePath, null);
   assert.equal(archived.publishedPath, null);
   assert.equal(archived.hasPrivateNote, true);
+  assert.equal(Object.hasOwn(archived, "privateBody"), false);
 });
 ```
 
@@ -1493,7 +1594,7 @@ export function renderDashboardHtml() {
       }
 
       function sortLearning(posts) {
-        const rank = { "needs-revisit": 1, "first-answer-written": 2, "questions-ready": 3, "not-started": 4, reviewed: 5, "interview-ready": 6 };
+        const rank = { "needs-revisit": 1, "questions-ready": 2, "first-answer-written": 3, reviewed: 4, "not-started": 5, "interview-ready": 6 };
         return [...posts]
           .filter((post) => post.publishStatus !== "archived-note")
           .sort((a, b) => (rank[a.learningStatus] ?? 9) - (rank[b.learningStatus] ?? 9) || a.id.localeCompare(b.id));
@@ -1670,6 +1771,8 @@ Open `http://127.0.0.1:4317` and check:
 - `privateBody` never appears in `/api/inventory`.
 - User can see source/published status differences.
 - User can see invalid tag and quick fix suggestion fields where applicable.
+- `archived-note` appears in Content Ops but not in Learning Ops.
+- Learning Ops sort order puts action-needed states before `interview-ready`.
 
 - [ ] **Step 4: Commit**
 
@@ -1689,6 +1792,9 @@ git commit -m "docs: update blog ops dashboard progress"
   - Private note non-exposure is covered by Tasks 5-7.
   - Tag suggestions and quick fix suggestions are covered by Tasks 3 and 6.
   - Ignore safety is covered by Task 4 and Task 6.
+  - Git-unavailable fallback is covered by Task 4.
+  - Portable path expansion is covered by Task 2.
+  - `archived-note` handling is covered by Tasks 3, 6, and 7.
   - Dashboard launch is covered by Task 7.
 
 - Scope control:
@@ -1696,6 +1802,7 @@ git commit -m "docs: update blog ops dashboard progress"
   - No arbitrary command execution is implemented.
   - No production Astro route is added.
   - No private note body is returned by inventory records.
+  - Future mutation/PR support must be added through separate action modules, not by changing scanner modules to write files.
 
 - Final verification:
   - `npm run validate:posts`
