@@ -2,6 +2,8 @@
 
 이 문서는 블로그, 포트폴리오, 면접 대비 작업의 다음 순서를 잊지 않기 위한 운영 문서다.
 
+장기 방향과 단계별 우선순위는 [로드맵](roadmap.md)을 따른다. 이 문서는 로드맵에서 지금 실제로 집어 들 작업만 추적한다.
+
 ## 원칙
 
 - 특정 프로젝트가 아니라 모든 프로젝트의 블로그 작성, 발행, 면접 대비 흐름을 추적한다.
@@ -13,6 +15,7 @@
 
 ## 현재 우선순위
 
+- [ ] Blog Ops Dashboard 설계 문서 작성
 - [x] CI/CD 답변 노트 1회 소리 내어 복습
 - [x] Sigak 글 1개를 같은 방식으로 면접 질문 세트화
 - [x] Sigak Flyway 개인 답변 1차 작성
@@ -61,6 +64,17 @@
 - [ ] `src/data/projects.json`에 프로젝트 메타데이터 등록
 - [ ] 발행 전 `npm run validate:posts -- --source --project <project>` 실행
 - [ ] 발행 후 면접 질문 세트와 개인 답변 노트 생성
+
+### blog ops
+
+- [ ] Blog Ops Dashboard가 해결할 문제와 v1 범위 정의
+- [ ] source post, published post, private note의 경계 정리
+- [ ] read-only dashboard에 필요한 데이터 목록 정리
+- [ ] Learning Ops Dashboard에서 추적할 상태와 private 데이터 경계 정리
+- [ ] Learning Ops 상태 자동 판정과 `needs-revisit` 전환 조건 정리
+- [ ] Learning Ops 정렬, 필터, 시각 구분 기준 정리
+- [ ] safe CRUD에서 허용할 작업과 금지할 작업 정리
+- [ ] 검증, sync, PR 자동화 흐름 설계
 
 ## 블로그 작성 스킬 목표
 
