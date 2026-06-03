@@ -6,6 +6,12 @@ import test, { after } from "node:test";
 
 import { expandConfiguredPath, loadBlogOpsConfig } from "./blog-ops/config.mjs";
 import { extractSection, readMarkdownFile } from "./blog-ops/markdown.mjs";
+import {
+  getLearningStatus,
+  getPublishStatus,
+  getQuickFixSuggestions,
+  getTagSuggestions,
+} from "./blog-ops/status-rules.mjs";
 
 const tempDirs = [];
 
@@ -120,4 +126,56 @@ test("expandConfiguredPath supports portable environment variables and relative 
   assert.equal(expandConfiguredPath("%USERPROFILE%/docs/blog", { root, env }), path.normalize("C:/Users/tester/docs/blog"));
   assert.equal(expandConfiguredPath("docs/blog", { root, env }), path.join(root, "docs/blog"));
   assert.throws(() => expandConfiguredPath("${MISSING}/docs/blog", { root, env }), /Unknown environment variable/);
+});
+
+test("getPublishStatus classifies file presence combinations", () => {
+  assert.equal(getPublishStatus({ hasSource: true, hasPublished: true, hasPrivateNote: false, draft: false }), "published");
+  assert.equal(getPublishStatus({ hasSource: true, hasPublished: false, hasPrivateNote: false, draft: false }), "pending-sync");
+  assert.equal(getPublishStatus({ hasSource: true, hasPublished: false, hasPrivateNote: false, draft: true }), "draft");
+  assert.equal(getPublishStatus({ hasSource: false, hasPublished: true, hasPrivateNote: false, draft: undefined }), "orphan-published");
+  assert.equal(getPublishStatus({ hasSource: false, hasPublished: false, hasPrivateNote: true, draft: undefined }), "archived-note");
+});
+
+test("archived-note is only for private notes without source or published files", () => {
+  assert.equal(getPublishStatus({ hasSource: true, hasPublished: false, hasPrivateNote: true, draft: false }), "pending-sync");
+  assert.equal(getPublishStatus({ hasSource: false, hasPublished: true, hasPrivateNote: true, draft: undefined }), "orphan-published");
+  assert.equal(getPublishStatus({ hasSource: false, hasPublished: false, hasPrivateNote: true, draft: undefined }), "archived-note");
+});
+
+test("getLearningStatus applies priority order", () => {
+  assert.equal(getLearningStatus({ needsRevisit: true, interviewReady: true, reviewed: true, firstAnswerWritten: true, questionsReady: true }), "needs-revisit");
+  assert.equal(getLearningStatus({ needsRevisit: false, interviewReady: true, reviewed: true, firstAnswerWritten: true, questionsReady: true }), "interview-ready");
+  assert.equal(getLearningStatus({ needsRevisit: false, interviewReady: false, reviewed: true, firstAnswerWritten: true, questionsReady: true }), "reviewed");
+  assert.equal(getLearningStatus({ needsRevisit: false, interviewReady: false, reviewed: false, firstAnswerWritten: true, questionsReady: true }), "first-answer-written");
+  assert.equal(getLearningStatus({ needsRevisit: false, interviewReady: false, reviewed: false, firstAnswerWritten: false, questionsReady: true }), "questions-ready");
+  assert.equal(getLearningStatus({ needsRevisit: false, interviewReady: false, reviewed: false, firstAnswerWritten: false, questionsReady: false }), "not-started");
+});
+
+test("getTagSuggestions recommends case, separator, and alias matches", () => {
+  const allowedTags = new Set(["Backend", "Vector Search", "PostgreSQL"]);
+
+  assert.deepEqual(getTagSuggestions("backend", allowedTags), ["Backend"]);
+  assert.deepEqual(getTagSuggestions("vector-search", allowedTags), ["Vector Search"]);
+  assert.deepEqual(getTagSuggestions("postgres", allowedTags), ["PostgreSQL"]);
+  assert.deepEqual(getTagSuggestions("unknown", allowedTags), []);
+});
+
+test("getQuickFixSuggestions suggests non-mutating frontmatter fixes", () => {
+  const suggestions = getQuickFixSuggestions({
+    hasFrontmatter: true,
+    frontmatter: {
+      title: "Post",
+      type: "bad-type",
+      project: "missing",
+      tags: [],
+      summary: "",
+    },
+    allowedTypes: new Set(["dev-log", "deep-dive"]),
+    knownProjects: new Set(["demo"]),
+  });
+
+  assert.deepEqual(
+    suggestions.map((item) => item.code),
+    ["missing-summary", "empty-tags", "missing-draft", "missing-featured", "invalid-type", "invalid-project"],
+  );
 });
