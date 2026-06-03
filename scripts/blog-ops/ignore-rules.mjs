@@ -26,7 +26,7 @@ function readGitignorePatterns(root) {
     .filter((line) => line && !line.startsWith("#"));
 }
 
-export function isIgnoredByGit({ root, file, fallbackPatterns = [], gitCommand = "git" }) {
+export function isIgnoredByGit({ root, file, gitCommand = "git" }) {
   const result = spawnSync(gitCommand, ["check-ignore", "-q", file], {
     cwd: root,
     stdio: "ignore",
@@ -35,11 +35,9 @@ export function isIgnoredByGit({ root, file, fallbackPatterns = [], gitCommand =
   if (result.status === 0) return true;
   if (result.status === 1) return false;
 
-  const gitignorePatterns = readGitignorePatterns(root);
-
   return fallbackMatch({
     root,
     file,
-    patterns: gitignorePatterns.length > 0 ? gitignorePatterns : fallbackPatterns,
+    patterns: readGitignorePatterns(root),
   });
 }
