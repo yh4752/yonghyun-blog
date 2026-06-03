@@ -5,6 +5,7 @@ import path from "node:path";
 import test, { after } from "node:test";
 
 import { expandConfiguredPath, loadBlogOpsConfig } from "./blog-ops/config.mjs";
+import { isIgnoredByGit } from "./blog-ops/ignore-rules.mjs";
 import { extractSection, readMarkdownFile } from "./blog-ops/markdown.mjs";
 import {
   getLearningStatus,
@@ -178,4 +179,46 @@ test("getQuickFixSuggestions suggests non-mutating frontmatter fixes", () => {
     suggestions.map((item) => item.code),
     ["missing-summary", "empty-tags", "missing-draft", "missing-featured", "invalid-type", "invalid-project"],
   );
+});
+
+test("isIgnoredByGit returns true when a path is ignored", () => {
+  const root = makeTempDir();
+  fs.writeFileSync(path.join(root, ".gitignore"), "private/\n", "utf8");
+  fs.mkdirSync(path.join(root, ".git"), { recursive: true });
+
+  const ignored = isIgnoredByGit({
+    root,
+    file: path.join(root, "private", "note.md"),
+    fallbackPatterns: ["private/"],
+  });
+
+  assert.equal(ignored, true);
+});
+
+test("isIgnoredByGit returns false when no ignore rule matches", () => {
+  const root = makeTempDir();
+  fs.writeFileSync(path.join(root, ".gitignore"), "dist/\n", "utf8");
+  fs.mkdirSync(path.join(root, ".git"), { recursive: true });
+
+  const ignored = isIgnoredByGit({
+    root,
+    file: path.join(root, "docs", "interview-notes", "private", "note.md"),
+    fallbackPatterns: ["docs/interview-notes/private/"],
+  });
+
+  assert.equal(ignored, false);
+});
+
+test("isIgnoredByGit falls back to .gitignore parsing when git is unavailable", () => {
+  const root = makeTempDir();
+  fs.writeFileSync(path.join(root, ".gitignore"), "docs/interview-notes/private/\n", "utf8");
+
+  const ignored = isIgnoredByGit({
+    root,
+    file: path.join(root, "docs", "interview-notes", "private", "note.md"),
+    fallbackPatterns: [],
+    gitCommand: "missing-git-command-for-test",
+  });
+
+  assert.equal(ignored, true);
 });
