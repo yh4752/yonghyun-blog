@@ -71,6 +71,8 @@
 - [ ] source post, published post, private note의 경계 정리
 - [ ] read-only dashboard에 필요한 데이터 목록 정리
 - [ ] Learning Ops Dashboard에서 추적할 상태와 private 데이터 경계 정리
+- [ ] Learning Ops 상태 자동 판정과 `needs-revisit` 전환 조건 정리
+- [ ] Learning Ops 정렬, 필터, 시각 구분 기준 정리
 - [ ] safe CRUD에서 허용할 작업과 금지할 작업 정리
 - [ ] 검증, sync, PR 자동화 흐름 설계
 

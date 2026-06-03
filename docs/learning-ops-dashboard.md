@@ -131,6 +131,169 @@ needs-revisit
 
 예를 들어 `interview-ready`였던 글도 시간이 지나 다시 설명이 어려워지면 `needs-revisit`으로 돌아갈 수 있다.
 
+## 발행 상태와 학습 상태
+
+발행 상태와 학습 상태는 서로 다른 축이다.
+
+```txt
+publish status
+→ draft
+→ published
+→ unpublished
+
+learning status
+→ not-started
+→ questions-ready
+→ first-answer-written
+→ reviewed
+→ interview-ready
+→ needs-revisit
+```
+
+초안 글도 학습 트랙에 올릴 수 있다. 다만 `draft: true`인 글은 아직 공개 포트폴리오 자산이 아니므로 Dashboard에서 `Draft`로 명확히 표시한다.
+
+권장 정책:
+
+- `draft: true` 글도 질문 세트와 개인 답변 노트를 만들 수 있다.
+- `draft: true` 글은 `interview-ready`가 되어도 "공개 대표 글" 목록에는 넣지 않는다.
+- `draft: false`이고 발행본에 동기화된 글을 기본 학습 우선순위로 둔다.
+- 원본에서 `draft: true`로 돌아간 글은 발행본에서 제거될 수 있지만, 개인 답변 노트는 삭제하지 않는다.
+- 원본 글이 삭제됐지만 개인 답변 노트가 남아 있으면 기본 목록에서는 숨기고 `Archived learning notes`에서만 보여준다.
+
+### 발행 상태 판정
+
+v1에서는 이전 발행 이력을 저장하지 않으므로 아래처럼 현재 파일 상태만으로 판정한다.
+
+| 상태 | 판정 |
+| --- | --- |
+| `draft` | source post가 있고 `draft: true`다 |
+| `published` | source post가 있고 `draft: false`이며 published post도 있다 |
+| `pending-sync` | source post가 있고 `draft: false`지만 published post가 아직 없다 |
+| `orphan-published` | published post는 있지만 source post가 없다 |
+| `archived-note` | source/published post는 없지만 private note만 있다 |
+
+`unpublished`라는 말은 사용자에게 설명할 때만 쓴다. 구현 상태명으로는 `draft`, `pending-sync`, `orphan-published`, `archived-note`처럼 파일 상태가 드러나는 이름을 우선 사용한다.
+
+## 자동 판정 규칙
+
+Learning Ops v1은 상태를 파일에서 계산한다. 구현 시 글의 identity는 아래 값을 사용한다.
+
+```txt
+<project>/<slug>
+```
+
+`slug`는 frontmatter의 `slug`가 있으면 그 값을 쓰고, 없으면 파일명에서 `.md`를 제거한 값을 쓴다.
+
+### 질문 세트 판정
+
+`questions-ready`는 공개 글 본문에서 아래 조건을 만족할 때 true로 본다.
+
+- `## 면접에서 설명할 수 있어야 할 질문` 섹션이 있다.
+- 해당 섹션 아래에 비어 있지 않은 질문 항목이 3개 이상 있다.
+- 질문 항목은 `- `로 시작하거나 `?`로 끝나는 줄로 판정한다.
+
+예시:
+
+```md
+## 면접에서 설명할 수 있어야 할 질문
+
+- 왜 GitHub Actions를 추가했나요?
+- branch protection이 없다면 CI의 의미가 어떻게 달라지나요?
+- Vercel 배포와 GitHub Actions CI의 책임은 어떻게 나뉘나요?
+```
+
+질문 섹션은 있지만 항목이 비어 있으면 `questions-ready`로 보지 않는다.
+
+### 개인 답변 노트 판정
+
+개인 답변 노트는 아래 경로에 파일이 있으면 존재한다고 본다.
+
+```txt
+docs/interview-notes/private/<project>/<slug>.md
+```
+
+`first-answer-written`은 개인 답변 노트에서 아래 조건을 만족할 때 true로 본다.
+
+- `## 첫 답변` 섹션이 있다.
+- 해당 섹션에 placeholder가 아닌 내용이 있다.
+
+placeholder는 아래처럼 내용이 없는 템플릿 표시를 말한다.
+
+```txt
+-
+TODO
+작성 예정
+비어 있음
+```
+
+`잘 모르겠다`도 첫 답변으로 인정한다. 다만 이 경우에는 충분히 이해한 상태가 아니므로, 에이전트 리뷰나 추가 설명 없이 `interview-ready`로 넘어갈 수 없다.
+
+### reviewed 판정
+
+`reviewed`는 개인 답변 노트에 아래 섹션 중 2개 이상이 내용과 함께 있을 때 true로 본다.
+
+- `## 부족한 개념`
+- `## 코드/문서 근거`
+- `## 꼬리 질문 대비`
+
+이 상태는 "에이전트나 사용자가 한 번 검토했다"는 뜻이지, 바로 면접 준비 완료라는 뜻은 아니다.
+
+### interview-ready 판정
+
+`interview-ready`는 아래 조건을 모두 만족할 때 true로 본다.
+
+- `questions-ready`가 true다.
+- 개인 답변 노트가 있다.
+- `## 면접용 30-60초 답변` 섹션에 비어 있지 않은 답변이 있다.
+- 명시적으로 `needs-revisit` 상태가 아니어야 한다.
+
+v1에서는 `needs-revisit`의 명시 상태가 없다면 파일 기반으로만 판단한다. v1.5에서 progress manifest를 도입하면 manifest의 상태가 우선한다.
+
+### 상태 우선순위
+
+여러 조건이 동시에 true일 수 있으므로 최종 learning status는 아래 순서로 결정한다.
+
+1. `needs-revisit`
+2. `interview-ready`
+3. `reviewed`
+4. `first-answer-written`
+5. `questions-ready`
+6. `not-started`
+
+예를 들어 질문 세트도 있고 개인 답변 노트도 있으며 30-60초 답변도 있지만, manifest의 `status`가 `needs-revisit`이면 최종 상태는 `needs-revisit`이다.
+
+## needs-revisit 전환 조건
+
+`needs-revisit`은 아래 중 하나를 만족할 때 표시한다.
+
+### v1 파일 기반 조건
+
+- 개인 답변 노트에 `status: needs-revisit` 같은 명시적 frontmatter가 있다.
+- 개인 답변 노트에 `## 다음에 다시 볼 것` 섹션이 있고, 내용이 비어 있지 않다.
+- `## 첫 답변`에는 내용이 있지만 `## 면접용 30-60초 답변`이 비어 있다.
+- 첫 답변이 `잘 모르겠다`, `모르겠다`, `불확실` 같은 표현만으로 끝나고 이후 보강 섹션이 없다.
+
+### v1.5 manifest 기반 조건
+
+private progress manifest를 도입한 뒤에는 아래 조건도 사용한다.
+
+- `status`가 `needs-revisit`이다.
+- `nextReviewAt`이 오늘 또는 과거 날짜다.
+- `lastReviewedAt` 이후 원본 글 또는 발행본의 content hash가 변경됐다.
+- 질문 세트가 바뀌었지만 개인 답변 노트가 갱신되지 않았다.
+
+시간 기준은 처음에는 단순하게 둔다.
+
+```txt
+interview-ready가 된 글
+→ nextReviewAt = lastReviewedAt + 14일
+
+needs-revisit 후 다시 reviewed가 된 글
+→ nextReviewAt = lastReviewedAt + 7일
+```
+
+이 주기는 나중에 실제 사용하면서 조정한다.
+
 ## 완료 처리
 
 학습 완료는 숨김 처리하지 않는다. 완료된 글은 포트폴리오 자산으로 승격한다.
@@ -210,6 +373,40 @@ frontmatter validation         공개       있음         있음            완
 Flyway adoption                공개       있음         있음            완료           reviewed
 SchemaSpy adoption             공개       없음         없음            미완료         not-started
 ```
+
+기본 정렬은 "지금 처리해야 할 글"이 위로 오게 한다.
+
+1. `needs-revisit`
+2. `first-answer-written`이지만 `reviewed`가 아닌 글
+3. `questions-ready`이지만 개인 답변 노트가 없는 글
+4. published 상태의 `not-started`
+5. draft 상태의 `not-started`
+6. `interview-ready`
+
+필터는 최소한 아래를 제공한다.
+
+- project
+- publish status
+- learning status
+- has questions
+- has private note
+
+### 시각 구분
+
+색은 상태를 빠르게 찾기 위한 보조 수단으로만 사용한다. 색만으로 의미를 전달하지 않고, 항상 텍스트 라벨을 함께 둔다.
+
+권장 구분:
+
+| 상태 | 시각 구분 |
+| --- | --- |
+| `needs-revisit` | muted amber 또는 soft red badge |
+| `first-answer-written` | muted blue badge |
+| `reviewed` | muted cyan badge |
+| `interview-ready` | muted green badge |
+| `questions-ready` | neutral outline badge |
+| `not-started` | gray text |
+
+`interview-ready`는 완료 영역에서 강조하고, `needs-revisit`은 목록 상단과 Overview에서 눈에 띄게 표시한다.
 
 ### 4. Detail View
 
@@ -299,7 +496,12 @@ project:
 
 ### v1.5
 
-필요하면 private progress manifest를 도입한다.
+아래 요구가 생기면 private progress manifest를 도입한다.
+
+- `needs-revisit`을 날짜 기준으로 자동 계산해야 한다.
+- 글 변경 이후 답변 노트가 오래됐는지 비교해야 한다.
+- 사용자가 상태를 수동으로 override해야 한다.
+- 여러 파일의 섹션 검사만으로 상태를 안정적으로 계산하기 어려워진다.
 
 ```txt
 .local/learning-progress.json
@@ -312,12 +514,28 @@ project:
   "sigak/2026-05-28-flyway-adoption": {
     "status": "needs-revisit",
     "lastReviewedAt": "2026-06-02",
-    "nextReviewAt": "2026-06-16"
+    "nextReviewAt": "2026-06-16",
+    "sourceHash": "sha256:...",
+    "questionsHash": "sha256:..."
   }
 }
 ```
 
 이 파일을 도입한다면 반드시 `.gitignore`에 추가한다.
+
+### 전환 계획
+
+manifest는 개인 답변 노트를 대체하지 않는다. 답변 내용은 계속 `docs/interview-notes/private/<project>/<slug>.md`에 두고, manifest는 상태와 복습 일정만 보관한다.
+
+전환 순서:
+
+1. v1의 파일 기반 규칙으로 현재 상태를 계산한다.
+2. manifest 초안을 생성하되, private 답변 내용은 넣지 않는다.
+3. manifest가 있는 글은 manifest의 `status`, `lastReviewedAt`, `nextReviewAt`을 우선 사용한다.
+4. manifest에 없는 글은 기존 파일 기반 규칙으로 fallback한다.
+5. 모든 개인 답변 노트가 manifest에 등록된 뒤에도, 질문 세트와 private note 존재 여부는 파일에서 계속 계산한다.
+
+즉 manifest는 상태 추적을 보강하는 파일이지, 글이나 답변의 source of truth가 아니다.
 
 ## Blog Ops Dashboard와의 관계
 
@@ -338,8 +556,11 @@ Learning Ops는 Content Ops보다 뒤에 붙는 부가 기능이 아니다. 이 
 
 - [ ] `docs/interview-notes/private/`가 `.gitignore`에 포함되어 있는가?
 - [ ] 공개 글과 개인 노트의 경계가 화면에서 명확한가?
-- [ ] 상태 계산이 파일 존재 여부에만 의존해도 충분한가?
+- [ ] 상태 계산 규칙이 구현 가능한 수준으로 구체적인가?
+- [ ] 발행 상태와 학습 상태가 분리되어 있는가?
 - [ ] private progress manifest가 필요한 시점이 명확한가?
+- [ ] `needs-revisit`로 돌아가는 기준이 명확한가?
+- [ ] 상태별 정렬과 시각 구분이 정의되어 있는가?
 - [ ] 에이전트 프롬프트가 먼저 답변을 요구하도록 되어 있는가?
 - [ ] 완료 상태가 복습 대상으로 돌아올 수 있는가?
 
