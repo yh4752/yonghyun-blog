@@ -48,6 +48,8 @@ v1은 read-only inventory를 만든다.
 - invalid tag correction suggestion 표시
 - Learning Ops 상태 표시
 - 질문 세트와 개인 답변 노트 존재 여부 표시
+- private progress manifest 기반 학습 상태와 복습 일정 표시
+- source/questions hash 변경에 따른 `needs-revisit` 후보 표시
 - 선택한 글을 학습/면접 에이전트로 넘길 프롬프트 생성
 
 ### v1에서 하지 않을 것
@@ -154,6 +156,7 @@ scripts/blog-ops/
   ├─ config.mjs
   ├─ posts-inventory.mjs
   ├─ learning-inventory.mjs
+  ├─ progress-manifest.mjs
   ├─ status-rules.mjs
   ├─ git-status.mjs
   ├─ ignore-rules.mjs
@@ -196,18 +199,29 @@ slug는 frontmatter의 `slug`가 있으면 그 값을 쓰고, 없으면 파일�
 
 - 공개 글의 질문 세트 존재 여부 계산
 - private note 존재 여부 계산
+- private progress manifest 읽기
 - first answer, reviewed, interview-ready 상태 계산
-- `needs-revisit` 후보 계산
+- `nextReviewAt`, content hash, questions hash 기반 `needs-revisit` 후보 계산
 - agent prompt 생성에 필요한 값 제공
 
-상세 규칙은 [Learning Ops Dashboard](../../../learning-ops-dashboard.md)를 따른다.
+상세 규칙은 [Learning Ops Dashboard](../../learning-ops-dashboard.md)를 따른다.
+
+### `progress-manifest.mjs`
+
+역할:
+
+- `.local/learning-progress.json` 읽기
+- manifest가 `.gitignore`에 포함되어 있는지 확인
+- manifest에 없는 글은 파일 기반 계산으로 fallback할 수 있게 빈 상태 제공
+- manifest에 있는 상태, 복습 일정, hash를 learning inventory에 병합
+- 답변 내용, 약점 메모, 면접용 문장은 절대 저장하거나 반환하지 않음
 
 ### `status-rules.mjs`
 
 역할:
 
 - publish status 계산
-- learning status 우선순위 계산
+- manifest 우선 learning status 계산
 - tag 상태 계산
 - validation hint 계산
 
@@ -310,6 +324,9 @@ src/content/blog/<project>/*.md
 
 docs/interview-notes/private/<project>/<slug>.md
   -> private note existence and learning state
+
+.local/learning-progress.json
+  -> private learning status, review schedule, source/questions hash
 ```
 
 Dashboard API는 위 데이터를 합쳐 `inventory`를 만든다.
@@ -342,12 +359,17 @@ Dashboard API는 위 데이터를 합쳐 `inventory`를 만든다.
   "hasQuestions": true,
   "hasPrivateNote": true,
   "hasFirstAnswer": true,
+  "hasProgressManifest": true,
+  "learningStatusSource": "manifest",
+  "lastReviewedAt": "2026-06-02",
+  "nextReviewAt": "2026-06-16",
+  "learningWarnings": [],
   "quickFixSuggestions": [],
   "warnings": []
 }
 ```
 
-private note의 내용은 API 응답에 넣지 않는다. v1에서는 경로와 존재 여부만 제공한다.
+private note의 내용은 API 응답에 넣지 않는다. v1에서는 경로와 존재 여부만 제공한다. progress manifest의 상태, 복습 일정, hash mismatch warning은 응답에 넣을 수 있지만 답변 문장이나 개인 약점은 넣지 않는다.
 
 ## 화면 구조
 
@@ -404,7 +426,7 @@ Content Ops의 기본 필터:
 
 학습/면접 상태를 보여준다.
 
-정렬과 상태 규칙은 [Learning Ops Dashboard](../../../learning-ops-dashboard.md)를 따른다.
+정렬과 상태 규칙은 [Learning Ops Dashboard](../../learning-ops-dashboard.md)를 따른다.
 
 Learning Ops 대상:
 
@@ -430,6 +452,8 @@ Learning Ops의 기본 필터:
 - private note
 - first answer
 - learning status
+- last reviewed
+- next review
 - next action
 
 ### 4. Shared Filter Bar
@@ -456,6 +480,8 @@ Learning Ops 전용 필터:
 - has private note
 - learning status
 - needs revisit
+- review due
+- manifest missing
 - archived learning notes
 
 탭을 전환해도 `project`, `type`, `tag` 필터는 유지한다. 하지만 정렬은 탭별 기본값으로 돌아간다. 이렇게 하면 같은 프로젝트를 보면서도 Content Ops와 Learning Ops의 우선순위를 다르게 볼 수 있다.
@@ -584,7 +610,7 @@ alias map은 v1에서는 코드 상수로 시작한다. 오픈소스화 전에 �
 
 - private note 파일이 있으면 `git check-ignore -q <private-note-path>`를 실행한다.
 - private note 파일이 아직 없으면 `docs/interview-notes/private/` 디렉터리를 대상으로 검사한다.
-- `.local/learning-progress.json`을 쓰기 시작하면 `.local/`도 같은 방식으로 검사한다.
+- `.local/learning-progress.json`은 v1부터 사용하므로 `.local/`도 같은 방식으로 검사한다.
 - 검사 실패는 warning으로 표시하고, v1에서는 자동으로 `.gitignore`를 수정하지 않는다.
 
 ### git dirty state
@@ -681,8 +707,14 @@ PR assistant는 git 작업을 도와준다.
 - frontmatter quick fix suggestion을 fixture별로 생성한다.
 - 질문 세트가 3개 이상이면 `questions-ready`로 표시한다.
 - private note 존재 여부만 표시하고 내용을 반환하지 않는다.
+- progress manifest의 `status`, `lastReviewedAt`, `nextReviewAt`을 우선 적용한다.
+- manifest가 없는 글은 파일 기반 learning status로 fallback한다.
+- `nextReviewAt`이 오늘 또는 과거면 `needs-revisit`로 표시한다.
+- source/questions hash가 바뀌면 stale warning을 표시한다.
+- progress manifest 내용에 답변 문장이 포함되지 않는지 fixture로 확인한다.
 - learning status 우선순위를 적용한다.
 - private note path가 `git check-ignore` 결과로 안전하게 판정되는지 확인한다.
+- `.local/learning-progress.json`이 `git check-ignore` 결과로 안전하게 판정되는지 확인한다.
 - Content Ops와 Learning Ops가 같은 project filter를 공유하되 탭별 정렬을 유지한다.
 
 ### 검증 명령
@@ -710,6 +742,7 @@ Blog Ops Dashboard v1은 아래 조건을 만족하면 완료로 본다.
 - source와 published 상태 차이를 볼 수 있다.
 - invalid tag와 frontmatter warning을 볼 수 있다.
 - Learning Ops 상태를 글별로 볼 수 있다.
+- private progress manifest 기반 복습 상태와 다음 복습일을 볼 수 있다.
 - private note 내용은 노출하지 않는다.
 - 선택한 글의 다음 권장 명령을 볼 수 있다.
 - 선택한 글을 학습/면접 에이전트로 넘길 프롬프트를 만들 수 있다.

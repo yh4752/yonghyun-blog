@@ -50,7 +50,7 @@ Blog Ops Dashboard
 
 - 공개 글과 개인 답변 노트를 섞지 않는다.
 - 에이전트가 먼저 완성 답변을 만들지 않고, 사용자의 첫 답변을 먼저 받는다.
-- Learning Ops v1은 read-only 추적에서 시작한다.
+- Learning Ops v1은 private progress manifest를 함께 읽는 정확한 상태 추적에서 시작한다.
 - 완료 상태는 영구 완료가 아니라, 일정 시간이 지나면 복습 대상으로 돌아올 수 있다.
 - private 데이터를 public repository에 올리지 않는다.
 - 상태 추적은 글 단위로 하되, 프로젝트별로 묶어 볼 수 있어야 한다.
@@ -66,7 +66,7 @@ Blog Ops Dashboard
 - 어떤 글이 학습 루틴 대상인지 여부
 - 공개 글에 질문 세트가 있는지 여부
 - `docs/blog-learning-pattern.md` 같은 작성/학습 규칙
-- `docs/next-actions.md`의 큰 작업 큐
+- `docs/next-actions.md`의 가까운 작업 목록
 
 ### 비공개 데이터
 
@@ -79,6 +79,7 @@ Blog Ops Dashboard
 - 면접용 30-60초 답변 초안
 - 다음 복습일
 - 복습 메모
+- private progress manifest의 상태, 복습 일정, content hash
 
 현재 비공개 답변 노트 위치는 아래와 같다.
 
@@ -86,11 +87,16 @@ Blog Ops Dashboard
 docs/interview-notes/private/<project>/<post-slug>.md
 ```
 
-이 경로는 `.gitignore`에 포함되어 있어야 한다.
+개인 답변 노트와 progress manifest는 `.gitignore`에 포함되어 있어야 한다.
+
+```txt
+docs/interview-notes/private/
+.local/
+```
 
 ## 권장 데이터 소스
 
-Learning Ops는 처음부터 별도 데이터베이스를 만들지 않는다. 기존 파일 구조에서 계산 가능한 정보부터 사용한다.
+Learning Ops는 처음부터 별도 데이터베이스를 만들지 않는다. 대신 기존 파일 구조에서 계산 가능한 정보와 비공개 progress manifest를 함께 사용한다.
 
 | 정보 | 출처 | 공개 여부 |
 | --- | --- | --- |
@@ -101,7 +107,9 @@ Learning Ops는 처음부터 별도 데이터베이스를 만들지 않는다. �
 | 질문 세트 존재 여부 | 글 본문 섹션 검사 | 공개 |
 | 개인 답변 노트 존재 여부 | `docs/interview-notes/private/<project>/<slug>.md` | 비공개 |
 | 첫 답변 작성 여부 | 개인 답변 노트 본문 검사 | 비공개 |
-| 복습 상태 | private progress manifest 또는 개인 노트 | 비공개 |
+| 학습 상태 override | `.local/learning-progress.json` | 비공개 |
+| 복습 일정 | `.local/learning-progress.json` | 비공개 |
+| 글/질문 변경 감지 | `.local/learning-progress.json`의 hash | 비공개 |
 
 ## 상태 모델
 
@@ -176,13 +184,20 @@ v1에서는 이전 발행 이력을 저장하지 않으므로 아래처럼 현�
 
 ## 자동 판정 규칙
 
-Learning Ops v1은 상태를 파일에서 계산한다. 구현 시 글의 identity는 아래 값을 사용한다.
+Learning Ops v1은 상태를 파일 구조와 private progress manifest를 합쳐 계산한다. 구현 시 글의 identity는 아래 값을 사용한다.
 
 ```txt
 <project>/<slug>
 ```
 
 `slug`는 frontmatter의 `slug`가 있으면 그 값을 쓰고, 없으면 파일명에서 `.md`를 제거한 값을 쓴다.
+
+상태 계산 우선순위는 아래와 같다.
+
+1. `.local/learning-progress.json`에 명시된 `status`, `lastReviewedAt`, `nextReviewAt`, hash 정보를 우선 사용한다.
+2. manifest에 없는 글은 공개 글과 개인 답변 노트의 섹션을 검사해 fallback 상태를 계산한다.
+3. manifest 상태와 파일 상태가 충돌하면 Dashboard는 manifest 상태를 표시하되, warning으로 불일치를 보여준다.
+4. 답변 내용의 source of truth는 계속 `docs/interview-notes/private/<project>/<slug>.md`다. manifest에는 답변 문장이나 약점 메모를 넣지 않는다.
 
 ### 질문 세트 판정
 
@@ -246,8 +261,8 @@ TODO
 - 개인 답변 노트가 있다.
 - `## 면접용 30-60초 답변` 섹션에 비어 있지 않은 답변이 있다.
 - 명시적으로 `needs-revisit` 상태가 아니어야 한다.
-
-v1에서는 `needs-revisit`의 명시 상태가 없다면 파일 기반으로만 판단한다. v1.5에서 progress manifest를 도입하면 manifest의 상태가 우선한다.
+- manifest의 `nextReviewAt`이 오늘 또는 과거 날짜가 아니어야 한다.
+- manifest에 저장된 `sourceHash` 또는 `questionsHash`가 현재 글과 다르면 `interview-ready` 대신 `needs-revisit` 후보로 본다.
 
 ### 상태 우선순위
 
@@ -266,16 +281,9 @@ v1에서는 `needs-revisit`의 명시 상태가 없다면 파일 기반으로만
 
 `needs-revisit`은 아래 중 하나를 만족할 때 표시한다.
 
-### v1 파일 기반 조건
+### manifest 기반 조건
 
-- 개인 답변 노트에 `status: needs-revisit` 같은 명시적 frontmatter가 있다.
-- 개인 답변 노트에 `## 다음에 다시 볼 것` 섹션이 있고, 내용이 비어 있지 않다.
-- `## 첫 답변`에는 내용이 있지만 `## 면접용 30-60초 답변`이 비어 있다.
-- 첫 답변이 `잘 모르겠다`, `모르겠다`, `불확실` 같은 표현만으로 끝나고 이후 보강 섹션이 없다.
-
-### v1.5 manifest 기반 조건
-
-private progress manifest를 도입한 뒤에는 아래 조건도 사용한다.
+v1부터 private progress manifest를 사용해 아래 조건을 우선 적용한다.
 
 - `status`가 `needs-revisit`이다.
 - `nextReviewAt`이 오늘 또는 과거 날짜다.
@@ -293,6 +301,15 @@ needs-revisit 후 다시 reviewed가 된 글
 ```
 
 이 주기는 나중에 실제 사용하면서 조정한다.
+
+### 파일 기반 fallback 조건
+
+manifest에 해당 글이 없거나 manifest를 아직 만들지 않은 프로젝트에서는 아래 조건을 fallback으로 사용한다.
+
+- 개인 답변 노트에 `status: needs-revisit` 같은 명시적 frontmatter가 있다.
+- 개인 답변 노트에 `## 다음에 다시 볼 것` 섹션이 있고, 내용이 비어 있지 않다.
+- `## 첫 답변`에는 내용이 있지만 `## 면접용 30-60초 답변`이 비어 있다.
+- 첫 답변이 `잘 모르겠다`, `모르겠다`, `불확실` 같은 표현만으로 끝나고 이후 보강 섹션이 없다.
 
 ## 완료 처리
 
@@ -476,13 +493,14 @@ project:
 
 ## 저장 방식
 
-초기에는 파일 기반으로 충분하다.
+초기부터 private progress manifest를 함께 사용한다. 글이 늘어날수록 섹션 존재 여부만으로는 "실제로 복습이 필요한지"를 정확히 알기 어렵기 때문이다.
 
 ### v1
 
 - 질문 세트 존재 여부는 공개 글 본문에서 계산한다.
 - 개인 답변 노트 존재 여부는 ignored private path에서 계산한다.
-- 상태는 개인 답변 노트의 섹션 존재 여부로 추정한다.
+- 첫 답변, reviewed, 30-60초 답변 존재 여부는 개인 답변 노트의 섹션으로 계산한다.
+- 최종 학습 상태, 마지막 복습일, 다음 복습일, 글/질문 변경 감지는 `.local/learning-progress.json`을 우선 사용한다.
 
 예:
 
@@ -492,16 +510,10 @@ project:
 
 면접용 30-60초 답변 섹션 있음
 → interview-ready 후보
+
+manifest nextReviewAt 지남
+→ needs-revisit
 ```
-
-### v1.5
-
-아래 요구가 생기면 private progress manifest를 도입한다.
-
-- `needs-revisit`을 날짜 기준으로 자동 계산해야 한다.
-- 글 변경 이후 답변 노트가 오래됐는지 비교해야 한다.
-- 사용자가 상태를 수동으로 override해야 한다.
-- 여러 파일의 섹션 검사만으로 상태를 안정적으로 계산하기 어려워진다.
 
 ```txt
 .local/learning-progress.json
@@ -521,7 +533,7 @@ project:
 }
 ```
 
-이 파일을 도입한다면 반드시 `.gitignore`에 추가한다.
+이 파일은 반드시 `.gitignore`에 포함한다.
 
 ### 전환 계획
 
@@ -529,9 +541,9 @@ manifest는 개인 답변 노트를 대체하지 않는다. 답변 내용은 계
 
 전환 순서:
 
-1. v1의 파일 기반 규칙으로 현재 상태를 계산한다.
-2. manifest 초안을 생성하되, private 답변 내용은 넣지 않는다.
-3. manifest가 있는 글은 manifest의 `status`, `lastReviewedAt`, `nextReviewAt`을 우선 사용한다.
+1. 파일 기반 규칙으로 현재 상태를 한 번 계산한다.
+2. 계산 결과를 바탕으로 manifest 초안을 생성하되, private 답변 내용은 넣지 않는다.
+3. manifest가 있는 글은 manifest의 `status`, `lastReviewedAt`, `nextReviewAt`, hash를 우선 사용한다.
 4. manifest에 없는 글은 기존 파일 기반 규칙으로 fallback한다.
 5. 모든 개인 답변 노트가 manifest에 등록된 뒤에도, 질문 세트와 private note 존재 여부는 파일에서 계속 계산한다.
 
@@ -555,10 +567,11 @@ Learning Ops는 Content Ops보다 뒤에 붙는 부가 기능이 아니다. 이 
 ## 구현 전 체크리스트
 
 - [ ] `docs/interview-notes/private/`가 `.gitignore`에 포함되어 있는가?
+- [ ] `.local/learning-progress.json`이 `.gitignore`에 포함되어 있는가?
 - [ ] 공개 글과 개인 노트의 경계가 화면에서 명확한가?
 - [ ] 상태 계산 규칙이 구현 가능한 수준으로 구체적인가?
 - [ ] 발행 상태와 학습 상태가 분리되어 있는가?
-- [ ] private progress manifest가 필요한 시점이 명확한가?
+- [ ] private progress manifest가 답변 내용을 저장하지 않는가?
 - [ ] `needs-revisit`로 돌아가는 기준이 명확한가?
 - [ ] 상태별 정렬과 시각 구분이 정의되어 있는가?
 - [ ] 에이전트 프롬프트가 먼저 답변을 요구하도록 되어 있는가?
@@ -571,6 +584,7 @@ Learning Ops v1은 아래 조건을 만족하면 충분하다.
 - 프로젝트별 글 목록에서 학습 상태를 볼 수 있다.
 - 질문 세트가 있는 글과 없는 글을 구분할 수 있다.
 - 개인 답변 노트가 있는 글과 없는 글을 구분할 수 있다.
+- private progress manifest를 기준으로 복습 상태와 다음 복습일을 볼 수 있다.
 - 다음에 복습하거나 질문 세트를 만들 글을 알 수 있다.
 - 개인 답변 내용은 public dashboard나 public commit에 노출되지 않는다.
 - 선택한 글을 학습/면접 에이전트로 넘길 프롬프트를 만들 수 있다.
