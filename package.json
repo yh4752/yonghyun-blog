@@ -13,6 +13,7 @@
     "astro": "astro",
     "init:project": "node scripts/init-project.mjs",
     "new:post": "node scripts/new-post.mjs",
+    "ops:dashboard": "node scripts/blog-ops-dashboard.mjs",
     "sync:posts": "node scripts/sync-posts.mjs",
     "validate:posts": "node scripts/validate-posts.mjs"
   },
