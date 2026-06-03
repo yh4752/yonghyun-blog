@@ -18,12 +18,6 @@
 
 ## 현재 우선순위
 
-- [x] Blog Ops Dashboard 설계 문서 작성
-- [x] Blog Ops Dashboard 설계 문서 리뷰
-- [x] Blog Ops Dashboard 구현 계획 작성
-- [x] Blog Ops Dashboard 구현 계획 리뷰
-- [x] Blog Ops Dashboard read-only inventory 구현
-- [x] Learning Ops private progress manifest 구현 및 테스트 추가
 - [ ] Blog Ops Dashboard v1 사용 후기 기록
 - [ ] Sigak Flyway 검색/RAG 연결 1회 복습
 - [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
@@ -40,20 +34,6 @@ Blog Ops Dashboard가 구현되기 전까지는 아래 후보만 수동으로 �
 
 ### blog ops
 
-- [x] Blog Ops Dashboard가 해결할 문제와 v1 범위 정의
-- [x] source post, published post, private note의 경계 정리
-- [x] read-only dashboard에 필요한 데이터 목록 정리
-- [x] Learning Ops Dashboard에서 추적할 상태와 private 데이터 경계 정리
-- [x] Learning Ops 상태 자동 판정과 `needs-revisit` 전환 조건 정리
-- [x] Learning Ops 정렬, 필터, 시각 구분 기준 정리
-- [x] `archived-note` 발생 조건과 UI 표시 정책 정리
-- [x] frontmatter quick fix suggestion 범위 정리
-- [x] invalid tag suggestion 규칙 정리
-- [x] `.gitignore` 기반 private note 경로 검증 정책 정리
-- [x] Learning Ops 기본 정렬과 `needs-revisit` 표시 정책을 구현 계획에 반영
-- [x] `.local/learning-progress.json` manifest schema 구현
-- [x] manifest가 답변 내용을 저장하지 않도록 테스트 fixture 구현
-- [ ] Blog Ops Dashboard v1 로컬 사용 후기 기록
 - [ ] safe CRUD에서 허용할 작업과 금지할 작업 정리
 - [ ] 검증, sync, PR 자동화 흐름 설계
 
