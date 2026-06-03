@@ -15,7 +15,8 @@
 
 ## 현재 우선순위
 
-- [ ] Blog Ops Dashboard 설계 문서 작성
+- [x] Blog Ops Dashboard 설계 문서 작성
+- [ ] Blog Ops Dashboard 설계 문서 리뷰
 - [x] CI/CD 답변 노트 1회 소리 내어 복습
 - [x] Sigak 글 1개를 같은 방식으로 면접 질문 세트화
 - [x] Sigak Flyway 개인 답변 1차 작성
@@ -73,6 +74,10 @@
 - [ ] Learning Ops Dashboard에서 추적할 상태와 private 데이터 경계 정리
 - [ ] Learning Ops 상태 자동 판정과 `needs-revisit` 전환 조건 정리
 - [ ] Learning Ops 정렬, 필터, 시각 구분 기준 정리
+- [ ] `archived-note` 발생 조건과 UI 표시 정책 정리
+- [ ] frontmatter quick fix suggestion 범위 정리
+- [ ] invalid tag suggestion 규칙 정리
+- [ ] `.gitignore` 기반 private note 경로 검증 정책 정리
 - [ ] safe CRUD에서 허용할 작업과 금지할 작업 정리
 - [ ] 검증, sync, PR 자동화 흐름 설계
 
