@@ -635,6 +635,71 @@ Dashboard는 로컬 전용이다.
 
 v1 이후 아래 순서로 확장한다.
 
+### Safe CRUD 기본 원칙
+
+여기서 CRUD는 production 블로그나 발행본을 직접 고치는 CMS 기능이 아니다. 로컬 source post와 안전한 운영 명령을 다루는 제한된 작업 흐름이다.
+
+공통 원칙:
+
+- 모든 수정은 source post에만 적용한다.
+- 발행본 `src/content/blog/<project>/`는 직접 수정하지 않는다.
+- 변경 전에는 diff preview를 보여준다.
+- validation을 통과하기 전에는 sync, commit, PR 단계를 권장하지 않는다.
+- command execution은 allow-list만 허용한다.
+- arbitrary shell command 입력 UI는 만들지 않는다.
+- source repo와 blog repo의 dirty state를 분리해서 보여준다.
+- 대상 파일 외 변경사항이 있으면 mutating action을 막고 먼저 git 상태를 정리하도록 안내한다.
+
+### 상태별 허용 작업
+
+| 상태 | 허용 작업 | 금지 작업 | 기본 next action |
+| --- | --- | --- | --- |
+| `published` | source frontmatter 편집, source validation, sync 준비 | published file 직접 수정 | "source를 수정한 뒤 validate/sync를 실행하세요" |
+| `draft` | source frontmatter 편집, draft 유지, draft 해제 준비, Learning Ops 연결 | 공개 대표 글로 표시 | "계속 작성하거나 draft 해제 전 validation을 실행하세요" |
+| `pending-sync` | source validation, sync 실행, published validation | source 없이 published만 수동 생성 | "sync 후 published validation을 실행하세요" |
+| `orphan-published` | source 복구 안내, published 제거 후보 표시, archive 정책 선택 | 브라우저에서 published 직접 수정, 자동 삭제 | "source 복구/발행본 제거/archive 중 하나를 선택하세요" |
+| `unknown` | frontmatter skeleton 제안, exclude 검토 안내 | 구조화 frontmatter 편집, sync 실행 | "frontmatter를 먼저 복구하거나 source exclude 여부를 결정하세요" |
+| `archived-note` | private note path 확인, cleanup 후보 표시 | private note 내용 표시, 자동 삭제 | "학습 노트 보존 또는 수동 정리를 결정하세요" |
+
+`orphan-published`와 `unknown`은 자동 수정하지 않는다. 두 상태는 사용자 의도가 필요하다.
+
+### 허용할 mutating action
+
+Phase 3에서 허용할 수 있는 작업:
+
+- 새 source post 생성
+- source frontmatter의 제한된 필드 수정
+- `draft: true`와 `draft: false` 토글
+- tag를 허용 목록 안의 값으로 교체
+- quick fix suggestion 중 안전한 값 적용
+  - `draft: true` 추가
+  - `featured: false` 추가
+  - date 형식 보정
+  - 대소문자/구분자만 다른 tag를 기존 allowed tag로 교체
+- `.local/learning-progress.json`에 학습 상태 metadata 추가 또는 갱신
+- allow-list에 포함된 검증 명령 실행
+
+Phase 3에서 보류할 작업:
+
+- 본문 편집
+- source 파일 이동/이름 변경
+- allowed tag 목록 자동 추가
+- `relatedPosts` 자동 추론
+- published-only 글 자동 삭제
+- source repo와 blog repo를 한 번에 commit
+
+### 금지할 작업
+
+아래 작업은 future phase에서도 기본 금지로 둔다. 필요하면 별도 설계를 다시 작성한다.
+
+- production 블로그에서 직접 CRUD
+- published post 직접 수정
+- private note 내용 표시 또는 원격 전송
+- arbitrary frontmatter key 추가
+- arbitrary shell command 실행
+- `.gitignore` 밖에 private progress manifest 생성
+- branch protection을 우회하는 main 직접 push 안내
+
 ### Phase 3. Safe Frontmatter Editing
 
 허용 필드:
@@ -659,7 +724,19 @@ v1 이후 아래 순서로 확장한다.
 
 ### Phase 4. Validation and Sync Runner
 
-버튼으로 실행할 명령:
+Validation and Sync Runner는 글 발행 전후의 검증 절차를 버튼으로 묶되, 임의 명령 실행기가 되어서는 안 된다.
+
+기본 실행 흐름:
+
+1. source repo 상태 확인
+2. source post validation
+3. source에서 published content로 sync
+4. published content validation
+5. test
+6. build
+7. diff summary 생성
+
+버튼으로 실행할 수 있는 명령은 allow-list로 제한한다.
 
 ```bash
 npm run validate:posts -- --source --project <project>
@@ -669,9 +746,44 @@ npm test
 npm run build
 ```
 
-명령 실행 결과는 로그 panel에 표시한다.
+`<project>`는 `posts.config.yml`에 등록된 project slug만 허용한다. 사용자가 직접 shell command나 임의 argument를 입력하는 UI는 만들지 않는다.
 
-실패하면 다음 단계 버튼을 비활성화한다.
+단계별 차단 규칙:
+
+- source repo를 찾을 수 없으면 source validation과 sync를 비활성화한다.
+- source validation이 실패하면 sync를 비활성화한다.
+- sync가 실패하면 published validation, test, build를 비활성화한다.
+- published validation이 실패하면 test, build, PR 단계를 비활성화한다.
+- test가 실패하면 build와 PR 단계를 비활성화한다.
+- build가 실패하면 PR 단계를 비활성화한다.
+- 대상 파일 외 dirty state가 있으면 sync, commit, PR 단계를 비활성화한다.
+
+명령 실행 결과는 로그 panel에 표시한다. 로그는 command, exit code, stdout/stderr 일부, 다음 권장 조치로 나눈다.
+
+실패 메시지는 문제와 다음 행동을 분리해서 보여준다.
+
+예시:
+
+| 실패 지점 | 표시할 next action |
+| --- | --- |
+| source validation 실패 | "원본 글의 frontmatter 또는 편집 정책을 먼저 고치세요" |
+| sync 실패 | "`posts.config.yml` 경로와 source 파일 존재 여부를 확인하세요" |
+| published validation 실패 | "동기화된 발행본의 frontmatter가 source와 일치하는지 확인하세요" |
+| test 실패 | "변경한 스크립트 또는 inventory 계산 로직을 먼저 고치세요" |
+| build 실패 | "Astro route, content collection schema, import 오류를 확인하세요" |
+
+diff summary는 PR 작성 전에 반드시 보여준다.
+
+표시할 항목:
+
+- source repo 변경 파일
+- blog repo 변경 파일
+- 생성된 published post
+- 삭제 또는 orphan 후보
+- frontmatter 변경 요약
+- learning progress manifest 변경 여부
+
+source repo 변경과 blog repo 변경은 서로 다른 commit 후보로 보여준다.
 
 ### Phase 5. PR Assistant
 
@@ -680,11 +792,51 @@ PR assistant는 git 작업을 도와준다.
 순서:
 
 1. blog repo와 source repo dirty state 확인
-2. source repo 변경이 있으면 source repo 커밋 먼저 안내
-3. blog repo에서 sync 결과 커밋
-4. branch 생성
+2. 현재 branch가 `main`이면 작업 branch 생성을 먼저 안내
+3. source repo 변경이 있으면 source repo 커밋 먼저 안내
+4. blog repo에서 sync 결과 커밋
 5. push
 6. draft PR 생성
+
+기본 branch 이름:
+
+```text
+codex/blog-ops-<YYYY-MM-DD>-<short-topic>
+```
+
+commit message 후보:
+
+```text
+docs: update blog ops dashboard workflow
+blog: sync <project> posts
+blog: add <YYYY-MM-DD> dev log
+```
+
+PR 생성 전 필수 조건:
+
+- `npm run validate:posts` 통과
+- `npm test` 통과
+- `npm run build` 통과
+- blog repo dirty state가 PR에 포함할 파일만 남아 있음
+- source repo 변경이 있으면 별도 commit 또는 별도 안내가 완료됨
+- 현재 branch가 `main`이 아님
+
+PR assistant가 해도 되는 작업:
+
+- branch 생성 제안
+- staged file 목록 제안
+- commit message 제안
+- draft PR title/body 생성
+- remote push 안내
+
+PR assistant가 자동으로 해서는 안 되는 작업:
+
+- unrelated file stage
+- source repo와 blog repo 동시 commit
+- failing validation 상태에서 PR 생성
+- production deploy 직접 실행
+- branch protection 우회
+- `main` 직접 push
 
 `main` 직접 push는 절대 권장하지 않는다.
 
