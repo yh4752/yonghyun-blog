@@ -18,7 +18,9 @@
 
 ## 현재 우선순위
 
-- [ ] Blog Ops Dashboard v1 사용 후기 기록
+- [x] Blog Ops Dashboard v1 사용 후기 기록
+- [x] safe CRUD에서 허용할 작업과 금지할 작업 정리
+- [x] 검증, sync, PR 자동화 흐름 설계
 - [ ] Sigak Flyway 검색/RAG 연결 1회 복습
 - [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
 
@@ -34,8 +36,9 @@ Blog Ops Dashboard가 구현되기 전까지는 아래 후보만 수동으로 �
 
 ### blog ops
 
-- [ ] safe CRUD에서 허용할 작업과 금지할 작업 정리
-- [ ] 검증, sync, PR 자동화 흐름 설계
+- [x] `orphan-published` 처리 정책 확정
+- [x] `unknown` source post 처리 정책 확정
+- [x] 상태별 next action 문구 정의
 
 ## 블로그 작성 스킬 목표
 
