@@ -497,12 +497,10 @@ npm run build
 ### 전체 발행 전 권장 순서
 
 ```bash
-npm run validate:posts -- --source --project <project>
-npm run sync:posts
-npm run validate:posts
-npm test
-npm run build
+npm run publish:posts -- --project <project>
 ```
+
+위 명령은 source 검증, 해당 프로젝트 sync, published 검증, 테스트, 빌드를 순서대로 실행한다.
 
 ### 발행본 삭제
 
@@ -673,14 +671,10 @@ deep-dive 글에 '## 검증' 섹션이 없습니다.
 
 ## 최종 발행 체크
 
-발행 직전 아래 네 줄을 통과해야 한다.
+발행 직전 아래 명령을 통과해야 한다.
 
 ```bash
-npm run validate:posts -- --source --project <project>
-npm run sync:posts
-npm run validate:posts
-npm test
-npm run build
+npm run publish:posts -- --project <project>
 ```
 
 통과 후 확인할 것:

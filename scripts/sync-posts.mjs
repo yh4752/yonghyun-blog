@@ -4,6 +4,32 @@ import { parse } from "yaml";
 
 const ROOT = process.cwd();
 
+function readProjectValue(argv, index) {
+  const value = argv[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error("--project requires a value.");
+  }
+  return value;
+}
+
+function parseArgs(argv) {
+  const args = { project: undefined };
+  for (let index = 0; index < argv.length; index += 1) {
+    const item = argv[index];
+    if (item === "--project") {
+      args.project = readProjectValue(argv, index);
+      index += 1;
+      continue;
+    }
+    if (item.startsWith("--project=")) {
+      const value = item.slice("--project=".length);
+      if (!value) throw new Error("--project requires a value.");
+      args.project = value;
+    }
+  }
+  return args;
+}
+
 function readConfig() {
   return parse(fs.readFileSync(path.join(ROOT, "posts.config.yml"), "utf8"));
 }
@@ -39,12 +65,27 @@ function listMarkdownFiles(sourceDir, include, exclude) {
     .map((name) => path.join(sourceDir, name));
 }
 
+let args;
+try {
+  args = parseArgs(process.argv.slice(2));
+} catch (error) {
+  console.error(`Error: ${error.message}`);
+  process.exit(1);
+}
 const config = readConfig();
+const sources = config.sources ?? [];
+const selectedSources = args.project ? sources.filter((source) => source.project === args.project) : sources;
+
+if (args.project && selectedSources.length === 0) {
+  console.error(`Error: unknown project '${args.project}' in posts.config.yml.`);
+  process.exit(1);
+}
+
 const contentDir = path.resolve(ROOT, config.site.contentDir);
 const desired = new Map();
 const changed = [];
 
-for (const source of config.sources ?? []) {
+for (const source of selectedSources) {
   const sourceDir = expandPath(source.path);
   const projectDir = path.join(contentDir, source.project);
   fs.mkdirSync(projectDir, { recursive: true });
@@ -75,7 +116,7 @@ for (const source of config.sources ?? []) {
   }
 }
 
-for (const source of config.sources ?? []) {
+for (const source of selectedSources) {
   const projectDir = path.join(contentDir, source.project);
   if (!fs.existsSync(projectDir)) continue;
   for (const entry of fs.readdirSync(projectDir, { withFileTypes: true })) {
