@@ -21,6 +21,44 @@ test("renderDashboardHtml renders progress manifest learning columns", () => {
   assert.match(html, /learningWarnings/);
 });
 
+test("renderDashboardHtml includes copy-only Action Runner Preview commands", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /Action Runner Preview/);
+  assert.match(html, /publishPreviewCommands/);
+  assert.match(html, /npm run publish:posts -- --project /);
+  assert.match(html, /--dry-run/);
+  assert.match(html, /Copy dry-run/);
+  assert.match(html, /Copy publish/);
+  assert.match(html, /renderCommand\("Copy dry-run", \{ agentPrompt: preview\.dryRun \}\)/);
+  assert.match(html, /renderCommand\("Copy publish", \{ agentPrompt: preview\.publish \}\)/);
+});
+
+test("renderDashboardHtml does not expose direct command execution controls", () => {
+  const html = renderDashboardHtml();
+
+  assert.doesNotMatch(html, /data-run-command/);
+  assert.doesNotMatch(html, /Run command/);
+  assert.doesNotMatch(html, /Execute command/);
+  assert.doesNotMatch(html, /arbitrary shell/i);
+});
+
+test("renderDashboardHtml keeps sync command suggestions project-scoped", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /npm run sync:posts -- --project /);
+  assert.doesNotMatch(html, /commands\.push\("npm run sync:posts"\)/);
+});
+
+test("renderDashboardHtml does not default All Projects publish preview to first project", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /function activePublishProjectSlug\(\)/);
+  assert.match(html, /if \(state\.activeProject === "all"\) return "";/);
+  assert.doesNotMatch(html, /state\.inventory\.projects\[0\]\?\.slug/);
+  assert.match(html, /프로젝트를 선택하면 publish command를 보여줍니다\./);
+});
+
 test("createDashboardServer serves inventory without private note content", async () => {
   const server = createDashboardServer({
     inventoryProvider: () => ({

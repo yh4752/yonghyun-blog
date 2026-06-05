@@ -11,6 +11,9 @@
 - GitHub Actions가 검증하고, Vercel이 배포한다.
 - `main` 직접 push는 branch protection으로 막는다.
 - 글은 문제, 선택지, 결정, 검증, 트레이드오프, 면접 질문으로 이어지는 학습형 구조를 지향한다.
+- `init:project`, `new:post`, `validate:posts`, `sync:posts`, `publish:posts`로 작성과 발행 루틴을 CLI에서 반복할 수 있다.
+- Blog Ops Dashboard는 로컬에서 Content Ops와 Learning Ops 상태를 읽기 전용으로 보여준다.
+- 2026-06-04 기준 Dashboard 디자인 반영, project-scoped publish flow, yonghyun-blog/Sigak 발행 dogfooding까지 완료했다.
 
 ## 장기 목표
 
@@ -43,27 +46,39 @@
 - 모든 변경은 검증과 PR 흐름을 거친다.
 - `draft: true`는 사이트 비노출이지, 진짜 비공개가 아님을 명확히 표시한다.
 
-단계:
+현재 단계:
 
-1. Read-only inventory
+1. [x] Read-only inventory
    - 프로젝트 목록, 글 목록, draft 상태, 태그, source/published 상태를 보여준다.
 
-2. Safe frontmatter editing
+2. [x] Learning Ops inventory
+   - 질문 세트, 개인 답변 노트 존재 여부, progress manifest 기반 상태를 보여준다.
+   - private note 본문은 노출하지 않는다.
+
+3. [x] Dashboard visual refresh
+   - Claude Design handoff를 바탕으로 macOS 계열의 로컬 운영 도구 UI를 적용했다.
+
+4. [x] CLI validation and sync runner
+   - `publish:posts -- --project <project>`가 source validation, sync, published validation, test, build를 순서대로 실행한다.
+   - `sync:posts -- --project <project>`로 특정 프로젝트만 동기화할 수 있다.
+
+5. [ ] Safe frontmatter editing
    - `title`, `summary`, `tags`, `draft`, `featured` 같은 작은 필드만 수정한다.
    - 변경 전 diff 또는 preview를 보여준다.
 
-3. Validation and sync runner
+6. [ ] Dashboard action runner
    - `validate:posts --source --project <project>`
    - `sync:posts`
    - `validate:posts`
    - `npm test`
    - `npm run build`
+   - v1.1에서는 실제 실행보다 dry-run, command preview, copy command를 먼저 둔다.
 
-4. PR assistant
+7. [ ] PR assistant
    - branch 생성, commit, push, PR 생성까지 도와준다.
    - source repo와 blog repo가 다른 경우 커밋 경계를 명확히 안내한다.
 
-5. Project onboarding
+8. [x] Project onboarding CLI
    - 새 프로젝트의 `docs/blog` 생성, `posts.config.yml` 등록, `projects.json` 등록을 한 흐름으로 묶는다.
 
 ### Track B. Learning and Interview Agent
@@ -117,7 +132,9 @@ Dashboard에서 글별 학습 상태를 추적하는 방식은 [Learning Ops Das
 - `new:post`
 - `sync:posts`
 - `validate:posts`
+- `publish:posts`
 - Blog Ops Dashboard
+- Blog Ops inventory/status rules
 - technical blog learning workflow 문서와 템플릿
 
 오픈소스화 전에 확인할 것:
@@ -139,32 +156,32 @@ Dashboard에서 글별 학습 상태를 추적하는 방식은 [Learning Ops Das
 
 ### Phase 1. Blog Ops Dashboard 설계
 
-- [ ] 대시보드가 해결할 문제 정의
-- [ ] v1에서 하지 않을 것 정의
-- [ ] source post, published post, private note의 경계 명시
-- [ ] 로컬 전용으로 시작하는 이유 정리
-- [ ] 화면 목록과 작업 흐름 설계
-- [ ] PR assistant의 커밋/브랜치 정책 설계
+- [x] 대시보드가 해결할 문제 정의
+- [x] v1에서 하지 않을 것 정의
+- [x] source post, published post, private note의 경계 명시
+- [x] 로컬 전용으로 시작하는 이유 정리
+- [x] 화면 목록과 작업 흐름 설계
+- [x] PR assistant의 커밋/브랜치 정책 설계
 
 ### Phase 2. Read-only Dashboard
 
-- [ ] 프로젝트 목록 읽기
-- [ ] source 글 목록 읽기
-- [ ] published 글 목록 읽기
-- [ ] draft/published 상태 비교
-- [ ] 태그 허용 목록과 글 태그 비교
-- [ ] 화면에서 검증 상태를 이해할 수 있게 표시
+- [x] 프로젝트 목록 읽기
+- [x] source 글 목록 읽기
+- [x] published 글 목록 읽기
+- [x] draft/published 상태 비교
+- [x] 태그 허용 목록과 글 태그 비교
+- [x] 화면에서 검증 상태를 이해할 수 있게 표시
 
 ### Phase 2.5. Learning Ops Inventory
 
-- [ ] 글별 질문 세트 존재 여부 표시
-- [ ] 개인 답변 노트 존재 여부 표시
-- [ ] 학습 상태 표시
-- [ ] 학습 상태 자동 판정 규칙 구현
-- [ ] 다음 복습 후보 표시
-- [ ] 상태별 정렬과 시각 구분 적용
-- [ ] 학습/면접 에이전트 시작 프롬프트 생성
-- [ ] 공개 가능한 상태와 비공개 답변 내용을 분리
+- [x] 글별 질문 세트 존재 여부 표시
+- [x] 개인 답변 노트 존재 여부 표시
+- [x] 학습 상태 표시
+- [x] 학습 상태 자동 판정 규칙 구현
+- [x] 다음 복습 후보 표시
+- [x] 상태별 정렬과 시각 구분 적용
+- [x] 학습/면접 에이전트 시작 프롬프트 생성
+- [x] 공개 가능한 상태와 비공개 답변 내용을 분리
 
 ### Phase 3. Safe CRUD
 
@@ -177,39 +194,44 @@ Dashboard에서 글별 학습 상태를 추적하는 방식은 [Learning Ops Das
 
 ### Phase 4. Validation, Sync, PR
 
-- [ ] source validation 실행
-- [ ] sync 실행
-- [ ] published validation 실행
-- [ ] test/build 실행
+- [x] project-scoped source validation 실행
+- [x] project-scoped sync 실행
+- [x] published validation 실행
+- [x] test/build 실행
+- [x] `publish:posts`로 검증 체인 묶기
+- [x] Dashboard action runner v1.1 범위 확정
+- [ ] Dashboard에서 runner dry-run과 command preview 표시
+- [ ] Dashboard에서 allow-list 기반 실제 runner 실행
 - [ ] branch 생성
 - [ ] commit 생성
 - [ ] push와 PR 생성
 
 ### Phase 5. 반복 사용과 오픈소스 판단
 
-- [ ] yonghyun-blog 글 하나에 적용
-- [ ] Sigak 글 하나에 적용
+- [x] yonghyun-blog 글 하나에 적용
+- [x] Sigak 글 하나에 적용
 - [ ] 새 프로젝트 초기화 시나리오에 적용
 - [ ] 불편했던 점을 `docs/skill-dogfooding` 또는 별도 평가 문서에 기록
 - [ ] 오픈소스 분리 여부 결정
 
 ## 당장 다음 작업
 
-다음 작업은 Phase 1의 설계 문서 작성이다.
+다음 작업은 Phase 3과 Phase 4 사이의 작은 v1.1이다.
 
-문서 위치:
+확정된 v1.1 범위는 **Action Runner Preview**다.
 
-```txt
-docs/superpowers/specs/YYYY-MM-DD-blog-ops-dashboard-design.md
-```
+- Dashboard는 선택한 프로젝트의 발행 검증 계획을 보여준다.
+- `npm run publish:posts -- --project <project> --dry-run`과 실제 실행 명령을 preview로 표시한다.
+- 사용자는 command를 복사해서 터미널에서 실행한다.
+- Dashboard가 직접 명령을 실행하거나 파일을 변경하지 않는다.
 
-그 다음에 구현 계획을 별도 plan 문서로 쓴다.
+다음 순서:
 
-문서 위치:
-
-```txt
-docs/superpowers/plans/YYYY-MM-DD-blog-ops-dashboard.md
-```
+1. `publish:posts --dry-run` 결과를 Dashboard에서 command preview로 보여준다.
+2. copy command를 제공한다.
+3. 실제 실행 버튼은 allow-list, dirty state check, diff preview 정책이 구현된 뒤 붙인다.
+4. Learning Ops에서 오늘 복습할 글 1개를 고르고 private note/progress manifest 흐름을 확인한다.
+5. 작업이 끝나면 6/5 dev-log로 운영 루틴 적용 결과를 기록한다.
 
 ## 보류할 것
 

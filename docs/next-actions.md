@@ -21,24 +21,73 @@
 - [x] Blog Ops Dashboard v1 사용 후기 기록
 - [x] safe CRUD에서 허용할 작업과 금지할 작업 정리
 - [x] 검증, sync, PR 자동화 흐름 설계
-- [ ] Sigak Flyway 검색/RAG 연결 1회 복습
-- [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
+- [x] Blog Ops Dashboard 디자인 반영
+- [x] `publish:posts`로 project-scoped 발행 검증 체인 추가
+- [x] 2026-06-04 yonghyun-blog dev-log 작성, PR, production 배포
+- [x] 운영 문서를 현재 구현 상태에 맞춰 최신화
+- [x] Dashboard action runner v1.1 범위 확정
+- [x] `publish:posts --dry-run` command preview를 Dashboard에 연결
+- [ ] Learning Ops 운영 대상 글 1개 선정
+- [ ] 2026-06-05 dev-log 작성
 
-## Dashboard 전환 전 임시 후보
+## 이번 주 후보
 
-Blog Ops Dashboard가 구현되기 전까지는 아래 후보만 수동으로 남긴다. 전체 글 목록, 완료된 글, 글별 세부 단계는 여기에 누적하지 않는다.
+Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 않는다. 아래에는 이번 주에 실제로 집어 들 수 있는 후보만 남긴다.
 
 - [ ] 블로그 스캐폴딩 글 재구성 검토
 - [ ] 발행본 직접 수정 방지 글 재구성 검토
 - [ ] SchemaSpy adoption 글 학습형/포트폴리오형 재구성 후보 검토
 - [ ] Sigak 글에서 프로젝트 맥락, 설계 결정, 검증 근거가 충분한지 점검
 - [ ] 새 프로젝트 생성 시 `docs/blog` 작성 규칙 적용
+- [ ] Sigak Flyway 검색/RAG 연결 1회 복습
+- [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
 
 ### blog ops
 
 - [x] `orphan-published` 처리 정책 확정
 - [x] `unknown` source post 처리 정책 확정
 - [x] 상태별 next action 문구 정의
+- [x] read-only inventory 구현
+- [x] Content Ops와 Learning Ops 탭 구현
+- [x] private note 본문 비노출 정책 구현
+- [x] project-scoped `sync:posts` 구현
+- [x] project-scoped `publish:posts` 구현
+- [x] Dashboard runner는 먼저 dry-run/command preview로 시작
+- [ ] 실제 실행 버튼은 allow-list, dirty state check, diff preview 이후에만 추가
+
+## 오늘 집어 들 작업
+
+오늘은 아래 순서로 진행한다.
+
+- [x] 운영 문서를 현재 구현 상태에 맞춰 최신화한다.
+- [x] Dashboard action runner v1.1의 최소 범위를 정한다.
+- [x] 구현한다면 `publish:posts --dry-run` command preview부터 시작한다.
+- [ ] Learning Ops 대상 글 1개를 고른다.
+- [ ] 마지막에 6/5 dev-log로 남긴다.
+
+## Dashboard action runner v1.1 확정 범위
+
+v1.1은 **Action Runner Preview**로 제한한다.
+
+포함:
+
+- 선택한 프로젝트의 publish plan 표시
+- `npm run publish:posts -- --project <project> --dry-run` 표시
+- `npm run publish:posts -- --project <project>` 표시
+- 단계 목록 표시: source validation, project sync, published validation, test, build
+- dry-run command와 publish command 복사
+- source 우선, 발행본 직접 수정 금지, dirty state 확인 같은 safety note 표시
+
+제외:
+
+- Dashboard에서 명령 직접 실행
+- 임의 shell command 입력
+- 파일 변경
+- frontmatter 편집
+- draft 토글
+- 자동 commit, push, PR 생성
+
+실제 실행 버튼은 allow-list, dirty state check, diff preview, 로그 panel이 구현된 뒤 v1.2에서 검토한다.
 
 ## 블로그 작성 스킬 목표
 

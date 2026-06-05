@@ -733,12 +733,13 @@
       }
 
       .pipeline {
-        height: 92px;
+        min-height: 118px;
+        height: auto;
         flex-shrink: 0;
         display: flex;
         align-items: center;
         gap: 0;
-        padding: 0 22px;
+        padding: 14px 22px;
         background: var(--panel);
         border-top: 1px solid var(--border);
       }
@@ -838,6 +839,68 @@
         font-weight: 600;
         box-shadow: var(--shadow-sm);
         white-space: nowrap;
+      }
+
+      .runner-preview {
+        flex-shrink: 0;
+        width: min(430px, 34vw);
+        margin-left: 22px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--panel-alt);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .runner-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 9px;
+      }
+
+      .runner-title {
+        color: var(--text);
+        font-size: 12.5px;
+        font-weight: 650;
+      }
+
+      .runner-project {
+        color: var(--text-tertiary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .runner-steps {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin: 0 0 10px;
+        padding: 0;
+        list-style: none;
+      }
+
+      .runner-steps li {
+        padding: 3px 7px;
+        border-radius: 999px;
+        background: var(--quiet-bg);
+        color: var(--quiet);
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+      }
+
+      .runner-actions {
+        display: grid;
+        gap: 7px;
+      }
+
+      .runner-note {
+        margin-top: 9px;
+        color: var(--text-sec);
+        font-size: 11.5px;
+        line-height: 1.45;
       }
 
       .empty {
@@ -973,6 +1036,11 @@
           margin-left: 0;
           width: 100%;
           justify-content: center;
+        }
+
+        .runner-preview {
+          margin-left: 0;
+          width: 100%;
         }
       }
     </style>
@@ -1225,7 +1293,7 @@
           commands.push("npm run validate:posts -- --source --project " + post.project);
         }
         if (post.publishStatus === "pending-sync") {
-          commands.push("npm run sync:posts");
+          commands.push("npm run sync:posts -- --project " + post.project);
           commands.push("npm run validate:posts");
         }
         if (post.publishStatus === "published" || post.publishStatus === "orphan-published") {
@@ -1384,9 +1452,59 @@
       }
 
       function renderCommand(command, post) {
-        const copyValue = command === "Copy learning agent prompt" ? post.agentPrompt || "" : command;
+        const isLearningPrompt = command === "Copy learning agent prompt";
+        const isRunnerCopy = command === "Copy dry-run" || command === "Copy publish";
+        const isExplicitCopy = isLearningPrompt || isRunnerCopy;
+        const copyValue = isExplicitCopy ? post.agentPrompt || "" : command;
+        const displayValue = isRunnerCopy ? copyValue : command;
         const copied = state.copied === command;
-        return "<button class=\"command\" data-copy=\"" + escapeHtml(copyValue) + "\" data-copy-label=\"" + escapeHtml(command) + "\" type=\"button\"><span class=\"copy-state\">" + (copied ? "✓" : "$") + "</span><code>" + escapeHtml(command) + "</code><span class=\"copy-state\">" + (copied ? "copied" : "copy") + "</span></button>";
+        return "<button class=\"command\" data-copy=\"" + escapeHtml(copyValue) + "\" data-copy-label=\"" + escapeHtml(command) + "\" type=\"button\"><span class=\"copy-state\">" + (copied ? "✓" : "$") + "</span><code>" + escapeHtml(displayValue) + "</code><span class=\"copy-state\">" + (copied ? "copied" : "copy") + "</span></button>";
+      }
+
+      function activePublishProjectSlug() {
+        if (state.activeProject === "all") return "";
+        return state.activeProject;
+      }
+
+      function publishPreviewCommands() {
+        const project = activePublishProjectSlug();
+        if (!project) {
+          return {
+            project: "",
+            dryRun: "",
+            publish: "",
+          };
+        }
+        return {
+          project,
+          dryRun: "npm run publish:posts -- --project " + project + " --dry-run",
+          publish: "npm run publish:posts -- --project " + project,
+        };
+      }
+
+      function publishPreviewSteps() {
+        return ["source validation", "project sync", "published validation", "test", "build"];
+      }
+
+      function renderRunnerPreview() {
+        const preview = publishPreviewCommands();
+        if (!preview.project) {
+          return "<div class=\"runner-preview\"><div class=\"runner-head\"><span class=\"runner-title\">Action Runner Preview</span></div><div class=\"runner-note\">프로젝트를 선택하면 publish command를 보여줍니다.</div></div>";
+        }
+
+        const steps = publishPreviewSteps()
+          .map((step) => "<li>" + escapeHtml(step) + "</li>")
+          .join("");
+
+        return "<div class=\"runner-preview\">" +
+          "<div class=\"runner-head\"><span class=\"runner-title\">Action Runner Preview</span><span class=\"runner-project\">" + escapeHtml(preview.project) + "</span></div>" +
+          "<ul class=\"runner-steps\">" + steps + "</ul>" +
+          "<div class=\"runner-actions\">" +
+            renderCommand("Copy dry-run", { agentPrompt: preview.dryRun }) +
+            renderCommand("Copy publish", { agentPrompt: preview.publish }) +
+          "</div>" +
+          "<div class=\"runner-note\">Preview only. 터미널에서 실행하기 전에 source diff와 dirty state를 확인하세요. Dashboard는 v1.1에서 명령을 직접 실행하지 않습니다.</div>" +
+        "</div>";
       }
 
       function operationState() {
@@ -1420,7 +1538,7 @@
         document.querySelector("#pipeline").innerHTML =
           "<div class=\"pipeline-summary\"><div class=\"eyebrow\">Operation flow</div><div class=\"pipeline-status\"><span style=\"color: var(--error)\">●</span><span>" + summary + "</span></div></div>" +
           "<div class=\"pipeline-flow\">" + steps + "</div>" +
-          "<button class=\"primary-flow\" type=\"button\" data-copy=\"npm run validate:posts -- --source --project " + escapeHtml(state.activeProject === "all" ? "sigak" : state.activeProject) + "\">▶ " + escapeHtml(flow.action) + "</button>";
+          renderRunnerPreview();
       }
 
       function renderTopbar() {
@@ -1447,14 +1565,15 @@
       }
 
       async function copyValue(value, label) {
+        const copiedLabel = label || value;
         try {
           await navigator.clipboard.writeText(value);
-          state.copied = label || value;
-          renderInspector();
+          state.copied = copiedLabel;
+          render();
           setTimeout(() => {
-            if (state.copied === (label || value)) {
+            if (state.copied === copiedLabel) {
               state.copied = null;
-              renderInspector();
+              render();
             }
           }, 1400);
         } catch (error) {
