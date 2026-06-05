@@ -4,7 +4,7 @@
 
 **Goal:** Add Blog Ops Dashboard v1.2 Folder viewing/filtering and built-in Smart Views without changing the underlying `project` frontmatter contract.
 
-**Architecture:** Keep the dashboard API unchanged and derive all folder/view state in `scripts/blog-ops-dashboard-template.html` from `inventory.projects` and `inventory.posts`. Internally keep `state.activeProject` and project-scoped commands; user-facing labels become Folder/Folders. Smart Views are read-only filter shortcuts layered on top of folder filtering and before the existing tab-specific status filters.
+**Architecture:** Keep the dashboard API unchanged and derive all folder/view state in `scripts/blog-ops-dashboard-template.html` from `inventory.projects` and `inventory.posts`. Internally keep `state.activeProject` and project-scoped commands; user-facing labels become Folder/Folders. Smart Views are read-only filter shortcuts layered on top of folder filtering and before the existing tab-specific status filters, but they are defined as named predicates so later combined views can be added without rewriting the filter pipeline.
 
 **Tech Stack:** Node.js test runner, local Node dashboard, vanilla HTML/CSS/JavaScript template, existing Blog Ops inventory API.
 
@@ -21,6 +21,8 @@ Included:
 - Show folder stats: total posts, draft count, pending sync count.
 - Add built-in Smart Views: `All Writing`, `Dev Logs`, `Deep Dives`, `Needs Attention`, `Learning Queue`.
 - Combine filters in this order: folder -> smart view -> active tab filter.
+- Add mobile layout safeguards for two-line folder rows.
+- Record post-v1.2 follow-up signals in `docs/next-actions.md`.
 - Keep action runner commands project-scoped with `--project <slug>`.
 - Keep `All Folders` publish preview disabled.
 
@@ -30,6 +32,7 @@ Excluded:
 - Folder deletion.
 - `type: "note"` support.
 - Custom Smart View config.
+- Multi-select or user-composed Smart Views.
 - Rename frontmatter `project` to `folder`.
 - URL migration.
 
@@ -45,6 +48,9 @@ Excluded:
 - Modify: `scripts/blog-ops-dashboard.test.mjs`
   - Static HTML tests for Folder labels, Smart View rendering, and command safety.
   - Existing action runner test language from project-facing to folder-facing.
+
+- Modify: `docs/next-actions.md`
+  - Add a small v1.2 follow-up log for terminology, mobile layout, Smart View demand, and future folder CRUD signals.
 
 - No changes:
   - `scripts/blog-ops/posts-inventory.mjs`
@@ -85,6 +91,8 @@ test("renderDashboardHtml includes built-in Smart Views", () => {
   assert.match(html, /Smart Views/);
   assert.match(html, /SMART_VIEWS/);
   assert.match(html, /data-smart-view=/);
+  assert.match(html, /matches: \(post\) => post\.type === "dev-log"/);
+  assert.match(html, /matches: \(post\) => post\.type === "deep-dive"/);
   assert.match(html, /All Writing/);
   assert.match(html, /Dev Logs/);
   assert.match(html, /Deep Dives/);
@@ -93,7 +101,22 @@ test("renderDashboardHtml includes built-in Smart Views", () => {
 });
 ```
 
-- [ ] **Step 3: Update action runner wording test**
+- [ ] **Step 3: Add static HTML test for mobile folder safeguards**
+
+Append this test after the Smart Views test.
+
+```js
+test("renderDashboardHtml includes mobile safeguards for folder rows", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /\.nav-text/);
+  assert.match(html, /\.nav-sub/);
+  assert.match(html, /max-width: min\(72vw, 220px\)/);
+  assert.match(html, /text-overflow: ellipsis/);
+});
+```
+
+- [ ] **Step 4: Update action runner wording test**
 
 Replace the final assertion in `renderDashboardHtml does not default All Projects publish preview to first project`.
 
@@ -109,7 +132,7 @@ assert.match(html, /if \(state\.activeProject === "all"\) return "";/);
 assert.doesNotMatch(html, /state\.inventory\.projects\[0\]\?\.slug/);
 ```
 
-- [ ] **Step 4: Run dashboard template tests and confirm failure**
+- [ ] **Step 5: Run dashboard template tests and confirm failure**
 
 Run:
 
@@ -122,6 +145,7 @@ Expected:
 ```txt
 not ok ... renderDashboardHtml labels project navigation as folders
 not ok ... renderDashboardHtml includes built-in Smart Views
+not ok ... renderDashboardHtml includes mobile safeguards for folder rows
 ```
 
 The action runner wording test may also fail until Task 4 updates the template text.
@@ -178,6 +202,10 @@ Add these styles after `.nav-name`.
   font-size: 11px;
   line-height: 1.45;
 }
+
+.nav-row .count {
+  flex-shrink: 0;
+}
 ```
 
 Change `.nav-row` height.
@@ -205,6 +233,28 @@ In the mobile media query, add `.folder-help` to hidden sidebar details.
 .folder-help,
 .local-state {
   display: none;
+}
+```
+
+Replace the mobile `.nav-row` block inside `@media (max-width: 820px)` with this version.
+
+```css
+.nav-row {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 150px;
+  max-width: min(72vw, 220px);
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.nav-text {
+  max-width: min(46vw, 140px);
+}
+
+.nav-sub {
+  max-width: 100%;
 }
 ```
 
@@ -312,34 +362,59 @@ const state = {
 };
 ```
 
-- [ ] **Step 3: Add `SMART_VIEWS` constant**
+- [ ] **Step 3: Add `SMART_VIEWS` definitions**
 
 Add after `FILTERS`.
 
 ```js
 const SMART_VIEWS = [
-  ["all", "All Writing", null],
-  ["dev-log", "Dev Logs", "info"],
-  ["deep-dive", "Deep Dives", "info"],
-  ["needs-attention", "Needs Attention", "error"],
-  ["learning-queue", "Learning Queue", "warn"],
+  {
+    key: "all",
+    label: "All Writing",
+    tone: null,
+    matches: () => true,
+  },
+  {
+    key: "dev-log",
+    label: "Dev Logs",
+    tone: "info",
+    matches: (post) => post.type === "dev-log",
+  },
+  {
+    key: "deep-dive",
+    label: "Deep Dives",
+    tone: "info",
+    matches: (post) => post.type === "deep-dive",
+  },
+  {
+    key: "needs-attention",
+    label: "Needs Attention",
+    tone: "error",
+    matches: (post) => hasAttention(post),
+  },
+  {
+    key: "learning-queue",
+    label: "Learning Queue",
+    tone: "warn",
+    matches: (post) =>
+      ["not-started", "questions-ready", "needs-revisit", "first-answer-written"].includes(post.learningStatus),
+  },
 ];
 ```
+
+v1.2 still allows only one active Smart View at a time. The object shape is intentional: future combined views can reuse the same `matches` predicates without changing the rest of the filter pipeline.
 
 - [ ] **Step 4: Add Smart View matching helpers**
 
 Add after `hasAttention(post)`.
 
 ```js
+function smartViewDefinition(key) {
+  return SMART_VIEWS.find((view) => view.key === key) || SMART_VIEWS[0];
+}
+
 function smartViewMatches(post, key) {
-  if (key === "all") return true;
-  if (key === "dev-log") return post.type === "dev-log";
-  if (key === "deep-dive") return post.type === "deep-dive";
-  if (key === "needs-attention") return hasAttention(post);
-  if (key === "learning-queue") {
-    return ["not-started", "questions-ready", "needs-revisit", "first-answer-written"].includes(post.learningStatus);
-  }
-  return true;
+  return smartViewDefinition(key).matches(post);
 }
 
 function countForSmartView(key) {
@@ -368,13 +443,13 @@ Add this function before `renderFilters()`.
 ```js
 function renderSmartViews() {
   document.querySelector("#smart-views").innerHTML = SMART_VIEWS
-    .map(([key, label, tone]) => {
-      const active = state.activeSmartView === key ? " active" : "";
-      const dot = tone ? "<span class=\"icon\" style=\"color: var(--" + tone + ")\">●</span>" : "<span class=\"icon\">•</span>";
-      return "<button class=\"nav-row" + active + "\" data-smart-view=\"" + escapeHtml(key) + "\" type=\"button\">" +
+    .map((view) => {
+      const active = state.activeSmartView === view.key ? " active" : "";
+      const dot = view.tone ? "<span class=\"icon\" style=\"color: var(--" + view.tone + ")\">●</span>" : "<span class=\"icon\">•</span>";
+      return "<button class=\"nav-row" + active + "\" data-smart-view=\"" + escapeHtml(view.key) + "\" type=\"button\">" +
         dot +
-        "<span class=\"nav-name\">" + escapeHtml(label) + "</span>" +
-        "<span class=\"count\">" + countForSmartView(key) + "</span>" +
+        "<span class=\"nav-name\">" + escapeHtml(view.label) + "</span>" +
+        "<span class=\"count\">" + countForSmartView(view.key) + "</span>" +
       "</button>";
     })
     .join("");
@@ -457,6 +532,12 @@ Remaining failures should be only copy text or old wording updated in Task 4.
 - Modify: `scripts/blog-ops-dashboard-template.html`
 - Modify: `scripts/blog-ops-dashboard.test.mjs`
 
+Implementation rule:
+
+- User-facing text says `Folder` or `Folders`.
+- Internal state, data attributes, and commands keep `project`, `activeProject`, `data-project`, and `--project`.
+- Do not partially rename internal variables in v1.2. A partial rename makes later folder CRUD more error-prone.
+
 - [ ] **Step 1: Update tab meta text**
 
 Replace this line in `renderRows()`.
@@ -519,11 +600,11 @@ node --test scripts/blog-ops-dashboard.test.mjs
 Expected:
 
 ```txt
-# pass 10
+# pass 11
 # fail 0
 ```
 
-The exact pass count is 10 if Task 1 added two tests to the current 8-test file.
+The exact pass count is 11 if Task 1 added three tests to the current 8-test file.
 
 ## Task 5: Browser QA
 
@@ -572,10 +653,23 @@ Check:
 
 - Sidebar groups scroll horizontally without page-level horizontal overflow.
 - Folder stat text does not overlap the count chip.
+- Long folder names truncate with ellipsis instead of wrapping into the count chip.
+- `All Folders` and Smart View buttons stay under `min(72vw, 220px)`.
 - Smart View buttons remain tappable.
 - Pipeline action runner stays within viewport width.
 
-- [ ] **Step 4: Stop dashboard server**
+- [ ] **Step 4: iPhone 14 Pro Max QA**
+
+Set viewport to `430x932`.
+
+Check:
+
+- Folder stat text remains visible or truncates cleanly.
+- No horizontal page overflow appears.
+- Switching between `Folders`, `Smart Views`, and `Content filters` does not move the main content unexpectedly.
+- The action runner preview still hides publish commands for `All Folders`.
+
+- [ ] **Step 5: Stop dashboard server**
 
 Use `Ctrl-C` in the terminal session running `npm run ops:dashboard`.
 
@@ -585,13 +679,25 @@ Expected:
 server process exits cleanly
 ```
 
-## Task 6: Full Verification and Commit
+## Task 6: Follow-Up Capture, Full Verification, and Commit
 
 **Files:**
 
 - Modify: files changed by Tasks 1-4.
+- Modify: `docs/next-actions.md`
 
-- [ ] **Step 1: Run dashboard tests**
+- [ ] **Step 1: Add v1.2 follow-up capture to Next Actions**
+
+In `docs/next-actions.md`, under `### blog ops`, add these unchecked items if they are not already present.
+
+```md
+- [ ] v1.2 Folder 용어가 실제 사용 중 project와 혼동되는지 관찰한다.
+- [ ] v1.2 모바일 Folder 통계가 작은 화면에서 읽기 좋은지 QA 결과를 기록한다.
+- [ ] Smart View를 단일 선택으로 충분히 쓰는지, 조합형 view 요청이 반복되는지 기록한다.
+- [ ] `type: note`, Folder 추가 wizard, Empty Folder 삭제 요구가 실제로 반복되는지 기록한다.
+```
+
+- [ ] **Step 2: Run dashboard tests**
 
 Run:
 
@@ -605,7 +711,7 @@ Expected:
 # fail 0
 ```
 
-- [ ] **Step 2: Run full test suite**
+- [ ] **Step 3: Run full test suite**
 
 Run:
 
@@ -619,7 +725,7 @@ Expected:
 # fail 0
 ```
 
-- [ ] **Step 3: Validate posts**
+- [ ] **Step 4: Validate posts**
 
 Run:
 
@@ -635,7 +741,7 @@ Validated 26 posts.
 
 The number may increase if new posts are added before implementation. Any validation error must be fixed before committing.
 
-- [ ] **Step 4: Build site**
+- [ ] **Step 5: Build site**
 
 Run:
 
@@ -651,12 +757,12 @@ Astro check reports 0 errors and Astro build exits successfully.
 
 Astro should report no errors. Warnings must be read and either fixed or recorded in the final handoff.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 Run:
 
 ```bash
-git add scripts/blog-ops-dashboard-template.html scripts/blog-ops-dashboard.test.mjs
+git add scripts/blog-ops-dashboard-template.html scripts/blog-ops-dashboard.test.mjs docs/next-actions.md
 git commit -m "feat: add blog ops folder views"
 ```
 
@@ -673,10 +779,11 @@ Spec coverage:
 - Folder label policy: Task 2 and Task 4.
 - Internal `project` contract unchanged: Task 4 explicitly verifies `--project` commands remain.
 - Folder stats: Task 2.
-- Smart Views: Task 3.
+- Smart Views: Task 3 uses named predicate definitions so future view composition can reuse the same matching layer.
 - No folder CRUD in v1.2: Scope section excludes creation/deletion.
 - Validation safety: Task 6.
-- Mobile check: Task 5.
+- Mobile layout safeguards: Task 2 CSS and Task 5 browser QA.
+- Post-v1.2 requirement collection: Task 6 updates `docs/next-actions.md`.
 
 Placeholder scan:
 
@@ -689,3 +796,4 @@ Type consistency:
 - State uses `activeSmartView` for built-in Smart View selection.
 - Existing `activeFilter` remains tab-specific.
 - Existing `data-project` remains the folder button attribute because it carries a project slug.
+- User-facing labels use Folder/Folders, while commands and internal state continue to use project slug.
