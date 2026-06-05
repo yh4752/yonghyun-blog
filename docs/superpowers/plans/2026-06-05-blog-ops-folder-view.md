@@ -4,7 +4,7 @@
 
 **Goal:** Add Blog Ops Dashboard v1.2 Folder viewing/filtering and built-in Smart Views without changing the underlying `project` frontmatter contract.
 
-**Architecture:** Keep the dashboard API unchanged and derive all folder/view state in `scripts/blog-ops-dashboard-template.html` from `inventory.projects` and `inventory.posts`. Internally keep `state.activeProject` and project-scoped commands; user-facing labels become Folder/Folders. Smart Views are read-only filter shortcuts layered on top of folder filtering and before the existing tab-specific status filters, but they are defined as named predicates so later combined views can be added without rewriting the filter pipeline.
+**Architecture:** Keep the dashboard API unchanged and derive all folder/view state in `scripts/blog-ops-dashboard-template.html` from `inventory.projects` and `inventory.posts`. Internally keep `state.activeProject` and project-scoped commands; user-facing labels become Folder/Folders. Smart Views are read-only filter shortcuts layered on top of folder filtering and before the existing tab-specific status filters, but they are defined as named predicates so later combined views can be added without rewriting the filter pipeline. Action Runner readiness stays folder-scoped because its preview command publishes the whole selected folder, not only the currently visible Smart View subset.
 
 **Tech Stack:** Node.js test runner, local Node dashboard, vanilla HTML/CSS/JavaScript template, existing Blog Ops inventory API.
 
@@ -21,6 +21,7 @@ Included:
 - Show folder stats: total posts, draft count, pending sync count.
 - Add built-in Smart Views: `All Writing`, `Dev Logs`, `Deep Dives`, `Needs Attention`, `Learning Queue`.
 - Combine filters in this order: folder -> smart view -> active tab filter.
+- Keep action runner readiness scoped to the selected folder, ignoring Smart View/status filters.
 - Add mobile layout safeguards for two-line folder rows.
 - Record post-v1.2 follow-up signals in `docs/next-actions.md`.
 - Keep action runner commands project-scoped with `--project <slug>`.
@@ -46,7 +47,7 @@ Excluded:
   - Responsive sidebar CSS for two-line folder rows.
 
 - Modify: `scripts/blog-ops-dashboard.test.mjs`
-  - Static HTML tests for Folder labels, Smart View rendering, and command safety.
+  - Static HTML tests for Folder labels, Smart View rendering, runner readiness scope, and command safety.
   - Existing action runner test language from project-facing to folder-facing.
 
 - Modify: `docs/next-actions.md`
@@ -73,10 +74,10 @@ Append this test after `renderDashboardHtml includes copy-only Action Runner Pre
 test("renderDashboardHtml labels project navigation as folders", () => {
   const html = renderDashboardHtml();
 
-  assert.match(html, /Folders/);
+  assert.match(html, /<div class="group-label">Folders<\/div>/);
   assert.match(html, /All Folders/);
   assert.match(html, /data-project=/);
-  assert.match(html, /이 도구에서 Folder는 내부적으로 project slug를 사용합니다\./);
+  assert.match(html, /Folder는 글을 묶고 발행 범위를 고르는 단위입니다\./);
 });
 ```
 
@@ -89,15 +90,32 @@ test("renderDashboardHtml includes built-in Smart Views", () => {
   const html = renderDashboardHtml();
 
   assert.match(html, /Smart Views/);
-  assert.match(html, /SMART_VIEWS/);
   assert.match(html, /data-smart-view=/);
-  assert.match(html, /matches: \(post\) => post\.type === "dev-log"/);
-  assert.match(html, /matches: \(post\) => post\.type === "deep-dive"/);
+  assert.match(html, /key: "dev-log"/);
+  assert.match(html, /key: "deep-dive"/);
+  assert.match(html, /key: "needs-attention"/);
+  assert.match(html, /key: "learning-queue"/);
+  assert.match(html, /smartViewMatches\(post, state\.activeSmartView\)/);
   assert.match(html, /All Writing/);
   assert.match(html, /Dev Logs/);
   assert.match(html, /Deep Dives/);
   assert.match(html, /Needs Attention/);
   assert.match(html, /Learning Queue/);
+});
+```
+
+- [ ] **Step 2a: Add static HTML test for runner readiness scope**
+
+Append this test after the Smart Views test.
+
+```js
+test("renderDashboardHtml keeps runner readiness folder-scoped", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /function folderScopedPosts\(\)/);
+  assert.match(html, /function baseFilteredPosts\(\) \{\s*return folderScopedPosts\(\)\.filter\(\(post\) => smartViewMatches\(post, state\.activeSmartView\)\);/);
+  assert.match(html, /function operationState\(\) \{\s*const posts = folderScopedPosts\(\);/);
+  assert.doesNotMatch(html, /function operationState\(\) \{\s*const posts = baseFilteredPosts\(\);/);
 });
 ```
 
@@ -112,7 +130,7 @@ test("renderDashboardHtml includes mobile safeguards for folder rows", () => {
   assert.match(html, /\.nav-text/);
   assert.match(html, /\.nav-sub/);
   assert.match(html, /max-width: min\(72vw, 220px\)/);
-  assert.match(html, /text-overflow: ellipsis/);
+  assert.match(html, /\.nav-sub\s*\{[^}]*text-overflow:\s*ellipsis/);
 });
 ```
 
@@ -170,7 +188,7 @@ Replace with:
 ```html
 <div class="group-label">Folders</div>
 <div class="nav-group" id="projects"></div>
-<div class="folder-help">이 도구에서 Folder는 내부적으로 project slug를 사용합니다.</div>
+<div class="folder-help">Folder는 글을 묶고 발행 범위를 고르는 단위입니다.</div>
 ```
 
 - [ ] **Step 2: Add folder helper styles**
@@ -410,16 +428,21 @@ Add after `hasAttention(post)`.
 
 ```js
 function smartViewDefinition(key) {
-  return SMART_VIEWS.find((view) => view.key === key) || SMART_VIEWS[0];
+  return SMART_VIEWS.find((view) => view.key === key) || SMART_VIEWS.find((view) => view.key === "all");
 }
 
 function smartViewMatches(post, key) {
   return smartViewDefinition(key).matches(post);
 }
 
+function folderScopedPosts() {
+  return allPosts().filter((post) => {
+    return state.activeProject === "all" || post.project === state.activeProject;
+  });
+}
+
 function countForSmartView(key) {
-  const posts = allPosts().filter((post) => state.activeProject === "all" || post.project === state.activeProject);
-  return posts.filter((post) => smartViewMatches(post, key)).length;
+  return folderScopedPosts().filter((post) => smartViewMatches(post, key)).length;
 }
 ```
 
@@ -429,12 +452,11 @@ Replace `baseFilteredPosts()`.
 
 ```js
 function baseFilteredPosts() {
-  return allPosts().filter((post) => {
-    const matchesFolder = state.activeProject === "all" || post.project === state.activeProject;
-    return matchesFolder && smartViewMatches(post, state.activeSmartView);
-  });
+  return folderScopedPosts().filter((post) => smartViewMatches(post, state.activeSmartView));
 }
 ```
+
+`operationState()` must use `folderScopedPosts()`, not `baseFilteredPosts()`, because Action Runner preview commands publish the selected folder with `--project <slug>` even when a Smart View is active.
 
 - [ ] **Step 6: Render Smart Views**
 

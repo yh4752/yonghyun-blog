@@ -53,6 +53,10 @@ Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 �
 - [x] project-scoped `sync:posts` 구현
 - [x] project-scoped `publish:posts` 구현
 - [x] Dashboard runner는 먼저 dry-run/command preview로 시작
+- [ ] v1.2 Folder 용어가 실제 사용 중 project와 혼동되는지 관찰한다
+- [ ] v1.2 모바일 Folder 통계가 작은 화면에서 읽기 좋은지 QA 결과를 기록한다
+- [ ] Smart View를 단일 선택으로 충분히 쓰는지, 조합형 view 요청이 반복되는지 기록한다
+- [ ] `type: note`, Folder 추가 wizard, Empty Folder 삭제 요구가 실제로 반복되는지 기록한다
 - [ ] 실제 실행 버튼은 allow-list, dirty state check, diff preview 이후에만 추가
 
 ## 오늘 집어 들 작업
@@ -74,7 +78,7 @@ v1.1은 **Action Runner Preview**로 제한한다.
 - 선택한 프로젝트의 publish plan 표시
 - `npm run publish:posts -- --project <project> --dry-run` 표시
 - `npm run publish:posts -- --project <project>` 표시
-- 단계 목록 표시: source validation, project sync, published validation, test, build
+- 단계 목록 표시: source validation, folder sync, published validation, test, build
 - dry-run command와 publish command 복사
 - source 우선, 발행본 직접 수정 금지, dirty state 확인 같은 safety note 표시
 
@@ -87,7 +91,7 @@ v1.1은 **Action Runner Preview**로 제한한다.
 - draft 토글
 - 자동 commit, push, PR 생성
 
-실제 실행 버튼은 allow-list, dirty state check, diff preview, 로그 panel이 구현된 뒤 v1.2에서 검토한다.
+실제 실행 버튼은 allow-list, dirty state check, diff preview, 로그 panel이 구현된 뒤 별도 후속 단계에서 검토한다.
 
 ## 블로그 작성 스킬 목표
 
