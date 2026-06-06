@@ -238,6 +238,64 @@ test("runner run endpoint rejects missing project", async () => {
   }
 });
 
+test("runner run endpoint rejects oversized JSON bodies", async () => {
+  let runnerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    runnerProvider: async () => {
+      runnerCalled = true;
+      return { status: "success" };
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/runner/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "validate-source",
+        project: "sigak",
+        padding: "x".repeat(17 * 1024),
+      }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 413);
+    assert.equal(json.error, "body-too-large");
+    assert.equal(runnerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("runner run endpoint rejects invalid JSON bodies", async () => {
+  let runnerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    runnerProvider: async () => {
+      runnerCalled = true;
+      return { status: "success" };
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/runner/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: '{"action":"validate-source","project":"sigak"',
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-json");
+    assert.equal(runnerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("runner run endpoint serializes concurrent executions", async () => {
   let releaseRunner;
   let markRunnerEntered;
