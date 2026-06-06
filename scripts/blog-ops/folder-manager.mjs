@@ -1,9 +1,10 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { parse, stringify } from "yaml";
+import { stringify } from "yaml";
 
-import { hashText } from "./change-preview.mjs";
+import { createFilePreview, hashText } from "./change-preview.mjs";
+import { loadBlogOpsConfig } from "./config.mjs";
 import { readProgressManifest } from "./progress-manifest.mjs";
 
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -33,18 +34,21 @@ function metadataFiles(root) {
   };
 }
 
-function readMetadata(root) {
+function readMetadata(root, env = process.env) {
   const { configFile, projectsFile } = metadataFiles(root);
   const configText = fs.readFileSync(configFile, "utf8");
   const projectsText = fs.readFileSync(projectsFile, "utf8");
+  const blogOpsConfig = loadBlogOpsConfig({ root, env });
 
   return {
     configFile,
     projectsFile,
     configText,
     projectsText,
-    config: parse(configText) ?? {},
-    projects: JSON.parse(projectsText),
+    config: blogOpsConfig.rawConfig,
+    projects: blogOpsConfig.projects,
+    resolvedSources: blogOpsConfig.sources,
+    contentDir: blogOpsConfig.contentDir,
     metadataHash: hashText(`${configText}\n${projectsText}`),
   };
 }
@@ -52,6 +56,42 @@ function readMetadata(root) {
 function writeMetadata({ configFile, projectsFile, config, projects }) {
   fs.writeFileSync(configFile, stringify(config), "utf8");
   fs.writeFileSync(projectsFile, `${JSON.stringify(projects, null, 2)}\n`, "utf8");
+}
+
+function readTextIfFile(file) {
+  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return "";
+  return fs.readFileSync(file, "utf8");
+}
+
+function createSetupFilePreview({ root, file, content }) {
+  const before = readTextIfFile(file);
+  const exists = before.length > 0 || (fs.existsSync(file) && fs.statSync(file).isFile());
+  return createFilePreview({
+    root,
+    file,
+    before,
+    after: exists ? before : content,
+    operation: exists ? "unchanged" : "create",
+  });
+}
+
+function metadataFilePreviews({ root, metadata, config, projects }) {
+  return [
+    createFilePreview({
+      root,
+      file: metadata.configFile,
+      before: metadata.configText,
+      after: stringify(config),
+      operation: "modify",
+    }),
+    createFilePreview({
+      root,
+      file: metadata.projectsFile,
+      before: metadata.projectsText,
+      after: `${JSON.stringify(projects, null, 2)}\n`,
+      operation: "modify",
+    }),
+  ];
 }
 
 function dirtyBlocker(files) {
@@ -204,7 +244,7 @@ export function previewCreateFolder({
   input,
   metadataDirtyProvider = defaultMetadataDirtyProvider,
 } = {}) {
-  const metadata = readMetadata(root);
+  const metadata = readMetadata(root, env);
   const dirtyFiles = readDirtyFiles({ root, metadataDirtyProvider });
   const projectRoot = expandProjectRoot(input?.projectRoot, { root, env });
   const blogDir = path.join(projectRoot, "docs", "blog");
@@ -219,6 +259,8 @@ export function previewCreateFolder({
     exclude: ["README.md", "topic-queue.md"],
   };
   const blockers = validateCreateInput({ input, metadata, blogDir, readmePath, topicQueuePath });
+  const nextConfig = { ...metadata.config, sources: [...(metadata.config.sources ?? []), configEntry] };
+  const nextProjects = [...metadata.projects, projectEntry];
 
   if (dirtyFiles.length > 0) blockers.unshift(dirtyBlocker(dirtyFiles));
 
@@ -241,6 +283,11 @@ export function previewCreateFolder({
     { type: "update-config", target: metadata.configFile, path: "posts.config.yml", entry: configEntry },
     { type: "update-projects", target: metadata.projectsFile, path: "src/data/projects.json", entry: projectEntry },
   ];
+  const filePreviews = [
+    createSetupFilePreview({ root, file: readmePath, content: readmeFor(projectEntry) }),
+    createSetupFilePreview({ root, file: topicQueuePath, content: topicQueueFor(projectEntry) }),
+    ...metadataFilePreviews({ root, metadata, config: nextConfig, projects: nextProjects }),
+  ];
 
   return {
     canApply: blockers.length === 0,
@@ -249,6 +296,7 @@ export function previewCreateFolder({
     configEntry,
     projectEntry,
     operations,
+    filePreviews,
   };
 }
 
@@ -259,7 +307,7 @@ export function applyCreateFolder({
   metadataHash,
   metadataDirtyProvider = defaultMetadataDirtyProvider,
 } = {}) {
-  const initial = readMetadata(root);
+  const initial = readMetadata(root, env);
   if (metadataHash !== initial.metadataHash) {
     throw codedError("stale-metadata", "stale-metadata: project metadata changed after preview.");
   }
@@ -285,7 +333,7 @@ export function applyCreateFolder({
     }
   }
 
-  const metadata = readMetadata(root);
+  const metadata = readMetadata(root, env);
   writeMetadata({
     ...metadata,
     config: { ...metadata.config, sources: [...(metadata.config.sources ?? []), preview.configEntry] },
@@ -300,13 +348,47 @@ export function applyCreateFolder({
   };
 }
 
-function listFiles(dir, predicate = () => true) {
+function listFilesRecursive(dir, predicate = () => true) {
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return [];
-  return fs
-    .readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && predicate(entry.name))
-    .map((entry) => path.join(dir, entry.name))
-    .sort();
+  const files = [];
+
+  function visit(currentDir) {
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const file = path.join(currentDir, entry.name);
+      const relativePath = slashRelative(dir, file);
+      if (entry.isDirectory()) {
+        visit(file);
+      } else if (entry.isFile() && predicate(entry.name, relativePath, file)) {
+        files.push(file);
+      }
+    }
+  }
+
+  visit(dir);
+  return files.sort();
+}
+
+function listSourceContentEntries(dir) {
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return [];
+  const entries = [];
+
+  function visit(currentDir) {
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const file = path.join(currentDir, entry.name);
+      const relativePath = slashRelative(dir, file);
+      if (entry.isDirectory()) {
+        entries.push({ type: "directory", file, relativePath: `${relativePath}/` });
+        visit(file);
+      } else if (entry.isFile()) {
+        entries.push({ type: "file", file, relativePath });
+      } else {
+        entries.push({ type: "other", file, relativePath });
+      }
+    }
+  }
+
+  visit(dir);
+  return entries;
 }
 
 function countProjectProgress(root, project) {
@@ -314,30 +396,62 @@ function countProjectProgress(root, project) {
   return Object.keys(manifest.entries).filter((id) => id.startsWith(`${project}/`)).length;
 }
 
-function readinessEntry({ code, label, count, nextAction }) {
+function formatPathDetail(paths, { empty, singular, plural, maxPaths = 3 }) {
+  if (paths.length === 0) return empty;
+  const noun = paths.length === 1 ? singular : plural;
+  const shown = paths.slice(0, maxPaths);
+  const remainder = paths.length - shown.length;
+  const suffix = remainder > 0 ? `${shown.join(", ")}, and ${remainder} more` : shown.join(", ");
+  return `${paths.length} ${noun} found: ${suffix}`;
+}
+
+function formatCountDetail(count, { empty, singular, plural }) {
+  if (count === 0) return empty;
+  return `${count} ${count === 1 ? singular : plural} found.`;
+}
+
+function readinessEntry({ code, label, count, detail, nextAction }) {
   return {
     code,
     label,
     status: count === 0 ? "passed" : "blocked",
-    count,
+    detail,
     nextAction,
   };
 }
 
-function deleteReadiness({ root, metadata, project, source }) {
-  const contentDir = path.resolve(root, metadata.config.site?.contentDir ?? "src/content/blog");
-  const sourceDir = source ? resolveConfiguredPath(source.path, { root }) : null;
-  const sourcePosts = sourceDir
-    ? listFiles(sourceDir, (name) => name.endsWith(".md") && !SETUP_FILES.has(name))
-    : [];
-  const publishedPosts = listFiles(path.join(contentDir, project), (name) => name.endsWith(".md"));
-  const privateNotes = listFiles(path.join(root, "docs", "interview-notes", "private", project), (name) =>
-    name.endsWith(".md"),
+function resolveSourceDir({ root, env, source, resolvedSource }) {
+  if (!source) return null;
+  const fallback = resolveConfiguredPath(source.path, { root, env });
+  if (fs.existsSync(fallback)) return fallback;
+  return resolvedSource?.expandedPath ?? fallback;
+}
+
+function isSetupRelativePath(relativePath) {
+  return SETUP_FILES.has(relativePath);
+}
+
+function deleteReadiness({ root, env, metadata, project, source, resolvedSource }) {
+  const contentDir = metadata.contentDir ?? path.resolve(root, metadata.config.site?.contentDir ?? "src/content/blog");
+  const sourceDir = resolveSourceDir({ root, env, source, resolvedSource });
+  const sourceEntries = sourceDir ? listSourceContentEntries(sourceDir) : [];
+  const sourcePostEntries = sourceEntries.filter(
+    (entry) => entry.type === "file" && entry.relativePath.endsWith(".md") && !isSetupRelativePath(entry.relativePath),
   );
+  const extraSourceEntries = sourceEntries.filter(
+    (entry) =>
+      !isSetupRelativePath(entry.relativePath) &&
+      !(entry.type === "file" && entry.relativePath.endsWith(".md")),
+  );
+  const sourcePosts = sourcePostEntries.map((entry) => entry.file);
+  const extraSourceFiles = extraSourceEntries.map((entry) => entry.file);
+  const sourcePostPaths = sourcePostEntries.map((entry) => entry.relativePath);
+  const extraSourcePaths = extraSourceEntries.map((entry) => entry.relativePath);
+  const publishedDir = path.join(contentDir, project);
+  const privateNotesDir = path.join(root, "docs", "interview-notes", "private", project);
+  const publishedPosts = listFilesRecursive(publishedDir, (name) => name.endsWith(".md"));
+  const privateNotes = listFilesRecursive(privateNotesDir, (name) => name.endsWith(".md"));
   const learningProgressCount = countProjectProgress(root, project);
-  const extraSourceFiles = sourceDir
-    ? listFiles(sourceDir, (name) => !SETUP_FILES.has(name) && !name.endsWith(".md"))
-    : [];
 
   return {
     sourceDir,
@@ -351,30 +465,61 @@ function deleteReadiness({ root, metadata, project, source }) {
         code: "source-posts",
         label: "Source posts",
         count: sourcePosts.length,
+        detail: formatPathDetail(sourcePostPaths, {
+          empty: "No source posts found.",
+          singular: "source post",
+          plural: "source posts",
+        }),
         nextAction: "source post를 다른 Folder로 옮기거나 삭제 정책을 먼저 결정하세요.",
       }),
       readinessEntry({
         code: "published-posts",
         label: "Published posts",
         count: publishedPosts.length,
+        detail: formatPathDetail(
+          publishedPosts.map((file) => slashRelative(publishedDir, file)),
+          {
+            empty: "No published posts found.",
+            singular: "published post",
+            plural: "published posts",
+          },
+        ),
         nextAction: "먼저 unpublish/sync 정책을 결정하세요.",
       }),
       readinessEntry({
         code: "private-notes",
         label: "Private notes",
         count: privateNotes.length,
+        detail: formatPathDetail(
+          privateNotes.map((file) => slashRelative(privateNotesDir, file)),
+          {
+            empty: "No private notes found.",
+            singular: "private note",
+            plural: "private notes",
+          },
+        ),
         nextAction: "Learning Ops에서 해당 note를 확인하세요.",
       }),
       readinessEntry({
         code: "learning-progress",
         label: "Learning progress",
         count: learningProgressCount,
+        detail: formatCountDetail(learningProgressCount, {
+          empty: "No learning progress entries found.",
+          singular: "learning progress entry",
+          plural: "learning progress entries",
+        }),
         nextAction: ".local/learning-progress.json에서 해당 Folder 기록을 정리하세요.",
       }),
       readinessEntry({
         code: "extra-source-files",
         label: "Extra source files",
         count: extraSourceFiles.length,
+        detail: formatPathDetail(extraSourcePaths, {
+          empty: "No extra source files found.",
+          singular: "extra source file",
+          plural: "extra source files",
+        }),
         nextAction: "README.md와 topic-queue.md 외 파일을 먼저 옮기거나 삭제하세요.",
       }),
     ],
@@ -392,7 +537,7 @@ function blockerForReadiness(item) {
   return {
     code: codes[item.code],
     message: `${item.label} still exist.`,
-    count: item.count,
+    detail: item.detail,
     nextAction: item.nextAction,
   };
 }
@@ -409,16 +554,19 @@ function metadataMismatchBlocker(project, sourceCount, projectCount) {
 
 export function previewDeleteFolder({
   root = process.cwd(),
+  env = process.env,
   project,
   removeSourceSetupFolder = false,
   metadataDirtyProvider = defaultMetadataDirtyProvider,
 } = {}) {
-  const metadata = readMetadata(root);
+  const metadata = readMetadata(root, env);
   const dirtyFiles = readDirtyFiles({ root, metadataDirtyProvider });
   const sources = metadata.config.sources ?? [];
   const matchingSources = sources.filter((source) => source.project === project);
+  const matchingResolvedSources = metadata.resolvedSources.filter((source) => source.project === project);
   const matchingProjects = metadata.projects.filter((item) => item.slug === project);
   const source = matchingSources[0];
+  const resolvedSource = matchingResolvedSources[0];
   const blockers = [];
 
   if (dirtyFiles.length > 0) blockers.push(dirtyBlocker(dirtyFiles));
@@ -426,13 +574,19 @@ export function previewDeleteFolder({
     blockers.push(metadataMismatchBlocker(project, matchingSources.length, matchingProjects.length));
   }
 
-  const scan = deleteReadiness({ root, metadata, project, source });
+  const scan = deleteReadiness({ root, env, metadata, project, source, resolvedSource });
   blockers.push(...scan.readiness.filter((item) => item.status === "blocked").map(blockerForReadiness));
+  const nextConfig = {
+    ...metadata.config,
+    sources: sources.filter((item) => item.project !== project),
+  };
+  const nextProjects = metadata.projects.filter((item) => item.slug !== project);
 
   const operations = [
     { type: "update-config", target: metadata.configFile, path: "posts.config.yml", project },
     { type: "update-projects", target: metadata.projectsFile, path: "src/data/projects.json", project },
   ];
+  const filePreviews = metadataFilePreviews({ root, metadata, config: nextConfig, projects: nextProjects });
 
   if (removeSourceSetupFolder && blockers.length === 0 && scan.sourceDir) {
     const readmePath = path.join(scan.sourceDir, "README.md");
@@ -440,6 +594,15 @@ export function previewDeleteFolder({
     for (const file of [readmePath, topicQueuePath]) {
       if (fs.existsSync(file) && fs.statSync(file).isFile()) {
         operations.push({ type: "remove-file", target: file, path: slashRelative(root, file) });
+        filePreviews.push(
+          createFilePreview({
+            root,
+            file,
+            before: fs.readFileSync(file, "utf8"),
+            after: "",
+            operation: "delete",
+          }),
+        );
       }
     }
     operations.push({ type: "remove-empty-dir", target: scan.sourceDir, path: slashRelative(root, scan.sourceDir) });
@@ -451,12 +614,14 @@ export function previewDeleteFolder({
     readiness: scan.readiness,
     metadataHash: metadata.metadataHash,
     operations,
+    filePreviews,
     sourcePath: scan.sourceDir,
   };
 }
 
 export function applyDeleteFolder({
   root = process.cwd(),
+  env = process.env,
   project,
   removeSourceSetupFolder = false,
   confirmation,
@@ -467,12 +632,12 @@ export function applyDeleteFolder({
     throw codedError("confirmation-mismatch", "confirmation-mismatch: 삭제 확인 문구를 정확히 입력하세요.");
   }
 
-  const initial = readMetadata(root);
+  const initial = readMetadata(root, env);
   if (metadataHash !== initial.metadataHash) {
     throw codedError("stale-metadata", "stale-metadata: project metadata changed after preview.");
   }
 
-  const preview = previewDeleteFolder({ root, project, removeSourceSetupFolder, metadataDirtyProvider });
+  const preview = previewDeleteFolder({ root, env, project, removeSourceSetupFolder, metadataDirtyProvider });
   if (!preview.canApply) {
     throw codedError("folder-delete-invalid", "folder-delete-invalid: preview has blocking errors.", {
       blockers: preview.blockers,
@@ -482,16 +647,6 @@ export function applyDeleteFolder({
     throw codedError("stale-metadata", "stale-metadata: project metadata changed after preview.");
   }
 
-  const metadata = readMetadata(root);
-  writeMetadata({
-    ...metadata,
-    config: {
-      ...metadata.config,
-      sources: (metadata.config.sources ?? []).filter((source) => source.project !== project),
-    },
-    projects: metadata.projects.filter((item) => item.slug !== project),
-  });
-
   if (removeSourceSetupFolder) {
     const removable = preview.operations.filter((operation) => operation.type === "remove-file");
     for (const operation of removable) {
@@ -500,6 +655,16 @@ export function applyDeleteFolder({
     const emptyDir = preview.operations.find((operation) => operation.type === "remove-empty-dir");
     if (emptyDir && fs.existsSync(emptyDir.target)) fs.rmdirSync(emptyDir.target);
   }
+
+  const metadata = readMetadata(root, env);
+  writeMetadata({
+    ...metadata,
+    config: {
+      ...metadata.config,
+      sources: (metadata.config.sources ?? []).filter((source) => source.project !== project),
+    },
+    projects: metadata.projects.filter((item) => item.slug !== project),
+  });
 
   return {
     status: "applied",

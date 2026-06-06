@@ -76,6 +76,8 @@ test("previewCreateFolder does not mutate files", (t) => {
   assert.match(preview.metadataHash, /^sha256:/);
   assert.equal(preview.operations.length, 5);
   assert.equal(preview.configEntry.path, "${HOME}/my-projects/new-folder/docs/blog");
+  assert.equal(preview.filePreviews.some((file) => file.path.endsWith("README.md") && file.operation === "create"), true);
+  assert.match(preview.filePreviews.find((file) => file.path === "posts.config.yml").afterPreview, /new-folder/);
   assert.equal(fs.existsSync(path.join(projectRoot, "docs", "blog")), false);
   assert.deepEqual(readYaml(path.join(root, "posts.config.yml")).sources, []);
   assert.deepEqual(readJson(path.join(root, "src", "data", "projects.json")), []);
@@ -105,6 +107,37 @@ test("applyCreateFolder creates setup files and metadata", (t) => {
   assert.equal(fs.existsSync(path.join(blogDir, "topic-queue.md")), true);
   assert.equal(readYaml(path.join(root, "posts.config.yml")).sources[0].project, "new-folder");
   assert.equal(readJson(path.join(root, "src", "data", "projects.json"))[0].slug, "new-folder");
+});
+
+test("applyCreateFolder rejects stale metadata from an old preview", (t) => {
+  const { root, home } = makeHub(t);
+  const projectRoot = path.join(home, "my-projects", "new-folder");
+  const input = createFolderPayload(projectRoot);
+  const preview = previewCreateFolder({
+    root,
+    env: { HOME: home },
+    input,
+    metadataDirtyProvider: () => [],
+  });
+
+  fs.writeFileSync(
+    path.join(root, "src", "data", "projects.json"),
+    `${JSON.stringify([{ slug: "other-folder", name: "Other Folder" }], null, 2)}\n`,
+    "utf8",
+  );
+
+  assert.throws(
+    () =>
+      applyCreateFolder({
+        root,
+        env: { HOME: home },
+        input,
+        metadataHash: preview.metadataHash,
+        metadataDirtyProvider: () => [],
+      }),
+    (error) => error.code === "stale-metadata" && /stale-metadata/.test(error.message),
+  );
+  assert.equal(fs.existsSync(path.join(projectRoot, "docs", "blog")), false);
 });
 
 test("previewCreateFolder rejects dirty metadata files", (t) => {
@@ -183,7 +216,17 @@ test("previewDeleteFolder blocks source posts and returns readiness checklist", 
 
   assert.equal(preview.canApply, false);
   assert.equal(preview.blockers[0].code, "source-posts-exist");
-  assert.equal(preview.readiness.find((item) => item.code === "source-posts").status, "blocked");
+  for (const item of preview.readiness) {
+    assert.deepEqual(Object.keys(item).sort(), ["code", "detail", "label", "nextAction", "status"].sort());
+  }
+  const sourceReadiness = preview.readiness.find((item) => item.code === "source-posts");
+  assert.deepEqual(sourceReadiness, {
+    code: "source-posts",
+    label: "Source posts",
+    status: "blocked",
+    detail: "1 source post found: 2026-06-06-note.md",
+    nextAction: "source post를 다른 Folder로 옮기거나 삭제 정책을 먼저 결정하세요.",
+  });
 });
 
 test("previewDeleteFolder rejects dirty metadata files", (t) => {
@@ -271,6 +314,41 @@ test("previewDeleteFolder reports published private learning and extra source bl
   assert.equal(preview.readiness.every((item) => item.nextAction), true);
 });
 
+test("previewDeleteFolder blocks nested custom setup content before removal", (t) => {
+  const { root, home } = makeHub(t);
+  const projectRoot = path.join(home, "my-projects", "old-folder");
+  const input = { ...createFolderPayload(projectRoot), slug: "old-folder", name: "Old Folder" };
+  const createPreview = previewCreateFolder({
+    root,
+    env: { HOME: home },
+    input,
+    metadataDirtyProvider: () => [],
+  });
+  applyCreateFolder({
+    root,
+    env: { HOME: home },
+    input,
+    metadataHash: createPreview.metadataHash,
+    metadataDirtyProvider: () => [],
+  });
+  fs.mkdirSync(path.join(projectRoot, "docs", "blog", "notes"), { recursive: true });
+  fs.writeFileSync(path.join(projectRoot, "docs", "blog", "notes", "custom.txt"), "custom", "utf8");
+
+  const preview = previewDeleteFolder({
+    root,
+    project: "old-folder",
+    removeSourceSetupFolder: true,
+    metadataDirtyProvider: () => [],
+  });
+
+  assert.equal(preview.canApply, false);
+  assert.equal(preview.blockers.some((blocker) => blocker.code === "extra-source-files-exist"), true);
+  const extraReadiness = preview.readiness.find((item) => item.code === "extra-source-files");
+  assert.equal(extraReadiness.status, "blocked");
+  assert.match(extraReadiness.detail, /notes\/custom\.txt/);
+  assert.equal(preview.operations.some((operation) => operation.type === "remove-empty-dir"), false);
+});
+
 test("previewDeleteFolder blocks metadata mismatch", (t) => {
   const { root } = makeHub(t);
   fs.writeFileSync(
@@ -335,6 +413,142 @@ test("applyDeleteFolder unregisters empty folders without removing source folder
   assert.deepEqual(readYaml(path.join(root, "posts.config.yml")).sources, []);
   assert.deepEqual(readJson(path.join(root, "src", "data", "projects.json")), []);
   assert.equal(fs.existsSync(path.join(projectRoot, "docs", "blog")), true);
+});
+
+test("applyDeleteFolder rejects stale metadata from an old preview", (t) => {
+  const { root, home } = makeHub(t);
+  const projectRoot = path.join(home, "my-projects", "old-folder");
+  const input = { ...createFolderPayload(projectRoot), slug: "old-folder", name: "Old Folder" };
+  const createPreview = previewCreateFolder({
+    root,
+    env: { HOME: home },
+    input,
+    metadataDirtyProvider: () => [],
+  });
+  applyCreateFolder({
+    root,
+    env: { HOME: home },
+    input,
+    metadataHash: createPreview.metadataHash,
+    metadataDirtyProvider: () => [],
+  });
+  const deletePreview = previewDeleteFolder({
+    root,
+    project: "old-folder",
+    removeSourceSetupFolder: false,
+    metadataDirtyProvider: () => [],
+  });
+
+  fs.writeFileSync(
+    path.join(root, "src", "data", "projects.json"),
+    `${JSON.stringify(
+      [
+        readJson(path.join(root, "src", "data", "projects.json"))[0],
+        { slug: "other-folder", name: "Other Folder" },
+      ],
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+
+  assert.throws(
+    () =>
+      applyDeleteFolder({
+        root,
+        project: "old-folder",
+        removeSourceSetupFolder: false,
+        confirmation: "delete old-folder",
+        metadataHash: deletePreview.metadataHash,
+        metadataDirtyProvider: () => [],
+      }),
+    (error) => error.code === "stale-metadata" && /stale-metadata/.test(error.message),
+  );
+  assert.equal(readYaml(path.join(root, "posts.config.yml")).sources[0].project, "old-folder");
+});
+
+test("applyDeleteFolder rejects invalid confirmation", (t) => {
+  const { root, home } = makeHub(t);
+  const projectRoot = path.join(home, "my-projects", "old-folder");
+  const input = { ...createFolderPayload(projectRoot), slug: "old-folder", name: "Old Folder" };
+  const createPreview = previewCreateFolder({
+    root,
+    env: { HOME: home },
+    input,
+    metadataDirtyProvider: () => [],
+  });
+  applyCreateFolder({
+    root,
+    env: { HOME: home },
+    input,
+    metadataHash: createPreview.metadataHash,
+    metadataDirtyProvider: () => [],
+  });
+  const deletePreview = previewDeleteFolder({
+    root,
+    project: "old-folder",
+    removeSourceSetupFolder: false,
+    metadataDirtyProvider: () => [],
+  });
+
+  assert.throws(
+    () =>
+      applyDeleteFolder({
+        root,
+        project: "old-folder",
+        removeSourceSetupFolder: false,
+        confirmation: "old-folder",
+        metadataHash: deletePreview.metadataHash,
+        metadataDirtyProvider: () => [],
+      }),
+    (error) => error.code === "confirmation-mismatch" && /confirmation-mismatch/.test(error.message),
+  );
+  assert.equal(readYaml(path.join(root, "posts.config.yml")).sources[0].project, "old-folder");
+});
+
+test("applyDeleteFolder rechecks nested setup content before metadata updates", (t) => {
+  const { root, home } = makeHub(t);
+  const projectRoot = path.join(home, "my-projects", "old-folder");
+  const input = { ...createFolderPayload(projectRoot), slug: "old-folder", name: "Old Folder" };
+  const createPreview = previewCreateFolder({
+    root,
+    env: { HOME: home },
+    input,
+    metadataDirtyProvider: () => [],
+  });
+  applyCreateFolder({
+    root,
+    env: { HOME: home },
+    input,
+    metadataHash: createPreview.metadataHash,
+    metadataDirtyProvider: () => [],
+  });
+  const deletePreview = previewDeleteFolder({
+    root,
+    project: "old-folder",
+    removeSourceSetupFolder: true,
+    metadataDirtyProvider: () => [],
+  });
+  fs.mkdirSync(path.join(projectRoot, "docs", "blog", "notes"), { recursive: true });
+  fs.writeFileSync(path.join(projectRoot, "docs", "blog", "notes", "custom.txt"), "custom", "utf8");
+
+  assert.throws(
+    () =>
+      applyDeleteFolder({
+        root,
+        project: "old-folder",
+        removeSourceSetupFolder: true,
+        confirmation: "delete old-folder",
+        metadataHash: deletePreview.metadataHash,
+        metadataDirtyProvider: () => [],
+      }),
+    (error) =>
+      error.code === "folder-delete-invalid" &&
+      error.blockers.some((blocker) => blocker.code === "extra-source-files-exist"),
+  );
+  assert.equal(readYaml(path.join(root, "posts.config.yml")).sources[0].project, "old-folder");
+  assert.equal(readJson(path.join(root, "src", "data", "projects.json"))[0].slug, "old-folder");
+  assert.equal(fs.existsSync(path.join(projectRoot, "docs", "blog", "README.md")), true);
 });
 
 test("applyDeleteFolder removes setup folder only when cleanup is explicit", (t) => {
