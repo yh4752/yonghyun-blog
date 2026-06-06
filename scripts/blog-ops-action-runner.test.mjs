@@ -123,6 +123,31 @@ test("createRunnerPreflight rejects projects missing from either config list", (
   ]);
 });
 
+test("createRunnerPreflight rejects projects missing from sources even when metadata exists", () => {
+  const preflight = createRunnerPreflight({
+    project: "sigak",
+    config: fakeConfig({
+      sources: [
+        {
+          project: "yonghyun-blog",
+          expandedPath: "/tmp/yonghyun-blog/docs/blog",
+        },
+      ],
+    }),
+    gitStatusProvider: () => ({ blogDirty: false, sourceDirty: false }),
+    pathExists: () => true,
+  });
+
+  assert.equal(preflight.canRun, false);
+  assert.deepEqual(preflight.actions, []);
+  assert.deepEqual(preflight.warnings, [
+    {
+      code: "unknown-project",
+      message: "sigak is not registered in posts.config.yml and src/data/projects.json.",
+    },
+  ]);
+});
+
 test("createRunnerPreflight rejects missing source paths", () => {
   const preflight = createRunnerPreflight({
     project: "sigak",
@@ -251,6 +276,26 @@ test("runRunnerAction truncates long stdout and stderr tails", async () => {
   assert.equal(result.stderr, "y".repeat(32768));
   assert.equal(result.stdoutTruncated, true);
   assert.equal(result.stderrTruncated, true);
+});
+
+test("runRunnerAction truncates multibyte stdout and stderr to valid utf8 byte tails", async () => {
+  const longStdout = "가".repeat(11_000);
+  const longStderr = "나".repeat(11_000);
+  const spawn = createFakeSpawn({ stdout: longStdout, stderr: longStderr, exitCode: 1 });
+  const result = await runRunnerAction({
+    action: "publish-dry-run",
+    project: "sigak",
+    config: fakeConfig(),
+    spawn,
+    pathExists: () => true,
+  });
+
+  assert.equal(result.stdoutTruncated, true);
+  assert.equal(result.stderrTruncated, true);
+  assert.ok(Buffer.byteLength(result.stdout, "utf8") <= 32768);
+  assert.ok(Buffer.byteLength(result.stderr, "utf8") <= 32768);
+  assert.notEqual(result.stdout[0], "\uFFFD");
+  assert.notEqual(result.stderr[0], "\uFFFD");
 });
 
 test("runRunnerAction times out and kills the child process", async () => {

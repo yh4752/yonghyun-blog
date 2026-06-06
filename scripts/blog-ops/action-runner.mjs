@@ -31,12 +31,21 @@ function truncateTail(value, maxBytes = MAX_OUTPUT_BYTES) {
   const text = String(value);
   const buffer = Buffer.from(text);
 
+  if (maxBytes <= 0) {
+    return { text: "", truncated: buffer.length > 0 };
+  }
+
   if (buffer.length <= maxBytes) {
     return { text, truncated: false };
   }
 
+  let start = buffer.length - maxBytes;
+  while (start < buffer.length && (buffer[start] & 0xc0) === 0x80) {
+    start += 1;
+  }
+
   return {
-    text: buffer.subarray(buffer.length - maxBytes).toString(),
+    text: buffer.subarray(start).toString(),
     truncated: true,
   };
 }
