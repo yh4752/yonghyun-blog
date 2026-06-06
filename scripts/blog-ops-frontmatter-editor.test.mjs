@@ -80,3 +80,23 @@ test("createFilePreview reports unchanged content", (t) => {
   assert.equal(preview.changed, false);
   assert.equal(preview.beforeHash, preview.afterHash);
 });
+
+test("createFilePreview treats nullish content and empty strings consistently", (t) => {
+  const root = makeTempRoot(t);
+  const file = path.join(root, "post.md");
+
+  for (const before of [null, undefined]) {
+    const preview = createFilePreview({
+      root,
+      file,
+      before,
+      after: "",
+    });
+
+    assert.equal(preview.changed, false);
+    assert.equal(preview.beforeHash, preview.afterHash);
+    assert.equal(preview.beforeHash, hashText(""));
+    assert.equal(preview.beforePreview, "");
+    assert.equal(preview.afterPreview, "");
+  }
+});
