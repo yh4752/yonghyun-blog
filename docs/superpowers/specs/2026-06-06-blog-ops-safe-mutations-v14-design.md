@@ -37,7 +37,7 @@ source post의 frontmatter 중 작은 필드만 수정한다.
 | 필드 | v1.4 동작 | 비고 |
 | --- | --- | --- |
 | `title` | 수정 가능 | 비어 있으면 저장 불가 |
-| `summary` | 수정 가능 | 80-160자 범위는 warning, 저장 차단은 아님 |
+| `summary` | 수정 가능 | live character count와 길이 가이드를 표시 |
 | `type` | 수정 가능 | 허용된 post type만 가능 |
 | `tags` | 수정 가능 | `src/data/tags.json` 허용 목록에서만 선택 |
 | `draft` | 수정 가능 | Dashboard에서 비공개 전환 가능 |
@@ -71,6 +71,19 @@ Folder 안에 실제 글과 학습 기록이 없을 때만 삭제를 허용한�
 - `posts.config.yml`과 `src/data/projects.json` 양쪽에 정상 등록되어 있다.
 
 조건을 만족하지 않으면 삭제 버튼은 비활성화하고 이유를 보여준다.
+
+삭제 조건은 사용자에게 복잡하게 보일 수 있다. 따라서 UI는 단순히 "삭제 불가"만 보여주지 않고, 삭제 가능성을 판단한 체크리스트를 표시한다.
+
+```txt
+Delete readiness
+[x] No source posts
+[x] No published posts
+[ ] Private notes still exist
+[x] No learning progress entries
+[x] Source folder has setup files only
+```
+
+각 실패 항목은 다음 행동을 함께 보여준다. 예를 들어 private note가 있으면 "Learning Ops에서 해당 note를 확인하세요"를 표시하고, published post가 있으면 "먼저 unpublish/sync 정책을 결정해야 합니다"를 표시한다.
 
 ### 제외
 
@@ -212,6 +225,66 @@ npm scripts
 `frontmatter-editor.mjs`와 `folder-manager.mjs`는 Dashboard 서버와 분리한다. 나중에 CLI나 오픈소스 패키지로 분리하기 쉽도록, HTTP request 객체에 의존하지 않는다.
 
 ## Post Safe Edit 설계
+
+### summary 작성 정책
+
+`summary`는 검색 결과, 글 목록, OG description에 쓰이는 짧은 설명이다. v1.4에서는 자동 작성보다 **작성 품질을 확인할 수 있는 보조 UI**를 먼저 제공한다.
+
+길이 정책:
+
+| 길이 | 상태 | UI 문구 |
+| --- | --- | --- |
+| 0자 | Error | "summary는 비어 있을 수 없습니다." |
+| 1-79자 | Warning | "조금 짧습니다. 문제, 결정, 결과가 드러나도록 80자 이상을 권장합니다." |
+| 80-160자 | Good | "권장 길이 안에 있습니다." |
+| 161-220자 | Warning | "조금 깁니다. 목록과 공유 카드에서 잘릴 수 있습니다." |
+| 221자 이상 | Error | "summary가 너무 깁니다. 220자 이하로 줄이세요." |
+
+저장 차단 기준은 0자와 221자 이상이다. 80-160자는 품질 권장 범위이고, 1-79자와 161-220자는 저장은 가능하지만 warning을 남긴다.
+
+UI는 textarea 아래에 live character count를 표시한다.
+
+```txt
+Summary
+142 / 160 recommended
+Good: problem, decision, and result are visible.
+```
+
+v1.4에서는 AI 자동 생성이나 본문 기반 자동 완성을 넣지 않는다. 대신 `Use current title as starting point` 같은 단순 helper도 넣지 않는다. 자동 생성은 잘못된 요약이 들어갈 수 있고, 사용자가 글의 핵심을 직접 정리하는 학습 효과를 줄일 수 있다.
+
+후속 단계에서 반복적으로 summary 작성이 불편하다는 신호가 쌓이면, v1.5 이후에 `Suggest summary from title + first paragraph`를 검토한다. 이때도 자동 저장이 아니라 제안 텍스트를 사용자가 선택해 반영하는 방식이어야 한다.
+
+### tag 작성 정책
+
+v1.4에서 tag는 `src/data/tags.json`의 허용 목록을 기준으로만 선택한다.
+
+Dashboard는 tag 정책 자체를 수정하지 않는다. 이유는 tag 추가가 단일 글 수정이 아니라 사이트 전체 탐색 구조를 바꾸는 결정이기 때문이다. 특정 글 하나에서 필요해 보이는 tag를 즉시 추가하면 태그 목록이 쉽게 오염된다.
+
+v1.4 UI는 아래까지만 제공한다.
+
+- 허용 tag multi-select
+- 선택한 tag count 표시
+- invalid tag가 source에 있으면 error와 suggestion 표시
+- alias suggestion 표시
+
+예시:
+
+```txt
+Invalid tag: postgres
+Suggested: PostgreSQL
+```
+
+사용자 정의 tag 입력창은 만들지 않는다. 새 tag가 필요하면 Dashboard는 "Tag policy update required" 안내와 함께 `src/data/tags.json`를 수정해야 한다고 알려준다.
+
+후속 단계에서 tag 관리 요구가 반복되면 v1.5 이후 `Tag Policy Manager`를 별도 기능으로 설계한다.
+
+Tag Policy Manager 후보 범위:
+
+- 새 tag 제안
+- 기존 tag와 중복/alias 검사
+- tag 사용 빈도 표시
+- `src/data/tags.json` preview/apply
+- validate 후 site-wide tag 영향 확인
 
 ### 읽기 API
 
@@ -384,7 +457,10 @@ featured: true
 | --- | --- |
 | `title` empty | Error |
 | `summary` empty | Error |
-| `summary` 80-160자 밖 | Warning |
+| `summary` 1-79자 | Warning |
+| `summary` 80-160자 | Good |
+| `summary` 161-220자 | Warning |
+| `summary` 221자 이상 | Error |
 | `type` allow-list 밖 | Error |
 | `tags` 빈 배열 | Error |
 | `tags` allow-list 밖 | Error, suggestion이 있으면 표시 |
@@ -510,6 +586,17 @@ v1.4의 삭제는 **empty Folder unregister**다.
 | source folder에 setup 파일 외 다른 파일 있음 | 불가 |
 | source path missing, dependent content 없음 | 등록 해제 가능 |
 | `posts.config.yml`과 `projects.json`이 불일치 | 불가, metadata repair 필요 |
+
+Dashboard는 이 조건을 checklist로 변환해 보여준다.
+
+| 체크 항목 | 실패 시 표시할 해결 가이드 |
+| --- | --- |
+| Source posts | "source post를 다른 Folder로 옮기거나 삭제 정책을 먼저 결정하세요." |
+| Published posts | "발행본이 남아 있습니다. unpublish/sync 정책을 먼저 결정하세요." |
+| Private notes | "Learning Ops private note가 남아 있습니다. 공개 글 삭제와 학습 기록 보존 여부를 결정하세요." |
+| Learning progress | ".local learning progress에 기록이 있습니다. 학습 상태를 archive하거나 삭제 정책을 정하세요." |
+| Extra source files | "README/topic-queue 외 파일이 있습니다. 사용자가 만든 파일인지 확인하세요." |
+| Metadata consistency | "posts.config.yml과 projects.json의 등록 상태가 다릅니다. metadata repair가 먼저 필요합니다." |
 
 source folder cleanup을 선택한 경우에는 추가 조건이 붙는다.
 
@@ -665,6 +752,19 @@ Cannot delete this Folder
 - private learning notes exist.
 ```
 
+삭제 가능성은 checklist로 보여준다.
+
+```txt
+Delete readiness
+Passed
+- Source posts: none
+- Published posts: none
+
+Blocked
+- Private notes: 1 note remains
+  Next: decide whether to keep this learning note or remove it manually.
+```
+
 삭제 가능하면 confirmation input을 보여준다.
 
 ```txt
@@ -700,6 +800,26 @@ Dirty repo는 무조건 차단하지 않는다. source post를 직접 편집한 
 
 정확한 git file dirty check가 어려운 환경에서는 hash check를 최소 안전장치로 사용하고, repo dirty는 warning으로 표시한다.
 
+Folder create/delete가 dirty metadata 때문에 차단될 때는 단순히 "dirty"라고 표시하지 않는다. 어떤 파일 때문에 막혔고, 사용자가 무엇을 확인해야 하는지 보여준다.
+
+예시:
+
+```txt
+Folder changes are blocked
+
+Blocked files
+- posts.config.yml has local changes
+- src/data/projects.json has local changes
+
+Why
+Folder create/delete rewrites project registration metadata. Applying this change on top of unreviewed metadata edits could drop or duplicate a Folder entry.
+
+Next
+Review and commit/stash the metadata changes, then refresh Dashboard and preview again.
+```
+
+v1.4는 Dashboard에서 commit/stash를 실행하지 않는다. 사용자가 터미널이나 Git UI에서 직접 정리한 뒤 다시 preview한다.
+
 ## 에러와 다음 행동 문구
 
 | 오류 | next action |
@@ -726,7 +846,13 @@ Dirty repo는 무조건 차단하지 않는다. source post를 직접 편집한 
 - apply는 허용된 field만 바꾼다.
 - markdown body는 그대로 유지된다.
 - `relatedPosts` formatting은 유지된다.
+- summary 0자는 error다.
+- summary 1-79자는 warning이고 apply 가능하다.
+- summary 80-160자는 warning이 없다.
+- summary 161-220자는 warning이고 apply 가능하다.
+- summary 221자 이상은 error다.
 - invalid tag는 error다.
+- invalid tag에 alias suggestion이 있으면 suggestion을 반환한다.
 - duplicate tag는 error다.
 - immutable field 변경은 error다.
 - source hash가 달라지면 apply가 `stale-source`로 실패한다.
@@ -749,6 +875,8 @@ Dirty repo는 무조건 차단하지 않는다. source post를 직접 편집한 
 - private note가 있으면 delete 불가다.
 - learning progress entry가 있으면 delete 불가다.
 - setup 파일 외 파일이 있으면 delete 불가다.
+- delete preview는 readiness checklist와 next action을 반환한다.
+- metadata dirty 상태이면 create/delete를 차단하고 blocked file 목록과 해결 안내를 반환한다.
 - confirmation이 틀리면 delete apply가 실패한다.
 - unregister-only delete는 source folder를 남긴다.
 - cleanup opt-in delete는 preview에 표시된 setup folder만 제거한다.
@@ -764,6 +892,7 @@ Dirty repo는 무조건 차단하지 않는다. source post를 직접 편집한 
 - `POST /api/safe-edit/post/apply`가 stale hash를 `409`로 거부한다.
 - `POST /api/folders/create/preview`가 operations를 반환한다.
 - `POST /api/folders/delete/preview`가 blockers를 반환한다.
+- folder create/delete가 dirty metadata 상태에서 차단 이유와 next action을 반환한다.
 - unknown `/api/safe-edit/*`, `/api/folders/*`는 JSON 404를 반환한다.
 
 ### dashboard template test
@@ -777,23 +906,31 @@ Dirty repo는 무조건 차단하지 않는다. source post를 직접 편집한 
 - `New Folder` UI가 있다.
 - `Delete Empty Folder` UI가 있다.
 - `draft`와 `featured`는 toggle UI다.
+- summary textarea 아래 live character count와 length status가 있다.
 - `tags`는 허용 목록 기반 선택 UI다.
+- tag policy update 안내가 있다.
+- Folder delete readiness checklist가 있다.
+- dirty metadata blocker 설명과 next action 문구가 있다.
 - delete confirmation 문구가 있다.
 - source-only/published direct edit 금지 문구가 있다.
 
 ## v1.5 이후로 미루는 것
 
-v1.4 이후 후보:
+v1.4 이후 후보는 많기 때문에, 우선순위를 아래처럼 둔다. 순서는 사용자 요구와 dogfooding 결과에 따라 바뀔 수 있지만, 기본 판단 기준은 "자주 반복되고, 안전 경계를 작게 유지할 수 있는가"다.
 
-- 새 글 생성 Dashboard UI
-- missing frontmatter quick fix
-- tag policy 관리 UI
-- `type: note` 도입
-- Folder rename
-- Folder metadata repair wizard
-- body editor
-- sync/full publish 실행 버튼
-- branch/commit/push/PR assistant
+| 우선순위 | 후보 | 이유 | 선행 조건 |
+| --- | --- | --- | --- |
+| 1 | 새 글 생성 Dashboard UI | Folder를 추가한 뒤 바로 첫 글을 만들고 싶어질 가능성이 높다. | source-only create, filename/slug 검증 |
+| 2 | missing frontmatter quick fix | 실제 dogfooding에서 frontmatter 누락이 발견됐다. | template 선택, preview/apply |
+| 3 | Tag Policy Manager | tag 목록이 늘수록 수동 JSON 편집이 불편해진다. | tag 중복/alias/사용 빈도 표시 |
+| 4 | `type: note` 도입 | notes/life 같은 비프로젝트 Folder 요구가 생길 수 있다. | content taxonomy 재검토 |
+| 5 | Folder metadata repair wizard | config/projects 불일치가 생기면 create/delete가 막힌다. | mismatch detection 안정화 |
+| 6 | sync/full publish 실행 버튼 | Safe Edit 이후 검증-발행 흐름을 더 줄일 수 있다. | dirty state, diff preview, rollback 설명 |
+| 7 | branch/commit/push/PR assistant | 운영 흐름을 끝까지 줄일 수 있다. | git boundary, source repo/blog repo 분리 |
+| 8 | Folder rename | URL, source path, published path 영향이 크다. | redirect/slug migration 정책 |
+| 9 | body editor | mini CMS에 가까워져 위험과 구현량이 크다. | markdown preview, conflict handling |
+
+v1.5의 기본 후보는 `새 글 생성 Dashboard UI` 또는 `missing frontmatter quick fix`다. 둘 중 어떤 것을 먼저 할지는 v1.4 dogfooding에서 더 자주 막히는 작업을 기준으로 결정한다.
 
 ## 완료 기준
 
@@ -801,6 +938,9 @@ v1.4는 아래 조건을 만족하면 완료로 본다.
 
 - Dashboard에서 source post frontmatter를 preview 후 apply할 수 있다.
 - 변경 가능한 field는 `title`, `summary`, `type`, `tags`, `draft`, `featured`뿐이다.
+- summary UI는 character count와 length status를 보여준다.
+- summary는 0자와 221자 이상에서 apply가 차단된다.
+- tag UI는 허용 목록 기반 선택과 invalid tag suggestion을 제공한다.
 - 발행본은 직접 수정되지 않는다.
 - 저장 전 changed fields와 affected file preview가 표시된다.
 - stale source file은 apply가 차단된다.
@@ -809,7 +949,9 @@ v1.4는 아래 조건을 만족하면 완료로 본다.
 - Dashboard에서 새 Folder를 preview 후 추가할 수 있다.
 - Dashboard에서 비어 있는 Folder만 삭제할 수 있다.
 - Folder 삭제는 dependent content가 있으면 차단된다.
+- Folder 삭제 UI는 readiness checklist와 실패 항목별 next action을 보여준다.
 - Folder 삭제는 confirmation text를 요구한다.
+- Folder create/delete는 `posts.config.yml` 또는 `projects.json` dirty 상태에서 차단 이유와 해결 방법을 보여준다.
 - `npm test`가 통과한다.
 - `npm run validate:posts`가 통과한다.
 - `npm run build`가 통과한다.
@@ -821,5 +963,7 @@ v1.4는 아래 조건을 만족하면 완료로 본다.
 - 기존 정책과 일관성: source-only 원칙과 `source -> validation -> sync -> PR` 흐름을 유지했다.
 - 위험한 기능 제외: body edit, slug/date/project rename, full publish, PR assistant는 후속 단계로 미뤘다.
 - Folder 삭제 안전성: 글, 발행본, private note, progress entry가 있으면 삭제할 수 없고, 물리 folder cleanup은 opt-in으로 제한했다.
+- UX 명확성: summary length, tag policy, delete readiness, dirty metadata blocker를 UI와 테스트 기준에 반영했다.
+- 후속 우선순위: v1.5 이후 후보를 단순 목록이 아니라 우선순위와 선행 조건으로 정리했다.
 - v1.3 재사용: 저장 후 검증은 Safe Edit endpoint가 직접 command를 실행하지 않고 기존 runner를 재사용하도록 정리했다.
 - 구현 가능성: 기존 `init:project` 정책, `posts.config.yml`, `projects.json`, inventory 구조를 기반으로 구현할 수 있다.
