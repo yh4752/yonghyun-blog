@@ -2,6 +2,17 @@ import fs from "node:fs";
 import http from "node:http";
 
 import { createRunnerPreflight, runRunnerAction } from "./blog-ops/action-runner.mjs";
+import {
+  applyCreateFolder,
+  applyDeleteFolder,
+  previewCreateFolder,
+  previewDeleteFolder,
+} from "./blog-ops/folder-manager.mjs";
+import {
+  applyPostFrontmatterEdit,
+  previewPostFrontmatterEdit,
+  readEditablePost,
+} from "./blog-ops/frontmatter-editor.mjs";
 import { buildBlogOpsInventory } from "./blog-ops/posts-inventory.mjs";
 
 const DEFAULT_PORT = 4317;
@@ -66,6 +77,22 @@ function statusForRunnerResult(result) {
   return 200;
 }
 
+function statusForMutationError(error) {
+  if (error.code === "stale-source" || error.code === "stale-metadata") return 409;
+  if (
+    [
+      "source-not-found",
+      "frontmatter-missing",
+      "frontmatter-parse-error",
+      "invalid-request-body",
+      "confirmation-mismatch",
+    ].includes(error.code)
+  ) {
+    return 400;
+  }
+  return error.status ?? 500;
+}
+
 function sendMethodNotAllowed(response, allow) {
   response.writeHead(405, {
     allow,
@@ -83,10 +110,49 @@ function isApiPath(pathname) {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
+function requiredString(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function requireFields(value, fields) {
+  const missing = fields.filter((field) => !requiredString(value[field]));
+  if (missing.length > 0) {
+    throw clientError(`Missing required field${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}.`, {
+      code: "invalid-request-body",
+    });
+  }
+}
+
+async function readJsonObjectBody(request) {
+  const body = await readJsonBody(request);
+  if (!isJsonObject(body)) {
+    throw clientError("Request body must be a JSON object.", { code: "invalid-request-body" });
+  }
+  return body;
+}
+
+function sendMutationError(response, error) {
+  sendJson(response, statusForMutationError(error), {
+    error: error.code ?? "mutation-error",
+    message: error.message,
+  });
+}
+
 export function createDashboardServer({
   inventoryProvider = buildBlogOpsInventory,
   runnerPreflightProvider = createRunnerPreflight,
   runnerProvider = runRunnerAction,
+  safeEditProvider = {
+    readPost: readEditablePost,
+    previewPost: previewPostFrontmatterEdit,
+    applyPost: applyPostFrontmatterEdit,
+  },
+  folderProvider = {
+    previewCreate: previewCreateFolder,
+    applyCreate: applyCreateFolder,
+    previewDelete: previewDeleteFolder,
+    applyDelete: applyDeleteFolder,
+  },
 } = {}) {
   let runnerBusy = false;
 
@@ -171,6 +237,158 @@ export function createDashboardServer({
         });
       } finally {
         runnerBusy = false;
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/safe-edit/post") {
+      if (request.method !== "GET") {
+        sendMethodNotAllowed(response, "GET");
+        return;
+      }
+
+      try {
+        const project = url.searchParams.get("project") ?? "";
+        const slug = url.searchParams.get("slug") ?? "";
+        requireFields({ project, slug }, ["project", "slug"]);
+        sendJson(response, 200, await safeEditProvider.readPost({ project, slug }));
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/safe-edit/post/preview") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const body = await readJsonObjectBody(request);
+        requireFields(body, ["project", "slug", "sourceHash"]);
+        sendJson(
+          response,
+          200,
+          await safeEditProvider.previewPost({
+            project: body.project,
+            slug: body.slug,
+            sourceHash: body.sourceHash,
+            changes: body.changes ?? {},
+          }),
+        );
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/safe-edit/post/apply") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const body = await readJsonObjectBody(request);
+        requireFields(body, ["project", "slug", "sourceHash"]);
+        sendJson(
+          response,
+          200,
+          await safeEditProvider.applyPost({
+            project: body.project,
+            slug: body.slug,
+            sourceHash: body.sourceHash,
+            changes: body.changes ?? {},
+          }),
+        );
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/folders/create/preview") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const body = await readJsonObjectBody(request);
+        sendJson(response, 200, await folderProvider.previewCreate({ input: body }));
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/folders/create/apply") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const body = await readJsonObjectBody(request);
+        sendJson(
+          response,
+          200,
+          await folderProvider.applyCreate({
+            input: body,
+            metadataHash: body.metadataHash,
+          }),
+        );
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/folders/delete/preview") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const body = await readJsonObjectBody(request);
+        requireFields(body, ["project"]);
+        sendJson(
+          response,
+          200,
+          await folderProvider.previewDelete({
+            project: body.project,
+            removeSourceSetupFolder: body.removeSourceSetupFolder,
+          }),
+        );
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/folders/delete/apply") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const body = await readJsonObjectBody(request);
+        requireFields(body, ["project", "confirmation"]);
+        sendJson(
+          response,
+          200,
+          await folderProvider.applyDelete({
+            project: body.project,
+            removeSourceSetupFolder: body.removeSourceSetupFolder,
+            confirmation: body.confirmation,
+            metadataHash: body.metadataHash,
+          }),
+        );
+      } catch (error) {
+        sendMutationError(response, error);
       }
       return;
     }

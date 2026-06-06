@@ -207,6 +207,291 @@ test("createDashboardServer returns JSON 404 for unknown API routes", async () =
   }
 });
 
+test("safe edit read endpoint returns editable post state", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    safeEditProvider: {
+      readPost: ({ project, slug }) => {
+        providerInput = { project, slug };
+        return {
+          project,
+          slug,
+          sourceHash: "sha256:abc",
+          editable: {
+            title: "Title",
+            summary: "Summary",
+            type: "dev-log",
+            tags: ["Documentation"],
+            draft: false,
+            featured: false,
+          },
+          readonly: { date: "2026-06-06", project },
+          allowedTypes: ["dev-log"],
+          allowedTags: ["Documentation"],
+        };
+      },
+      previewPost: () => {
+        throw new Error("not used");
+      },
+      applyPost: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/post?project=demo&slug=post`);
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.project, "demo");
+    assert.equal(json.slug, "post");
+    assert.equal(json.sourceHash, "sha256:abc");
+    assert.deepEqual(providerInput, { project: "demo", slug: "post" });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("safe edit preview endpoint returns provider result", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    safeEditProvider: {
+      readPost: () => {
+        throw new Error("not used");
+      },
+      previewPost: ({ project, slug, sourceHash, changes }) => {
+        providerInput = { project, slug, sourceHash, changes };
+        return {
+          project,
+          slug,
+          canApply: true,
+          changedFields: [{ field: "draft", before: false, after: true }],
+          changes,
+        };
+      },
+      applyPost: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/post/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post", sourceHash: "sha256:abc", changes: { draft: true } }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.canApply, true);
+    assert.equal(json.changedFields[0].field, "draft");
+    assert.deepEqual(providerInput, {
+      project: "demo",
+      slug: "post",
+      sourceHash: "sha256:abc",
+      changes: { draft: true },
+    });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("safe edit preview endpoint rejects non-object JSON bodies", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    safeEditProvider: {
+      readPost: () => {
+        throw new Error("not used");
+      },
+      previewPost: () => {
+        providerCalled = true;
+        return {};
+      },
+      applyPost: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/post/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "null",
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("safe edit preview endpoint rejects missing required fields", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    safeEditProvider: {
+      readPost: () => {
+        throw new Error("not used");
+      },
+      previewPost: () => {
+        providerCalled = true;
+        return {};
+      },
+      applyPost: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/post/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("safe edit apply maps stale source to 409", async () => {
+  const stale = Object.assign(new Error("stale-source"), { code: "stale-source" });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    safeEditProvider: {
+      readPost: () => {
+        throw new Error("not used");
+      },
+      previewPost: () => {
+        throw new Error("not used");
+      },
+      applyPost: () => {
+        throw stale;
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/post/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post", sourceHash: "sha256:abc", changes: { draft: true } }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(json.error, "stale-source");
+    assert.equal(json.message, "stale-source");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("folder create preview endpoint returns provider operations", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: ({ input }) => {
+        providerInput = input;
+        return {
+          canApply: true,
+          input,
+          operations: [{ type: "update-config", path: "posts.config.yml" }],
+        };
+      },
+      applyCreate: () => {
+        throw new Error("not used");
+      },
+      previewDelete: () => {
+        throw new Error("not used");
+      },
+      applyDelete: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const body = { slug: "demo", name: "Demo", projectRoot: "/tmp/demo" };
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/create/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.operations[0].type, "update-config");
+    assert.deepEqual(providerInput, body);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("folder delete preview endpoint returns provider blockers", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: () => {
+        throw new Error("not used");
+      },
+      applyCreate: () => {
+        throw new Error("not used");
+      },
+      previewDelete: ({ project, removeSourceSetupFolder }) => {
+        providerInput = { project, removeSourceSetupFolder };
+        return {
+          project,
+          canApply: false,
+          blockers: [{ code: "source-posts-exist", message: "Cannot delete Folder because 1 source post exists." }],
+        };
+      },
+      applyDelete: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/delete/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", removeSourceSetupFolder: false }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.canApply, false);
+    assert.equal(json.blockers[0].code, "source-posts-exist");
+    assert.deepEqual(providerInput, { project: "demo", removeSourceSetupFolder: false });
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("runner preflight returns safe actions for one folder", async () => {
   const server = createDashboardServer({
     inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
