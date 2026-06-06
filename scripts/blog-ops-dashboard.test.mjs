@@ -406,6 +406,45 @@ test("safe edit apply maps stale source to 409", async () => {
   }
 });
 
+test("safe edit apply maps provider validation failures to 400", async () => {
+  const invalid = Object.assign(new Error("frontmatter-edit-invalid"), { code: "frontmatter-edit-invalid" });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    safeEditProvider: {
+      readPost: () => {
+        throw new Error("not used");
+      },
+      previewPost: () => {
+        throw new Error("not used");
+      },
+      applyPost: () => {
+        throw invalid;
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/post/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project: "demo",
+        slug: "post",
+        sourceHash: "sha256:abc",
+        changes: { date: "2026-01-01" },
+      }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "frontmatter-edit-invalid");
+    assert.equal(json.message, "frontmatter-edit-invalid");
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("folder create preview endpoint returns provider operations", async () => {
   let providerInput;
   const server = createDashboardServer({
@@ -488,7 +527,48 @@ test("folder create apply endpoint returns provider result", async () => {
     assert.equal(response.status, 200);
     assert.equal(json.applied, true);
     assert.equal(json.operations[0].type, "create-folder");
-    assert.deepEqual(providerInput, { input: body, metadataHash: "sha256:old" });
+    assert.deepEqual(providerInput, {
+      input: { slug: "demo", name: "Demo", projectRoot: "/tmp/demo" },
+      metadataHash: "sha256:old",
+    });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("folder create apply rejects missing metadata hash before provider call", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: () => {
+        throw new Error("not used");
+      },
+      applyCreate: () => {
+        providerCalled = true;
+        return {};
+      },
+      previewDelete: () => {
+        throw new Error("not used");
+      },
+      applyDelete: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/create/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug: "demo", name: "Demo", projectRoot: "/tmp/demo" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
   } finally {
     await closeServer(server);
   }
@@ -526,6 +606,43 @@ test("folder create apply maps stale metadata to 409", async () => {
     assert.equal(response.status, 409);
     assert.equal(json.error, "stale-metadata");
     assert.equal(json.message, "stale-metadata");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("folder create apply maps provider validation failures to 400", async () => {
+  const invalid = Object.assign(new Error("folder-create-invalid"), { code: "folder-create-invalid" });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: () => {
+        throw new Error("not used");
+      },
+      applyCreate: () => {
+        throw invalid;
+      },
+      previewDelete: () => {
+        throw new Error("not used");
+      },
+      applyDelete: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/create/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug: "demo", metadataHash: "sha256:old" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "folder-create-invalid");
+    assert.equal(json.message, "folder-create-invalid");
   } finally {
     await closeServer(server);
   }
@@ -628,6 +745,44 @@ test("folder delete apply endpoint returns provider result", async () => {
   }
 });
 
+test("folder delete apply rejects missing metadata hash before provider call", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: () => {
+        throw new Error("not used");
+      },
+      applyCreate: () => {
+        throw new Error("not used");
+      },
+      previewDelete: () => {
+        throw new Error("not used");
+      },
+      applyDelete: () => {
+        providerCalled = true;
+        return {};
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/delete/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", confirmation: "DELETE demo" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("folder delete apply maps confirmation mismatch to 400", async () => {
   const mismatch = Object.assign(new Error("confirmation-mismatch"), { code: "confirmation-mismatch" });
   const server = createDashboardServer({
@@ -660,6 +815,43 @@ test("folder delete apply maps confirmation mismatch to 400", async () => {
     assert.equal(response.status, 400);
     assert.equal(json.error, "confirmation-mismatch");
     assert.equal(json.message, "confirmation-mismatch");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("folder delete apply maps provider validation failures to 400", async () => {
+  const invalid = Object.assign(new Error("folder-delete-invalid"), { code: "folder-delete-invalid" });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: () => {
+        throw new Error("not used");
+      },
+      applyCreate: () => {
+        throw new Error("not used");
+      },
+      previewDelete: () => {
+        throw new Error("not used");
+      },
+      applyDelete: () => {
+        throw invalid;
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/delete/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", confirmation: "DELETE demo", metadataHash: "sha256:old" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "folder-delete-invalid");
+    assert.equal(json.message, "folder-delete-invalid");
   } finally {
     await closeServer(server);
   }

@@ -84,6 +84,13 @@ function statusForMutationError(error) {
       "source-not-found",
       "frontmatter-missing",
       "frontmatter-parse-error",
+      "source-hash-required",
+      "duplicate-frontmatter-key",
+      "unknown-field",
+      "immutable-field",
+      "frontmatter-edit-invalid",
+      "folder-create-invalid",
+      "folder-delete-invalid",
       "invalid-request-body",
       "confirmation-mismatch",
     ].includes(error.code)
@@ -331,12 +338,14 @@ export function createDashboardServer({
 
       try {
         const body = await readJsonObjectBody(request);
+        requireFields(body, ["metadataHash"]);
+        const { metadataHash, ...input } = body;
         sendJson(
           response,
           200,
           await folderProvider.applyCreate({
-            input: body,
-            metadataHash: body.metadataHash,
+            input,
+            metadataHash,
           }),
         );
       } catch (error) {
@@ -376,7 +385,7 @@ export function createDashboardServer({
 
       try {
         const body = await readJsonObjectBody(request);
-        requireFields(body, ["project", "confirmation"]);
+        requireFields(body, ["project", "confirmation", "metadataHash"]);
         sendJson(
           response,
           200,
