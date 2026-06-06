@@ -27,27 +27,58 @@ function commandToString(command, args) {
   return [command, ...args].join(" ");
 }
 
-function truncateTail(value, maxBytes = MAX_OUTPUT_BYTES) {
-  const text = String(value);
-  const buffer = Buffer.from(text);
-
-  if (maxBytes <= 0) {
-    return { text: "", truncated: buffer.length > 0 };
-  }
-
-  if (buffer.length <= maxBytes) {
-    return { text, truncated: false };
-  }
-
-  let start = buffer.length - maxBytes;
+function decodeUtf8Tail(buffer) {
+  let start = 0;
   while (start < buffer.length && (buffer[start] & 0xc0) === 0x80) {
     start += 1;
   }
 
-  return {
-    text: buffer.subarray(start).toString(),
-    truncated: true,
+  return buffer.subarray(start).toString("utf8");
+}
+
+function createOutputTail(maxBytes = MAX_OUTPUT_BYTES) {
+  let tail = Buffer.alloc(0);
+  let truncated = false;
+
+  const push = (chunk) => {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+    if (buffer.length === 0) return;
+
+    if (maxBytes <= 0) {
+      tail = Buffer.alloc(0);
+      truncated = true;
+      return;
+    }
+
+    if (buffer.length >= maxBytes) {
+      truncated = truncated || tail.length > 0 || buffer.length > maxBytes;
+      tail = Buffer.from(buffer.subarray(buffer.length - maxBytes));
+      return;
+    }
+
+    const combined =
+      tail.length > 0 ? Buffer.concat([tail, buffer], tail.length + buffer.length) : Buffer.from(buffer);
+    if (combined.length > maxBytes) {
+      truncated = true;
+      tail = Buffer.from(combined.subarray(combined.length - maxBytes));
+      return;
+    }
+
+    tail = combined;
   };
+
+  const appendText = (value) => {
+    push(Buffer.from(String(value)));
+  };
+
+  const snapshot = () => {
+    return {
+      text: decodeUtf8Tail(tail),
+      truncated,
+    };
+  };
+
+  return { push, appendText, snapshot };
 }
 
 function findSource(config, project) {
@@ -219,12 +250,13 @@ export async function runRunnerAction({
 
   const command = renderRunnerCommand({ action, project });
   const startedAt = new Date().toISOString();
-  let stdout = "";
-  let stderr = "";
+  const stdout = createOutputTail();
+  const stderr = createOutputTail();
 
   return await new Promise((resolve) => {
     let child;
     let settled = false;
+    let timedOut = false;
     let timer;
 
     const finish = (result) => {
@@ -235,8 +267,8 @@ export async function runRunnerAction({
     };
 
     const resultBase = () => {
-      const trimmedStdout = truncateTail(stdout);
-      const trimmedStderr = truncateTail(stderr);
+      const trimmedStdout = stdout.snapshot();
+      const trimmedStderr = stderr.snapshot();
 
       return {
         action,
@@ -258,7 +290,7 @@ export async function runRunnerAction({
         env: process.env,
       });
     } catch (error) {
-      stderr += error.message;
+      stderr.appendText(error.message);
       finish({
         ...resultBase(),
         exitCode: null,
@@ -269,36 +301,40 @@ export async function runRunnerAction({
     }
 
     timer = setTimeout(() => {
-      const result = {
-        ...resultBase(),
-        exitCode: null,
-        status: "timed-out",
-        nextAction: "Run the same command in a terminal to inspect the slow step.",
-      };
-
-      finish(result);
-
+      timedOut = true;
       if (typeof child.kill === "function") {
-        child.kill("SIGTERM");
+        try {
+          child.kill("SIGTERM");
+        } catch (error) {
+          stderr.appendText(error.message);
+          finish({
+            ...resultBase(),
+            exitCode: null,
+            status: "timed-out",
+            nextAction: "Run the same command in a terminal to inspect the slow step.",
+          });
+        }
       }
     }, timeoutMs);
 
     child.stdout?.on("data", (chunk) => {
-      stdout += chunk.toString();
+      stdout.push(chunk);
     });
 
     child.stderr?.on("data", (chunk) => {
-      stderr += chunk.toString();
+      stderr.push(chunk);
     });
 
     child.on("error", (error) => {
-      stderr += error.message;
+      stderr.appendText(error.message);
 
       finish({
         ...resultBase(),
         exitCode: null,
-        status: "failed",
-        nextAction: definition.failureNextAction,
+        status: timedOut ? "timed-out" : "failed",
+        nextAction: timedOut
+          ? "Run the same command in a terminal to inspect the slow step."
+          : definition.failureNextAction,
       });
     });
 
@@ -307,9 +343,13 @@ export async function runRunnerAction({
 
       finish({
         ...resultBase(),
-        exitCode,
-        status: ok ? "success" : "failed",
-        nextAction: ok ? definition.successNextAction : definition.failureNextAction,
+        exitCode: timedOut ? null : exitCode,
+        status: timedOut ? "timed-out" : ok ? "success" : "failed",
+        nextAction: timedOut
+          ? "Run the same command in a terminal to inspect the slow step."
+          : ok
+            ? definition.successNextAction
+            : definition.failureNextAction,
       });
     });
   });

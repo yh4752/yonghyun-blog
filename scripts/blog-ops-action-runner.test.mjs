@@ -31,7 +31,26 @@ function fakeConfig(overrides = {}) {
   };
 }
 
-function createFakeSpawn({ stdout = "", stderr = "", exitCode = 0, delayMs = 0 } = {}) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function emitChunks(stream, chunks) {
+  for (const chunk of chunks) {
+    stream.emit("data", Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+}
+
+function createFakeSpawn({
+  stdout = "",
+  stderr = "",
+  stdoutChunks,
+  stderrChunks,
+  exitCode = 0,
+  delayMs = 0,
+  closeOnKill = true,
+  killCloseDelayMs = 0,
+} = {}) {
   const calls = [];
   const spawn = (command, args, options) => {
     const child = new EventEmitter();
@@ -40,15 +59,17 @@ function createFakeSpawn({ stdout = "", stderr = "", exitCode = 0, delayMs = 0 }
     child.killed = false;
     child.kill = () => {
       child.killed = true;
-      child.emit("close", null);
+      if (closeOnKill) {
+        setTimeout(() => child.emit("close", null), killCloseDelayMs);
+      }
       return true;
     };
     calls.push({ command, args, options, child });
 
     setTimeout(() => {
       if (child.killed) return;
-      if (stdout) child.stdout.emit("data", Buffer.from(stdout));
-      if (stderr) child.stderr.emit("data", Buffer.from(stderr));
+      emitChunks(child.stdout, stdoutChunks ?? (stdout ? [stdout] : []));
+      emitChunks(child.stderr, stderrChunks ?? (stderr ? [stderr] : []));
       child.emit("close", exitCode);
     }, delayMs);
 
@@ -298,6 +319,38 @@ test("runRunnerAction truncates multibyte stdout and stderr to valid utf8 byte t
   assert.notEqual(result.stderr[0], "\uFFFD");
 });
 
+test("runRunnerAction preserves utf8 split across stdout and stderr chunks", async () => {
+  const stdoutSyllable = Buffer.from("한");
+  const stderrSyllable = Buffer.from("글");
+  const spawn = createFakeSpawn({
+    stdoutChunks: [
+      "stdout ",
+      stdoutSyllable.subarray(0, 1),
+      stdoutSyllable.subarray(1),
+      " ok",
+    ],
+    stderrChunks: [
+      "stderr ",
+      stderrSyllable.subarray(0, 2),
+      stderrSyllable.subarray(2),
+      " fail",
+    ],
+    exitCode: 1,
+  });
+  const result = await runRunnerAction({
+    action: "publish-dry-run",
+    project: "sigak",
+    config: fakeConfig(),
+    spawn,
+    pathExists: () => true,
+  });
+
+  assert.equal(result.stdout, "stdout 한 ok");
+  assert.equal(result.stderr, "stderr 글 fail");
+  assert.doesNotMatch(result.stdout, /\uFFFD/);
+  assert.doesNotMatch(result.stderr, /\uFFFD/);
+});
+
 test("runRunnerAction times out and kills the child process", async () => {
   const spawn = createFakeSpawn({ stdout: "still running", delayMs: 50 });
   const result = await runRunnerAction({
@@ -313,4 +366,35 @@ test("runRunnerAction times out and kills the child process", async () => {
   assert.equal(result.exitCode, null);
   assert.equal(spawn.calls[0].child.killed, true);
   assert.equal(result.nextAction, "Run the same command in a terminal to inspect the slow step.");
+});
+
+test("runRunnerAction waits for close after timeout kill before resolving", async () => {
+  const spawn = createFakeSpawn({
+    stdout: "still running",
+    delayMs: 100,
+    closeOnKill: false,
+  });
+  const pendingResult = runRunnerAction({
+    action: "publish-dry-run",
+    project: "sigak",
+    config: fakeConfig(),
+    spawn,
+    timeoutMs: 5,
+    pathExists: () => true,
+  });
+  let settled = false;
+  pendingResult.then(() => {
+    settled = true;
+  });
+
+  await sleep(20);
+  assert.equal(spawn.calls[0].child.killed, true);
+  assert.equal(settled, false);
+
+  spawn.calls[0].child.emit("close", null);
+  const result = await pendingResult;
+
+  assert.equal(settled, true);
+  assert.equal(result.status, "timed-out");
+  assert.equal(result.exitCode, null);
 });
