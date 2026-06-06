@@ -224,6 +224,32 @@ test("previewCreateFolder rejects invalid featured and URL fields", (t) => {
   );
 });
 
+test("previewCreateFolder rejects non-http URL schemes", (t) => {
+  const { root, home } = makeHub(t);
+  const projectRoot = path.join(home, "my-projects", "new-folder");
+
+  const preview = previewCreateFolder({
+    root,
+    env: { HOME: home },
+    input: {
+      ...createFolderPayload(projectRoot),
+      repositoryUrl: "javascript:alert(1)",
+      demoUrl: "data:text/html,<h1>x</h1>",
+    },
+    metadataDirtyProvider: () => [],
+  });
+
+  assert.equal(preview.canApply, false);
+  assert.deepEqual(
+    preview.blockers.map((blocker) => [blocker.code, blocker.field]),
+    [
+      ["repository-url-invalid", "repositoryUrl"],
+      ["demo-url-invalid", "demoUrl"],
+    ],
+  );
+  assert.equal(preview.blockers.every((blocker) => /http:\/\/ or https:\/\//.test(blocker.message)), true);
+});
+
 test("previewCreateFolder rejects duplicate slugs", (t) => {
   const { root, home } = makeHub(t);
   fs.writeFileSync(
@@ -321,13 +347,25 @@ test("previewDeleteFolder blocks source posts and returns readiness checklist", 
   assert.equal(preview.canApply, false);
   assert.equal(preview.blockers[0].code, "source-posts-exist");
   for (const item of preview.readiness) {
-    assert.deepEqual(Object.keys(item).sort(), ["code", "detail", "label", "nextAction", "status"].sort());
+    assert.deepEqual(Object.keys(item).sort(), ["code", "count", "detail", "label", "nextAction", "status"].sort());
+    assert.equal(Number.isInteger(item.count), true);
   }
+  assert.deepEqual(
+    Object.fromEntries(preview.readiness.map((item) => [item.code, item.count])),
+    {
+      "source-posts": 1,
+      "published-posts": 0,
+      "private-notes": 0,
+      "learning-progress": 0,
+      "extra-source-files": 0,
+    },
+  );
   const sourceReadiness = preview.readiness.find((item) => item.code === "source-posts");
   assert.deepEqual(sourceReadiness, {
     code: "source-posts",
     label: "Source posts",
     status: "blocked",
+    count: 1,
     detail: "1 source post found: 2026-06-06-note.md",
     nextAction: "source post를 다른 Folder로 옮기거나 삭제 정책을 먼저 결정하세요.",
   });

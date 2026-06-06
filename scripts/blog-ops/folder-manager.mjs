@@ -205,7 +205,14 @@ function validateOptionalUrl(value, field, blockers) {
   const trimmed = value.trim();
   if (!trimmed) return;
   try {
-    new URL(trimmed);
+    const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      blockers.push({
+        code,
+        field,
+        message: `${field} must be an http:// or https:// URL string.`,
+      });
+    }
   } catch {
     blockers.push({
       code,
@@ -558,6 +565,7 @@ function readinessEntry({ code, label, count, detail, nextAction }) {
     code,
     label,
     status: count === 0 ? "passed" : "blocked",
+    count,
     detail,
     nextAction,
   };
