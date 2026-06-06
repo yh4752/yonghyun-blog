@@ -4,6 +4,15 @@ import test from "node:test";
 
 import { createDashboardServer, renderDashboardHtml, startDashboard } from "./blog-ops-dashboard.mjs";
 
+async function closeServer(server) {
+  await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+}
+
+async function listen(server) {
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return server.address().port;
+}
+
 test("renderDashboardHtml includes Content Ops and Learning Ops tabs", () => {
   const html = renderDashboardHtml();
 
@@ -133,6 +142,153 @@ test("createDashboardServer serves inventory without private note content", asyn
   assert.equal(response.status, 200);
   assert.equal(json.posts[0].hasPrivateNote, true);
   assert.equal(Object.hasOwn(json.posts[0], "privateBody"), false);
+});
+
+test("runner preflight returns safe actions for one folder", async () => {
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    runnerPreflightProvider: ({ project }) => ({
+      project,
+      canRun: true,
+      warnings: [],
+      actions: [
+        {
+          action: "validate-source",
+          label: "Validate source",
+          displayCommand: "npm run validate:posts -- --source --project sigak",
+          mutatesFiles: false,
+        },
+      ],
+    }),
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/runner/preflight?project=sigak`);
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.project, "sigak");
+    assert.equal(json.canRun, true);
+    assert.equal(json.actions[0].action, "validate-source");
+    assert.equal(json.actions[0].mutatesFiles, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("runner run endpoint rejects unknown actions", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    runnerProvider: async ({ action, project }) => {
+      providerInput = { action, project };
+      return {
+        action,
+        project,
+        status: "rejected",
+        error: "unknown-action",
+        stderr: "Dashboard does not allow this action. Check the UI and server allow-list.",
+      };
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/runner/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "npm test", project: "sigak", command: "npm test" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "unknown-action");
+    assert.deepEqual(providerInput, { action: "npm test", project: "sigak" });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("runner run endpoint rejects missing project", async () => {
+  let runnerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    runnerProvider: async () => {
+      runnerCalled = true;
+      return { status: "success" };
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/runner/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "validate-source" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "project-required");
+    assert.equal(json.message, "Select one Folder before running actions.");
+    assert.equal(runnerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("runner run endpoint serializes concurrent executions", async () => {
+  let releaseRunner;
+  let markRunnerEntered;
+  const runnerEntered = new Promise((resolve) => {
+    markRunnerEntered = resolve;
+  });
+  const runnerRelease = new Promise((resolve) => {
+    releaseRunner = resolve;
+  });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    runnerProvider: async ({ action, project }) => {
+      markRunnerEntered();
+      await runnerRelease;
+      return {
+        action,
+        project,
+        status: "success",
+        exitCode: 0,
+        stdout: "ok",
+        stderr: "",
+        stdoutTruncated: false,
+        stderrTruncated: false,
+      };
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const first = fetch(`http://127.0.0.1:${port}/api/runner/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "validate-source", project: "sigak" }),
+    });
+    const firstState = await Promise.race([runnerEntered.then(() => "entered"), first.then(() => "completed")]);
+    assert.equal(firstState, "entered");
+    const second = await fetch(`http://127.0.0.1:${port}/api/runner/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "publish-dry-run", project: "sigak" }),
+    });
+    releaseRunner();
+    const firstResponse = await first;
+
+    assert.equal(firstResponse.status, 200);
+    assert.equal(second.status, 409);
+    assert.equal((await second.json()).error, "runner-busy");
+  } finally {
+    releaseRunner();
+    await closeServer(server);
+  }
 });
 
 test("startDashboard tries the next port when the default is occupied", async () => {
