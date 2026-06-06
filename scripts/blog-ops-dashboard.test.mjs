@@ -449,6 +449,88 @@ test("folder create preview endpoint returns provider operations", async () => {
   }
 });
 
+test("folder create apply endpoint returns provider result", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: () => {
+        throw new Error("not used");
+      },
+      applyCreate: ({ input, metadataHash }) => {
+        providerInput = { input, metadataHash };
+        return {
+          applied: true,
+          input,
+          metadataHash: "sha256:new",
+          operations: [{ type: "create-folder", path: "src/content/blog/demo" }],
+        };
+      },
+      previewDelete: () => {
+        throw new Error("not used");
+      },
+      applyDelete: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const body = { slug: "demo", name: "Demo", projectRoot: "/tmp/demo", metadataHash: "sha256:old" };
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/create/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.applied, true);
+    assert.equal(json.operations[0].type, "create-folder");
+    assert.deepEqual(providerInput, { input: body, metadataHash: "sha256:old" });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("folder create apply maps stale metadata to 409", async () => {
+  const stale = Object.assign(new Error("stale-metadata"), { code: "stale-metadata" });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: () => {
+        throw new Error("not used");
+      },
+      applyCreate: () => {
+        throw stale;
+      },
+      previewDelete: () => {
+        throw new Error("not used");
+      },
+      applyDelete: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/create/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug: "demo", name: "Demo", metadataHash: "sha256:old" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(json.error, "stale-metadata");
+    assert.equal(json.message, "stale-metadata");
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("folder delete preview endpoint returns provider blockers", async () => {
   let providerInput;
   const server = createDashboardServer({
@@ -487,6 +569,97 @@ test("folder delete preview endpoint returns provider blockers", async () => {
     assert.equal(json.canApply, false);
     assert.equal(json.blockers[0].code, "source-posts-exist");
     assert.deepEqual(providerInput, { project: "demo", removeSourceSetupFolder: false });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("folder delete apply endpoint returns provider result", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: () => {
+        throw new Error("not used");
+      },
+      applyCreate: () => {
+        throw new Error("not used");
+      },
+      previewDelete: () => {
+        throw new Error("not used");
+      },
+      applyDelete: ({ project, removeSourceSetupFolder, confirmation, metadataHash }) => {
+        providerInput = { project, removeSourceSetupFolder, confirmation, metadataHash };
+        return {
+          project,
+          deleted: true,
+          removedSourceSetupFolder: removeSourceSetupFolder,
+          operations: [{ type: "remove-config-project", path: "posts.config.yml" }],
+        };
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/delete/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project: "demo",
+        removeSourceSetupFolder: true,
+        confirmation: "DELETE demo",
+        metadataHash: "sha256:old",
+      }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.deleted, true);
+    assert.equal(json.operations[0].type, "remove-config-project");
+    assert.deepEqual(providerInput, {
+      project: "demo",
+      removeSourceSetupFolder: true,
+      confirmation: "DELETE demo",
+      metadataHash: "sha256:old",
+    });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("folder delete apply maps confirmation mismatch to 400", async () => {
+  const mismatch = Object.assign(new Error("confirmation-mismatch"), { code: "confirmation-mismatch" });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    folderProvider: {
+      previewCreate: () => {
+        throw new Error("not used");
+      },
+      applyCreate: () => {
+        throw new Error("not used");
+      },
+      previewDelete: () => {
+        throw new Error("not used");
+      },
+      applyDelete: () => {
+        throw mismatch;
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/folders/delete/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", confirmation: "wrong", metadataHash: "sha256:old" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "confirmation-mismatch");
+    assert.equal(json.message, "confirmation-mismatch");
   } finally {
     await closeServer(server);
   }
