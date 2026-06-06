@@ -1260,7 +1260,9 @@
         runnerPreflight: null,
         runnerResult: null,
         runnerRunning: false,
-        runnerError: null,
+        runnerRunId: 0,
+        runnerPreflightError: null,
+        runnerRunError: null,
         theme: localStorage.getItem("blogOpsTheme") || "light",
       };
 
@@ -1754,14 +1756,19 @@
         const result = state.runnerResult;
         if (!result) return "";
         const exitCode = result.exitCode === undefined || result.exitCode === null ? "-" : result.exitCode;
+        const displayCommand = result.displayCommand || result.command || "-";
         return "<div class=\"runner-result\">" +
           "<div class=\"runner-result-row\"><strong>status</strong><span>" + escapeHtml(result.status || "-") + "</span></div>" +
           "<div class=\"runner-result-row\"><strong>exitCode</strong><span>" + escapeHtml(exitCode) + "</span></div>" +
-          "<div class=\"runner-result-row\"><strong>command</strong><code>" + escapeHtml(result.displayCommand || "-") + "</code></div>" +
+          "<div class=\"runner-result-row\"><strong>command</strong><code>" + escapeHtml(displayCommand) + "</code></div>" +
           renderRunnerOutput("stdout", result.stdout, result.stdoutTruncated) +
           renderRunnerOutput("stderr", result.stderr, result.stderrTruncated) +
           "<div class=\"runner-result-row\"><strong>next</strong><span>" + escapeHtml(result.nextAction || "-") + "</span></div>" +
         "</div>";
+      }
+
+      function runnerError() {
+        return state.runnerRunError || state.runnerPreflightError || "";
       }
 
       function renderRunnerPreview() {
@@ -1771,7 +1778,7 @@
         if (!preview.project) {
           return "<div class=\"runner-preview\">" +
             "<div class=\"runner-head\"><span class=\"runner-title\">Controlled Runner</span><span class=\"runner-project\">" + escapeHtml(selectedProject) + "</span></div>" +
-            "<div class=\"runner-message\">All Folders에서는 실행할 수 없습니다. 단일 Folder를 선택하면 publish command와 실행 가능한 action을 보여줍니다. 폴더를 선택하면 publish command를 보여줍니다.</div>" +
+            "<div class=\"runner-message\">All Folders에서는 실행할 수 없습니다. 단일 Folder를 선택하세요.</div>" +
             "<div class=\"runner-note\">" + escapeHtml(scopeNote) + "</div>" +
           "</div>";
         }
@@ -1787,7 +1794,7 @@
           ? actions.map((action) => renderRunnerAction(action, disabled)).join("")
           : "<div class=\"runner-message\">Preflight를 불러오면 실행 가능한 action이 표시됩니다.</div>";
         const running = state.runnerRunning ? "<div class=\"runner-message\">Runner 실행 중입니다…</div>" : "";
-        const error = state.runnerError ? "<div class=\"runner-message error\">" + escapeHtml(state.runnerError) + "</div>" : "";
+        const error = runnerError() ? "<div class=\"runner-message error\">" + escapeHtml(runnerError()) + "</div>" : "";
 
         return "<div class=\"runner-preview\">" +
           "<div class=\"runner-head\"><span class=\"runner-title\">Controlled Runner</span><span class=\"runner-project\">" + escapeHtml(selectedProject) + "</span></div>" +
@@ -1883,7 +1890,7 @@
 
       async function loadRunnerPreflight(project = activePublishProjectSlug()) {
         state.runnerPreflight = null;
-        state.runnerError = null;
+        state.runnerPreflightError = null;
         if (!project) {
           render();
           return;
@@ -1894,11 +1901,11 @@
           if (state.activeProject !== project) return;
           state.runnerPreflight = json;
           if (!response.ok) {
-            state.runnerError = json.message || json.error || "Runner preflight failed.";
+            state.runnerPreflightError = json.message || json.error || "Runner preflight failed.";
           }
         } catch (error) {
           if (state.activeProject === project) {
-            state.runnerError = error.message;
+            state.runnerPreflightError = error.message;
           }
         }
         render();
@@ -1917,8 +1924,9 @@
       async function runRunnerAction(action) {
         const project = activePublishProjectSlug();
         if (!project || state.runnerRunning) return;
+        const runId = ++state.runnerRunId;
         state.runnerRunning = true;
-        state.runnerError = null;
+        state.runnerRunError = null;
         state.runnerResult = null;
         render();
         try {
@@ -1928,18 +1936,23 @@
             body: JSON.stringify({ action, project }),
           });
           const json = await response.json();
+          if (state.runnerRunId !== runId || state.activeProject !== project) return;
           state.runnerResult = json;
           if (!response.ok) {
-            state.runnerError = json.message || json.error || "Runner action failed.";
+            state.runnerRunError = json.message || json.error || "Runner action failed.";
           }
         } catch (error) {
-          state.runnerError = error.message;
+          if (state.runnerRunId === runId && state.activeProject === project) {
+            state.runnerRunError = error.message;
+          }
         } finally {
           state.runnerRunning = false;
           render();
           await loadInventory().catch((error) => {
-            state.runnerError = "Inventory refresh failed: " + error.message;
-            render();
+            if (state.runnerRunId === runId && state.activeProject === project) {
+              state.runnerRunError = "Inventory refresh failed: " + error.message;
+              render();
+            }
           });
         }
       }
@@ -1952,10 +1965,11 @@
           state.selectedId = null;
           state.runnerPreflight = null;
           state.runnerResult = null;
-          state.runnerError = null;
+          state.runnerPreflightError = null;
+          state.runnerRunError = null;
           render();
           loadRunnerPreflight().catch((error) => {
-            state.runnerError = error.message;
+            state.runnerPreflightError = error.message;
             render();
           });
           return;

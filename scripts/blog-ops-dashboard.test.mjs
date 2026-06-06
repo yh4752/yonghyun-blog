@@ -38,6 +38,14 @@ test("renderDashboardHtml includes Controlled Runner actions and copy commands",
   assert.match(html, /runnerResult/);
   assert.match(html, /runnerRunning/);
   assert.match(html, /runnerError/);
+  assert.match(html, /runnerRunId/);
+  assert.match(html, /\+\+state\.runnerRunId/);
+  assert.match(html, /state\.runnerRunId !== runId \|\| state\.activeProject !== project/);
+  assert.match(html, /runnerPreflightError/);
+  assert.match(html, /runnerRunError/);
+  assert.match(html, /result\.displayCommand \|\| result\.command \|\| "-"/);
+  assert.match(html, /All Folders에서는 실행할 수 없습니다\. 단일 Folder를 선택하세요\./);
+  assert.doesNotMatch(html, /단일 Folder를 선택하면 publish command와 실행 가능한 action을 보여줍니다\. 폴더를 선택하면 publish command를 보여줍니다\./);
   assert.match(html, /\/api\/runner\/preflight\?project=/);
   assert.match(html, /\/api\/runner\/run/);
   assert.match(html, /data-run-action=/);
@@ -128,7 +136,7 @@ test("renderDashboardHtml does not default All Folders publish preview to first 
   assert.match(html, /function activePublishProjectSlug\(\)/);
   assert.match(html, /if \(state\.activeProject === "all"\) return "";/);
   assert.doesNotMatch(html, /state\.inventory\.projects\[0\]\?\.slug/);
-  assert.match(html, /폴더를 선택하면 publish command를 보여줍니다\./);
+  assert.match(html, /All Folders에서는 실행할 수 없습니다\. 단일 Folder를 선택하세요\./);
 });
 
 test("createDashboardServer serves inventory without private note content", async () => {
