@@ -284,11 +284,11 @@
 
       .nav-row {
         width: 100%;
-        height: 32px;
+        min-height: 38px;
         display: flex;
         align-items: center;
         gap: 9px;
-        padding: 0 9px;
+        padding: 5px 9px;
         border: 0;
         border-radius: 7px;
         color: var(--text);
@@ -312,6 +312,35 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         font-size: 13px;
+      }
+
+      .nav-text {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .nav-sub {
+        overflow: hidden;
+        color: var(--text-tertiary);
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .folder-help {
+        margin: -10px 8px 16px;
+        color: var(--text-tertiary);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .nav-row .count {
+        flex-shrink: 0;
       }
 
       .nav-row.active .nav-name {
@@ -733,12 +762,13 @@
       }
 
       .pipeline {
-        height: 92px;
+        min-height: 118px;
+        height: auto;
         flex-shrink: 0;
         display: flex;
         align-items: center;
         gap: 0;
-        padding: 0 22px;
+        padding: 14px 22px;
         background: var(--panel);
         border-top: 1px solid var(--border);
       }
@@ -840,6 +870,68 @@
         white-space: nowrap;
       }
 
+      .runner-preview {
+        flex-shrink: 0;
+        width: min(430px, 34vw);
+        margin-left: 22px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--panel-alt);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .runner-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 9px;
+      }
+
+      .runner-title {
+        color: var(--text);
+        font-size: 12.5px;
+        font-weight: 650;
+      }
+
+      .runner-project {
+        color: var(--text-tertiary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .runner-steps {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin: 0 0 10px;
+        padding: 0;
+        list-style: none;
+      }
+
+      .runner-steps li {
+        padding: 3px 7px;
+        border-radius: 999px;
+        background: var(--quiet-bg);
+        color: var(--quiet);
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+      }
+
+      .runner-actions {
+        display: grid;
+        gap: 7px;
+      }
+
+      .runner-note {
+        margin-top: 9px;
+        color: var(--text-sec);
+        font-size: 11.5px;
+        line-height: 1.45;
+      }
+
       .empty {
         padding: 28px 22px;
         color: var(--text-sec);
@@ -896,6 +988,7 @@
         }
 
         .searchbox,
+        .folder-help,
         .local-state {
           display: none;
         }
@@ -911,9 +1004,19 @@
         .nav-row {
           flex: 0 0 auto;
           width: auto;
-          min-width: 132px;
+          min-width: 150px;
+          max-width: min(72vw, 220px);
+          align-items: flex-start;
           border: 1px solid var(--border);
           background: var(--panel);
+        }
+
+        .nav-text {
+          max-width: min(46vw, 140px);
+        }
+
+        .nav-sub {
+          max-width: 100%;
         }
 
         .metrics {
@@ -974,6 +1077,11 @@
           width: 100%;
           justify-content: center;
         }
+
+        .runner-preview {
+          margin-left: 0;
+          width: 100%;
+        }
       }
     </style>
   </head>
@@ -1001,8 +1109,12 @@
             <span class="kbd">⌘K</span>
           </div>
 
-          <div class="group-label">Projects</div>
+          <div class="group-label">Folders</div>
           <div class="nav-group" id="projects"></div>
+          <div class="folder-help">Folder는 글을 묶고 발행 범위를 고르는 단위입니다.</div>
+
+          <div class="group-label">Smart Views</div>
+          <div class="nav-group" id="smart-views"></div>
 
           <div class="group-label" id="filter-label">Content filters</div>
           <div class="nav-group" id="filters"></div>
@@ -1023,7 +1135,7 @@
               <button class="tab" data-tab="learning" type="button" role="tab" aria-selected="false">Learning Ops</button>
             </div>
             <button class="top-button mobile-detail-toggle" id="mobile-detail" type="button">Selected detail</button>
-            <div class="tab-meta" id="tab-meta">0 posts · all projects</div>
+            <div class="tab-meta" id="tab-meta">0 posts · all folders</div>
           </section>
 
           <section class="rows" id="rows" aria-live="polite"></section>
@@ -1040,6 +1152,7 @@
         inventory: { projects: [], posts: [], warnings: [] },
         activeTab: "content",
         activeProject: "all",
+        activeSmartView: "all",
         activeFilter: "all",
         selectedId: null,
         copied: null,
@@ -1088,6 +1201,40 @@
           ["interview-ready", "Interview ready", "ok"],
         ],
       };
+
+      const SMART_VIEWS = [
+        {
+          key: "all",
+          label: "All Writing",
+          tone: null,
+          matches: () => true,
+        },
+        {
+          key: "dev-log",
+          label: "Dev Logs",
+          tone: "info",
+          matches: (post) => post.type === "dev-log",
+        },
+        {
+          key: "deep-dive",
+          label: "Deep Dives",
+          tone: "info",
+          matches: (post) => post.type === "deep-dive",
+        },
+        {
+          key: "needs-attention",
+          label: "Needs Attention",
+          tone: "error",
+          matches: (post) => hasAttention(post),
+        },
+        {
+          key: "learning-queue",
+          label: "Learning Queue",
+          tone: "warn",
+          matches: (post) =>
+            ["not-started", "questions-ready", "needs-revisit", "first-answer-written"].includes(post.learningStatus),
+        },
+      ];
 
       function escapeHtml(value) {
         return String(value ?? "")
@@ -1138,12 +1285,47 @@
         return state.inventory.posts || [];
       }
 
+      function folderStats(slug) {
+        const posts = slug === "all" ? allPosts() : allPosts().filter((post) => post.project === slug);
+        return {
+          total: posts.length,
+          drafts: posts.filter((post) => post.publishStatus === "draft").length,
+          pending: posts.filter((post) => post.publishStatus === "pending-sync").length,
+        };
+      }
+
+      function folderSubLabel(stats) {
+        const postLabel = stats.total === 1 ? "post" : "posts";
+        const parts = [stats.total + " " + postLabel];
+        if (stats.drafts > 0) parts.push(stats.drafts + " " + (stats.drafts === 1 ? "draft" : "drafts"));
+        if (stats.pending > 0) parts.push(stats.pending + " pending");
+        return parts.join(" · ");
+      }
+
       function hasAttention(post) {
         return (post.warnings || []).length > 0 || post.tagStatus === "invalid" || (post.quickFixSuggestions || []).length > 0;
       }
 
+      function smartViewDefinition(key) {
+        return SMART_VIEWS.find((view) => view.key === key) || SMART_VIEWS.find((view) => view.key === "all");
+      }
+
+      function smartViewMatches(post, key) {
+        return smartViewDefinition(key).matches(post);
+      }
+
+      function folderScopedPosts() {
+        return allPosts().filter((post) => {
+          return state.activeProject === "all" || post.project === state.activeProject;
+        });
+      }
+
+      function countForSmartView(key) {
+        return folderScopedPosts().filter((post) => smartViewMatches(post, key)).length;
+      }
+
       function baseFilteredPosts() {
-        return allPosts().filter((post) => state.activeProject === "all" || post.project === state.activeProject);
+        return folderScopedPosts().filter((post) => smartViewMatches(post, state.activeSmartView));
       }
 
       function filteredPosts() {
@@ -1197,7 +1379,7 @@
 
       function selectedPost() {
         const visiblePosts = currentPosts();
-        return visiblePosts.find((post) => post.id === state.selectedId) || visiblePosts[0] || allPosts()[0] || null;
+        return visiblePosts.find((post) => post.id === state.selectedId) || visiblePosts[0] || null;
       }
 
       function warningCodes(post) {
@@ -1225,7 +1407,7 @@
           commands.push("npm run validate:posts -- --source --project " + post.project);
         }
         if (post.publishStatus === "pending-sync") {
-          commands.push("npm run sync:posts");
+          commands.push("npm run sync:posts -- --project " + post.project);
           commands.push("npm run validate:posts");
         }
         if (post.publishStatus === "published" || post.publishStatus === "orphan-published") {
@@ -1242,18 +1424,32 @@
       }
 
       function renderProjects() {
-        const total = allPosts().length;
-        const items = [["all", "All Projects", total]].concat(
-          state.inventory.projects.map((project) => [
-            project.slug,
-            project.name,
-            allPosts().filter((post) => post.project === project.slug).length,
-          ]),
+        const items = [["all", "All Folders"]].concat(
+          state.inventory.projects.map((project) => [project.slug, project.name]),
         );
         document.querySelector("#projects").innerHTML = items
-          .map(([slug, name, count]) => {
+          .map(([slug, name]) => {
+            const stats = folderStats(slug);
             const active = state.activeProject === slug ? " active" : "";
-            return "<button class=\"nav-row" + active + "\" data-project=\"" + escapeHtml(slug) + "\" type=\"button\"><span class=\"icon\">" + (slug === "all" ? "▣" : "□") + "</span><span class=\"nav-name\">" + escapeHtml(name) + "</span><span class=\"count\">" + count + "</span></button>";
+            return "<button class=\"nav-row" + active + "\" data-project=\"" + escapeHtml(slug) + "\" type=\"button\" title=\"" + escapeHtml(folderSubLabel(stats)) + "\">" +
+              "<span class=\"icon\">" + (slug === "all" ? "▣" : "□") + "</span>" +
+              "<span class=\"nav-text\"><span class=\"nav-name\">" + escapeHtml(name) + "</span><span class=\"nav-sub\">" + escapeHtml(folderSubLabel(stats)) + "</span></span>" +
+              "<span class=\"count\">" + stats.total + "</span>" +
+            "</button>";
+          })
+          .join("");
+      }
+
+      function renderSmartViews() {
+        document.querySelector("#smart-views").innerHTML = SMART_VIEWS
+          .map((view) => {
+            const active = state.activeSmartView === view.key ? " active" : "";
+            const dot = view.tone ? "<span class=\"icon\" style=\"color: var(--" + view.tone + ")\">●</span>" : "<span class=\"icon\">•</span>";
+            return "<button class=\"nav-row" + active + "\" data-smart-view=\"" + escapeHtml(view.key) + "\" type=\"button\">" +
+              dot +
+              "<span class=\"nav-name\">" + escapeHtml(view.label) + "</span>" +
+              "<span class=\"count\">" + countForSmartView(view.key) + "</span>" +
+            "</button>";
           })
           .join("");
       }
@@ -1294,7 +1490,7 @@
         const posts = currentPosts();
         const selected = selectedPost();
         document.querySelector("#tab-meta").textContent =
-          posts.length + " posts · " + (state.activeProject === "all" ? "all projects" : state.activeProject);
+          posts.length + " posts · " + (state.activeProject === "all" ? "all folders" : state.activeProject);
 
         if (posts.length === 0) {
           document.querySelector("#rows").innerHTML = "<div class=\"empty\">조건에 맞는 글이 없습니다.</div>";
@@ -1303,7 +1499,7 @@
 
         if (state.activeTab === "content") {
           const head =
-            "<div class=\"row-head content-grid\"><div>Status</div><div>Title</div><div>Project</div><div>Source · Pub</div><div>Warnings</div></div>";
+            "<div class=\"row-head content-grid\"><div>Status</div><div>Title</div><div>Folder</div><div>Source · Pub</div><div>Warnings</div></div>";
           const rows = posts
             .map((post) => {
               const selectedClass = selected && selected.id === post.id ? " selected" : "";
@@ -1322,7 +1518,7 @@
         }
 
         const head =
-          "<div class=\"row-head learning-grid\"><div>Learning</div><div>Title</div><div>Project</div><div>Private note</div><div>Next Review</div></div>";
+          "<div class=\"row-head learning-grid\"><div>Learning</div><div>Title</div><div>Folder</div><div>Private note</div><div>Next Review</div></div>";
         const rows = posts
           .map((post) => {
             const selectedClass = selected && selected.id === post.id ? " selected" : "";
@@ -1384,13 +1580,63 @@
       }
 
       function renderCommand(command, post) {
-        const copyValue = command === "Copy learning agent prompt" ? post.agentPrompt || "" : command;
+        const isLearningPrompt = command === "Copy learning agent prompt";
+        const isRunnerCopy = command === "Copy dry-run" || command === "Copy publish";
+        const isExplicitCopy = isLearningPrompt || isRunnerCopy;
+        const copyValue = isExplicitCopy ? post.agentPrompt || "" : command;
+        const displayValue = isRunnerCopy ? copyValue : command;
         const copied = state.copied === command;
-        return "<button class=\"command\" data-copy=\"" + escapeHtml(copyValue) + "\" data-copy-label=\"" + escapeHtml(command) + "\" type=\"button\"><span class=\"copy-state\">" + (copied ? "✓" : "$") + "</span><code>" + escapeHtml(command) + "</code><span class=\"copy-state\">" + (copied ? "copied" : "copy") + "</span></button>";
+        return "<button class=\"command\" data-copy=\"" + escapeHtml(copyValue) + "\" data-copy-label=\"" + escapeHtml(command) + "\" type=\"button\"><span class=\"copy-state\">" + (copied ? "✓" : "$") + "</span><code>" + escapeHtml(displayValue) + "</code><span class=\"copy-state\">" + (copied ? "copied" : "copy") + "</span></button>";
+      }
+
+      function activePublishProjectSlug() {
+        if (state.activeProject === "all") return "";
+        return state.activeProject;
+      }
+
+      function publishPreviewCommands() {
+        const project = activePublishProjectSlug();
+        if (!project) {
+          return {
+            project: "",
+            dryRun: "",
+            publish: "",
+          };
+        }
+        return {
+          project,
+          dryRun: "npm run publish:posts -- --project " + project + " --dry-run",
+          publish: "npm run publish:posts -- --project " + project,
+        };
+      }
+
+      function publishPreviewSteps() {
+        return ["source validation", "folder sync", "published validation", "test", "build"];
+      }
+
+      function renderRunnerPreview() {
+        const preview = publishPreviewCommands();
+        if (!preview.project) {
+          return "<div class=\"runner-preview\"><div class=\"runner-head\"><span class=\"runner-title\">Action Runner Preview</span></div><div class=\"runner-note\">폴더를 선택하면 publish command를 보여줍니다.</div></div>";
+        }
+
+        const steps = publishPreviewSteps()
+          .map((step) => "<li>" + escapeHtml(step) + "</li>")
+          .join("");
+
+        return "<div class=\"runner-preview\">" +
+          "<div class=\"runner-head\"><span class=\"runner-title\">Action Runner Preview</span><span class=\"runner-project\">" + escapeHtml(preview.project) + "</span></div>" +
+          "<ul class=\"runner-steps\">" + steps + "</ul>" +
+          "<div class=\"runner-actions\">" +
+            renderCommand("Copy dry-run", { agentPrompt: preview.dryRun }) +
+            renderCommand("Copy publish", { agentPrompt: preview.publish }) +
+          "</div>" +
+          "<div class=\"runner-note\">Preview only. 터미널에서 실행하기 전에 source diff와 dirty state를 확인하세요. Dashboard는 명령을 직접 실행하지 않고 preview만 제공합니다.</div>" +
+        "</div>";
       }
 
       function operationState() {
-        const posts = baseFilteredPosts();
+        const posts = folderScopedPosts();
         const sourceIssues = posts.filter(hasAttention).length;
         const pendingSync = posts.filter((post) => post.publishStatus === "pending-sync").length;
         if (sourceIssues > 0) {
@@ -1420,7 +1666,7 @@
         document.querySelector("#pipeline").innerHTML =
           "<div class=\"pipeline-summary\"><div class=\"eyebrow\">Operation flow</div><div class=\"pipeline-status\"><span style=\"color: var(--error)\">●</span><span>" + summary + "</span></div></div>" +
           "<div class=\"pipeline-flow\">" + steps + "</div>" +
-          "<button class=\"primary-flow\" type=\"button\" data-copy=\"npm run validate:posts -- --source --project " + escapeHtml(state.activeProject === "all" ? "sigak" : state.activeProject) + "\">▶ " + escapeHtml(flow.action) + "</button>";
+          renderRunnerPreview();
       }
 
       function renderTopbar() {
@@ -1434,6 +1680,7 @@
       function render() {
         renderTopbar();
         renderProjects();
+        renderSmartViews();
         renderFilters();
         renderMetrics();
         renderRows();
@@ -1447,14 +1694,15 @@
       }
 
       async function copyValue(value, label) {
+        const copiedLabel = label || value;
         try {
           await navigator.clipboard.writeText(value);
-          state.copied = label || value;
-          renderInspector();
+          state.copied = copiedLabel;
+          render();
           setTimeout(() => {
-            if (state.copied === (label || value)) {
+            if (state.copied === copiedLabel) {
               state.copied = null;
-              renderInspector();
+              render();
             }
           }, 1400);
         } catch (error) {
@@ -1475,6 +1723,15 @@
         const projectButton = event.target.closest("[data-project]");
         if (projectButton) {
           state.activeProject = projectButton.dataset.project;
+          state.activeFilter = "all";
+          state.selectedId = null;
+          render();
+          return;
+        }
+
+        const smartViewButton = event.target.closest("[data-smart-view]");
+        if (smartViewButton) {
+          state.activeSmartView = smartViewButton.dataset.smartView;
           state.activeFilter = "all";
           state.selectedId = null;
           render();

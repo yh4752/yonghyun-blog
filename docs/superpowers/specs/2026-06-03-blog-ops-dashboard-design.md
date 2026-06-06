@@ -726,6 +726,38 @@ Phase 3에서 보류할 작업:
 
 Validation and Sync Runner는 글 발행 전후의 검증 절차를 버튼으로 묶되, 임의 명령 실행기가 되어서는 안 된다.
 
+#### v1.1: Action Runner Preview
+
+v1.1은 실제 명령 실행기가 아니다. Dashboard는 선택한 프로젝트의 발행 검증 계획을 보여주고, 사용자가 터미널에서 실행할 수 있는 명령을 복사할 수 있게 한다.
+
+포함 범위:
+
+- project filter에서 선택한 project slug를 기준으로 publish plan을 만든다.
+- dry-run command를 보여준다.
+- 실제 publish command를 보여준다.
+- source validation, project-scoped sync, published validation, test, build 순서를 단계별로 표시한다.
+- 각 command를 복사할 수 있게 한다.
+- source를 먼저 고치고, 발행본을 직접 수정하지 말고, dirty state를 확인하라는 safety note를 표시한다.
+
+v1.1에서 제외하는 것:
+
+- Dashboard에서 명령 직접 실행
+- arbitrary shell command 입력
+- 파일 변경
+- frontmatter 편집
+- draft toggle
+- 자동 commit, push, PR 생성
+- 로그 panel에 실제 stdout/stderr 표시
+
+v1.1 command preview:
+
+```bash
+npm run publish:posts -- --project <project> --dry-run
+npm run publish:posts -- --project <project>
+```
+
+실제 실행 버튼은 allow-list, dirty state check, diff preview, 로그 panel이 구현된 뒤 v1.2에서 검토한다.
+
 기본 실행 흐름:
 
 1. source repo 상태 확인
@@ -740,10 +772,11 @@ Validation and Sync Runner는 글 발행 전후의 검증 절차를 버튼으로
 
 ```bash
 npm run validate:posts -- --source --project <project>
-npm run sync:posts
+npm run sync:posts -- --project <project>
 npm run validate:posts
 npm test
 npm run build
+npm run publish:posts -- --project <project>
 ```
 
 `<project>`는 `posts.config.yml`에 등록된 project slug만 허용한다. 사용자가 직접 shell command나 임의 argument를 입력하는 UI는 만들지 않는다.
