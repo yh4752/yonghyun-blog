@@ -126,18 +126,45 @@ function sourceForProject(config, project) {
   return source;
 }
 
+function effectivePostSlug(post) {
+  return post.frontmatter.slug ?? basenameSlug(post.file);
+}
+
 function locateSourcePost({ root, project, slug, env }) {
   const config = loadBlogOpsConfig({ root, env });
   const source = sourceForProject(config, project);
   const candidates = listCandidateFiles(source);
+  const basenameCandidate = candidates.find((file) => basenameSlug(file) === slug);
+
+  if (basenameCandidate) {
+    const post = readPostFile(basenameCandidate);
+    if (effectivePostSlug(post) === slug) return { config, source, post };
+  }
 
   for (const file of candidates) {
-    const post = readPostFile(file);
-    const effectiveSlug = post.frontmatter.slug ?? basenameSlug(file);
-    if (effectiveSlug === slug) return { config, source, post };
+    if (file === basenameCandidate) continue;
+
+    try {
+      const post = readPostFile(file);
+      if (post.frontmatter.slug === slug) return { config, source, post };
+    } catch {
+      // Unrelated malformed posts should not block locating a valid target.
+    }
   }
 
   throw codedError("source-not-found", `source-not-found: source post '${project}/${slug}' was not found.`);
+}
+
+function sourceHashRequiredError() {
+  return {
+    code: "source-hash-required",
+    field: null,
+    message: "source-hash-required: sourceHash is required before editing.",
+  };
+}
+
+function hasRequiredSourceHash(sourceHash) {
+  return typeof sourceHash === "string" && sourceHash.trim().length > 0;
 }
 
 function renderValue(field, value) {
@@ -214,16 +241,25 @@ function validateChanges({ changes, current, allowedTags }) {
     }
   }
 
-  if (Object.hasOwn(changes, "title") && String(changes.title ?? "").trim() === "") {
-    errors.push({ code: "title-empty", field: "title", message: "title은 비어 있을 수 없습니다." });
+  if (Object.hasOwn(changes, "title")) {
+    if (typeof changes.title !== "string") {
+      errors.push({ code: "invalid-string", field: "title", message: "title은 string이어야 합니다." });
+    } else if (changes.title.trim() === "") {
+      errors.push({ code: "title-empty", field: "title", message: "title은 비어 있을 수 없습니다." });
+    }
   }
 
   if (Object.hasOwn(changes, "summary")) {
-    summaryState = summaryLengthState(changes.summary);
-    if (summaryState.status === "error") {
-      errors.push({ code: summaryState.code, field: "summary", message: summaryState.message });
-    } else if (summaryState.status === "warning") {
-      warnings.push({ code: summaryState.code, field: "summary", message: summaryState.message });
+    if (typeof changes.summary !== "string") {
+      errors.push({ code: "invalid-string", field: "summary", message: "summary는 string이어야 합니다." });
+      summaryState = summaryLengthState(current.summary ?? "");
+    } else {
+      summaryState = summaryLengthState(changes.summary);
+      if (summaryState.status === "error") {
+        errors.push({ code: summaryState.code, field: "summary", message: summaryState.message });
+      } else if (summaryState.status === "warning") {
+        warnings.push({ code: summaryState.code, field: "summary", message: summaryState.message });
+      }
     }
   } else {
     summaryState = summaryLengthState(current.summary ?? "");
@@ -370,7 +406,9 @@ export function previewPostFrontmatterEdit({
     allowedTags: config.allowedTags,
   });
 
-  if (sourceHash && sourceHash !== currentHash) {
+  if (!hasRequiredSourceHash(sourceHash)) {
+    errors.push(sourceHashRequiredError());
+  } else if (sourceHash !== currentHash) {
     errors.push({
       code: "stale-source",
       field: null,
@@ -415,9 +453,12 @@ export function applyPostFrontmatterEdit({
   changes,
   env = process.env,
 } = {}) {
-  const { post } = locateSourcePost({ root, project, slug, env });
-  const currentHash = hashText(post.raw);
-  if (sourceHash && sourceHash !== currentHash) {
+  if (!hasRequiredSourceHash(sourceHash)) {
+    throw codedError("source-hash-required", "source-hash-required: sourceHash is required before editing.");
+  }
+
+  const initial = locateSourcePost({ root, project, slug, env });
+  if (sourceHash !== hashText(initial.post.raw)) {
     throw codedError("stale-source", "stale-source: source file changed after preview.");
   }
 
@@ -426,6 +467,12 @@ export function applyPostFrontmatterEdit({
     const error = codedError("frontmatter-edit-invalid", "frontmatter-edit-invalid: preview has blocking errors.");
     error.errors = preview.errors;
     throw error;
+  }
+
+  const { post } = locateSourcePost({ root, project, slug, env });
+  const currentHash = hashText(post.raw);
+  if (sourceHash !== currentHash) {
+    throw codedError("stale-source", "stale-source: source file changed after preview.");
   }
 
   fs.writeFileSync(post.file, buildEditedRaw(post, preview.changedFields), "utf8");

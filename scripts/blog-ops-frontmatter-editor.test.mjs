@@ -255,6 +255,44 @@ test("readEditablePost does not locate a post by basename when frontmatter slug 
   );
 });
 
+test("readEditablePost skips unrelated malformed files when locating a valid target", (t) => {
+  const { root, sourceDir } = makeBlogHub(t);
+  fs.writeFileSync(
+    path.join(sourceDir, "2026-01-01-broken.md"),
+    `---
+title: [
+---
+
+# Bad YAML
+`,
+    "utf8",
+  );
+  const file = writePost(sourceDir, "2026-06-06-demo.md");
+
+  const result = readEditablePost({ root, project: "demo", slug: "2026-06-06-demo" });
+
+  assert.equal(result.sourcePath, path.relative(root, file).split(path.sep).join("/"));
+});
+
+test("readEditablePost returns parse errors for the requested basename target", (t) => {
+  const { root, sourceDir } = makeBlogHub(t);
+  fs.writeFileSync(
+    path.join(sourceDir, "2026-06-06-demo.md"),
+    `---
+title: [
+---
+
+# Bad YAML
+`,
+    "utf8",
+  );
+
+  assert.throws(
+    () => readEditablePost({ root, project: "demo", slug: "2026-06-06-demo" }),
+    (error) => error.code === "frontmatter-parse-error",
+  );
+});
+
 test("previewPostFrontmatterEdit changes only allowed fields and does not write", (t) => {
   const { root, sourceDir } = makeBlogHub(t);
   const file = writePost(sourceDir);
@@ -311,6 +349,61 @@ test("applyPostFrontmatterEdit writes frontmatter while preserving body and rela
   assert.match(after, /draft: true/);
   assert.match(after, /relatedPosts:\n  \[\n    "demo\/2026-06-05-demo",\n  \]/);
   assert.match(after, /본문은 바뀌면 안 됩니다\./);
+});
+
+test("preview and apply require a non-empty sourceHash", (t) => {
+  const { root, sourceDir } = makeBlogHub(t);
+  const file = writePost(sourceDir);
+  const before = fs.readFileSync(file, "utf8");
+
+  for (const sourceHash of [undefined, ""]) {
+    const preview = previewPostFrontmatterEdit({
+      root,
+      project: "demo",
+      slug: "2026-06-06-demo",
+      sourceHash,
+      changes: { draft: true },
+    });
+
+    assert.equal(preview.canApply, false);
+    assert.equal(preview.errors[0].code, "source-hash-required");
+
+    assert.throws(
+      () =>
+        applyPostFrontmatterEdit({
+          root,
+          project: "demo",
+          slug: "2026-06-06-demo",
+          sourceHash,
+          changes: { draft: true },
+        }),
+      (error) => error.code === "source-hash-required" || error.errors?.[0]?.code === "source-hash-required",
+    );
+    assert.equal(fs.readFileSync(file, "utf8"), before);
+  }
+});
+
+test("frontmatter preview rejects non-string title and summary changes", (t) => {
+  const { root, sourceDir } = makeBlogHub(t);
+  writePost(sourceDir);
+  const initial = readEditablePost({ root, project: "demo", slug: "2026-06-06-demo" });
+
+  const preview = previewPostFrontmatterEdit({
+    root,
+    project: "demo",
+    slug: "2026-06-06-demo",
+    sourceHash: initial.sourceHash,
+    changes: {
+      title: 123,
+      summary: ["not", "a", "string"],
+    },
+  });
+
+  assert.equal(preview.canApply, false);
+  assert.deepEqual(
+    preview.errors.filter((error) => error.code === "invalid-string").map((error) => error.field),
+    ["title", "summary"],
+  );
 });
 
 test("frontmatter preview rejects invalid tags with suggestions", (t) => {
