@@ -63,7 +63,7 @@ test("renderDashboardHtml includes Controlled Runner actions and copy commands",
   assert.match(html, /renderCommand\("Copy dry-run", \{ agentPrompt: preview\.dryRun \}\)/);
   assert.match(html, /renderCommand\("Copy publish", \{ agentPrompt: preview\.publish \}\)/);
   assert.doesNotMatch(html, /data-run-command/);
-  assert.doesNotMatch(html, /<textarea/i);
+  assert.doesNotMatch(html, /<textarea[^>]+data-run-command/i);
   assert.doesNotMatch(html, /<input[^>]+command/i);
 });
 
@@ -164,6 +164,57 @@ test("renderDashboardHtml includes Safe Mutations UI", () => {
   assert.match(html, /data-folder-create-preview/);
   assert.match(html, /data-folder-delete-preview/);
   assert.doesNotMatch(html, /src\/content\/blog[^\n]*Apply changes/);
+});
+
+test("renderDashboardHtml keeps safe mutation previews authoritative", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /function safeEditPreviewPayload\(\)/);
+  assert.match(html, /function safeEditPreviewMatches\(requestPayload\)/);
+  assert.match(html, /state\.safeEditPreview = \{ \.\.\.json, requestPayload \};/);
+  assert.match(html, /const requestPayload = state\.safeEditPreview\.requestPayload;/);
+  assert.match(html, /changes: requestPayload\.changes/);
+  assert.match(html, /function folderCreatePreviewMatches\(requestPayload\)/);
+  assert.match(html, /state\.folderCreatePreview = \{ \.\.\.json, requestPayload \};/);
+  assert.match(html, /const input = state\.folderCreatePreview\.requestPayload;/);
+  assert.match(html, /function folderDeletePreviewMatches\(requestPayload\)/);
+  assert.match(html, /state\.folderDeletePreview = \{ \.\.\.json, requestPayload \};/);
+  assert.match(html, /project: requestPayload\.project/);
+  assert.match(html, /removeSourceSetupFolder: requestPayload\.removeSourceSetupFolder/);
+});
+
+test("renderDashboardHtml keeps folder preview panels open after preview state", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /openFolderPanel: ""/);
+  assert.match(html, /function folderPanelIsOpen\(panel\)/);
+  assert.match(html, /data-folder-panel=\\?"create\\?"/);
+  assert.match(html, /data-folder-panel=\\?"delete\\?"/);
+  assert.match(html, /folderPanelIsOpen\("create"\)/);
+  assert.match(html, /folderPanelIsOpen\("delete"\)/);
+  assert.match(html, /state\.openFolderPanel = "create";/);
+  assert.match(html, /state\.openFolderPanel = "delete";/);
+  assert.match(html, /document\.addEventListener\("toggle"/);
+});
+
+test("renderDashboardHtml resets delete setup option when folder context changes", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /function resetFolderDeleteState\(\)/);
+  assert.match(html, /state\.removeSourceSetupFolder = false;/);
+  assert.match(html, /resetFolderDeleteState\(\);\s*state\.runnerPreflight = null;/);
+  assert.match(html, /state\.activeProject = nextProject;[\s\S]*resetFolderDeleteState\(\);/);
+  assert.match(html, /state\.activeProject = "all";[\s\S]*resetFolderDeleteState\(\);/);
+});
+
+test("renderDashboardHtml renders invalid selected tags as removable options", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /invalidSelectedTags/);
+  assert.match(html, /const tags = \[\.\.\.allowed, \.\.\.invalidSelectedTags\];/);
+  assert.match(html, /tag-option warning/);
+  assert.match(html, /not in tag policy/);
+  assert.match(html, /data-safe-edit-tag/);
 });
 
 test("createDashboardServer serves inventory without private note content", async () => {

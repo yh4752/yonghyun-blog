@@ -832,6 +832,17 @@
         padding: 5px 7px;
       }
 
+      .tag-option.warning {
+        border-color: var(--warn);
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+
+      .tag-warning {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+      }
+
       .mutation-check input,
       .tag-option input {
         width: auto;
@@ -1525,6 +1536,7 @@
         folderCreateError: "",
         folderDeletePreview: null,
         folderDeleteError: "",
+        openFolderPanel: "",
         deleteConfirmation: "",
         removeSourceSetupFolder: false,
         mutationApplying: false,
@@ -1660,12 +1672,17 @@
 
       function renderTagOptions(allowedTags, selectedTags) {
         const selected = new Set(selectedTags || []);
-        const tags = allowedTags || [];
+        const allowed = Array.isArray(allowedTags) ? allowedTags : [];
+        const invalidSelectedTags = [...selected].filter((tag) => !allowed.includes(tag));
+        const tags = [...allowed, ...invalidSelectedTags];
         if (!tags.length) return "<p class=\"muted\">허용된 tag 정책을 불러오지 못했습니다.</p>";
         return tags
           .map((tag) => {
             const checked = selected.has(tag) ? " checked" : "";
-            return "<label class=\"tag-option\"><input type=\"checkbox\" data-safe-edit-tag=\"" + escapeAttribute(tag) + "\"" + checked + "> " + escapeHtml(tag) + "</label>";
+            const invalid = !allowed.includes(tag);
+            const className = invalid ? "tag-option warning" : "tag-option";
+            const warning = invalid ? " <span class=\"tag-warning\">not in tag policy</span>" : "";
+            return "<label class=\"" + className + "\"><input type=\"checkbox\" data-safe-edit-tag=\"" + escapeAttribute(tag) + "\"" + checked + "> " + escapeHtml(tag) + warning + "</label>";
           })
           .join("");
       }
@@ -1996,6 +2013,35 @@
         return changes;
       }
 
+      function safeEditPreviewPayload() {
+        if (!state.safeEdit) return null;
+        return {
+          project: state.safeEdit.project,
+          slug: state.safeEdit.slug,
+          sourceHash: state.safeEdit.sourceHash,
+          changes: safeEditChanges(),
+        };
+      }
+
+      function safeEditPreviewMatches(requestPayload) {
+        return Boolean(
+          requestPayload &&
+            state.safeEdit &&
+            state.safeEdit.project === requestPayload.project &&
+            state.safeEdit.slug === requestPayload.slug &&
+            state.safeEdit.sourceHash === requestPayload.sourceHash &&
+            valuesEqual(safeEditChanges(), requestPayload.changes),
+        );
+      }
+
+      function safeEditPreviewCanApply() {
+        return Boolean(
+          state.safeEditPreview?.canApply &&
+            state.safeEditPreview.requestPayload &&
+            safeEditPreviewMatches(state.safeEditPreview.requestPayload),
+        );
+      }
+
       function folderCreateInput() {
         const draft = state.folderCreateDraft;
         return {
@@ -2012,6 +2058,56 @@
           repositoryUrl: draft.repositoryUrl,
           demoUrl: draft.demoUrl,
         };
+      }
+
+      function folderCreatePreviewMatches(requestPayload) {
+        return Boolean(requestPayload && valuesEqual(folderCreateInput(), requestPayload));
+      }
+
+      function folderCreatePreviewCanApply() {
+        return Boolean(
+          state.folderCreatePreview?.canApply &&
+            state.folderCreatePreview.requestPayload &&
+            folderCreatePreviewMatches(state.folderCreatePreview.requestPayload),
+        );
+      }
+
+      function folderDeletePreviewPayload() {
+        if (state.activeProject === "all") return null;
+        return {
+          project: state.activeProject,
+          removeSourceSetupFolder: state.removeSourceSetupFolder,
+        };
+      }
+
+      function folderDeletePreviewMatches(requestPayload) {
+        return Boolean(
+          requestPayload &&
+            state.activeProject === requestPayload.project &&
+            state.removeSourceSetupFolder === requestPayload.removeSourceSetupFolder,
+        );
+      }
+
+      function folderDeletePreviewCanApply() {
+        return Boolean(
+          state.folderDeletePreview?.canApply &&
+            state.folderDeletePreview.requestPayload &&
+            folderDeletePreviewMatches(state.folderDeletePreview.requestPayload),
+        );
+      }
+
+      function resetFolderDeleteState() {
+        state.folderDeletePreview = null;
+        state.folderDeleteError = "";
+        state.deleteConfirmation = "";
+        state.removeSourceSetupFolder = false;
+      }
+
+      function folderPanelIsOpen(panel) {
+        if (state.openFolderPanel === panel) return true;
+        if (panel === "create") return Boolean(state.folderCreatePreview || state.folderCreateError);
+        if (panel === "delete") return Boolean(state.folderDeletePreview || state.folderDeleteError);
+        return false;
       }
 
       function formatMutationValue(value) {
@@ -2117,7 +2213,7 @@
         const typeOptions = allowedTypes
           .map((type) => "<option value=\"" + escapeAttribute(type) + "\"" + (draft.type === type ? " selected" : "") + ">" + escapeHtml(type) + "</option>")
           .join("");
-        const canApply = Boolean(state.safeEditPreview?.canApply) && !state.safeEditApplying && !state.mutationApplying;
+        const canApply = safeEditPreviewCanApply() && !state.safeEditApplying && !state.mutationApplying;
 
         return "<section class=\"mutation-section safe-edit-panel\">" +
           "<h2>Safe Edit</h2>" +
@@ -2201,7 +2297,7 @@
         }
 
         const requiredConfirmation = "delete " + state.activeProject;
-        const canApply = Boolean(state.folderDeletePreview?.canApply) && state.deleteConfirmation === requiredConfirmation && !state.mutationApplying;
+        const canApply = folderDeletePreviewCanApply() && state.deleteConfirmation === requiredConfirmation && !state.mutationApplying;
         return "<p class=\"muted\">Current Folder: <code>" + escapeHtml(state.activeProject) + "</code></p>" +
           "<label class=\"mutation-check\"><input type=\"checkbox\" data-folder-delete-remove-setup" + (state.removeSourceSetupFolder ? " checked" : "") + "> Remove empty source setup folder</label>" +
           renderFolderDeletePreview() +
@@ -2215,11 +2311,11 @@
 
       function renderFolderManagementPanel() {
         const draft = state.folderCreateDraft;
-        const canCreateApply = Boolean(state.folderCreatePreview?.canApply) && !state.mutationApplying;
+        const canCreateApply = folderCreatePreviewCanApply() && !state.mutationApplying;
         return "<section class=\"mutation-section folder-management\">" +
           "<h2>Folder Management</h2>" +
           "<p class=\"muted\">Folder changes are blocked when metadata or readiness checks report blockers.</p>" +
-          "<details>" +
+          "<details data-folder-panel=\"create\"" + (folderPanelIsOpen("create") ? " open" : "") + ">" +
             "<summary>New Folder</summary>" +
             "<div class=\"mutation-fields\">" +
               "<label>Slug<input type=\"text\" data-folder-create-field=\"slug\" value=\"" + escapeAttribute(draft.slug) + "\"></label>" +
@@ -2241,7 +2337,7 @@
             "</div>" +
             renderFolderCreatePreview() +
           "</details>" +
-          "<details>" +
+          "<details data-folder-panel=\"delete\"" + (folderPanelIsOpen("delete") ? " open" : "") + ">" +
             "<summary>Delete Empty Folder</summary>" +
             renderFolderDeletePanel() +
           "</details>" +
@@ -2586,12 +2682,12 @@
 
       function updateSafeEditApplyButton() {
         const button = document.querySelector("[data-safe-edit-apply]");
-        if (button) button.disabled = !(state.safeEditPreview?.canApply && !state.safeEditApplying && !state.mutationApplying);
+        if (button) button.disabled = !(safeEditPreviewCanApply() && !state.safeEditApplying && !state.mutationApplying);
       }
 
       function updateFolderCreateApplyButton() {
         const button = document.querySelector("[data-folder-create-apply]");
-        if (button) button.disabled = !(state.folderCreatePreview?.canApply && !state.mutationApplying);
+        if (button) button.disabled = !(folderCreatePreviewCanApply() && !state.mutationApplying);
       }
 
       function updateFolderDeleteApplyButton() {
@@ -2600,7 +2696,7 @@
         if (button) {
           button.disabled = !(
             state.activeProject !== "all" &&
-            state.folderDeletePreview?.canApply &&
+            folderDeletePreviewCanApply() &&
             state.deleteConfirmation === requiredConfirmation &&
             !state.mutationApplying
           );
@@ -2659,24 +2755,24 @@
 
       async function previewSafeEdit() {
         if (!state.safeEdit || state.safeEditApplying) return;
+        const requestPayload = safeEditPreviewPayload();
+        if (!requestPayload) return;
         state.safeEditError = "";
+        state.safeEditPreview = null;
         render();
         try {
-          const { response, json } = await postJson("/api/safe-edit/post/preview", {
-            project: state.safeEdit.project,
-            slug: state.safeEdit.slug,
-            sourceHash: state.safeEdit.sourceHash,
-            changes: safeEditChanges(),
-          });
+          const { response, json } = await postJson("/api/safe-edit/post/preview", requestPayload);
+          if (!safeEditPreviewMatches(requestPayload)) return;
           if (!response.ok) {
             state.safeEditPreview = null;
             state.safeEditError = mutationErrorMessage(json, "Safe Edit preview failed.");
             render();
             return;
           }
-          state.safeEditPreview = json;
+          state.safeEditPreview = { ...json, requestPayload };
           state.safeEditError = "";
         } catch (error) {
+          if (!safeEditPreviewMatches(requestPayload)) return;
           state.safeEditPreview = null;
           state.safeEditError = error.message;
         }
@@ -2684,17 +2780,18 @@
       }
 
       async function applySafeEdit() {
-        if (!state.safeEdit || !state.safeEditPreview?.canApply || state.safeEditApplying) return;
+        if (!state.safeEdit || !safeEditPreviewCanApply() || state.safeEditApplying) return;
+        const requestPayload = state.safeEditPreview.requestPayload;
         state.safeEditApplying = true;
         state.mutationApplying = true;
         state.safeEditError = "";
         render();
         try {
           const { response, json } = await postJson("/api/safe-edit/post/apply", {
-            project: state.safeEdit.project,
-            slug: state.safeEdit.slug,
-            sourceHash: state.safeEdit.sourceHash,
-            changes: safeEditChanges(),
+            project: requestPayload.project,
+            slug: requestPayload.slug,
+            sourceHash: requestPayload.sourceHash,
+            changes: requestPayload.changes,
           });
           if (!response.ok) {
             state.safeEditError = mutationErrorMessage(json, "Safe Edit apply failed.");
@@ -2715,19 +2812,24 @@
       }
 
       async function previewFolderCreate() {
+        const requestPayload = folderCreateInput();
         state.folderCreateError = "";
+        state.folderCreatePreview = null;
+        state.openFolderPanel = "create";
         render();
         try {
-          const { response, json } = await postJson("/api/folders/create/preview", folderCreateInput());
+          const { response, json } = await postJson("/api/folders/create/preview", requestPayload);
+          if (!folderCreatePreviewMatches(requestPayload)) return;
           if (!response.ok) {
             state.folderCreatePreview = null;
             state.folderCreateError = mutationErrorMessage(json, "Folder create preview failed.");
             render();
             return;
           }
-          state.folderCreatePreview = json;
+          state.folderCreatePreview = { ...json, requestPayload };
           state.folderCreateError = "";
         } catch (error) {
+          if (!folderCreatePreviewMatches(requestPayload)) return;
           state.folderCreatePreview = null;
           state.folderCreateError = error.message;
         }
@@ -2735,7 +2837,8 @@
       }
 
       async function applyFolderCreate() {
-        if (!state.folderCreatePreview?.canApply || state.mutationApplying) return;
+        if (!folderCreatePreviewCanApply() || state.mutationApplying) return;
+        const input = state.folderCreatePreview.requestPayload;
         const metadataHash = state.folderCreatePreview.metadataHash;
         if (!metadataHash) {
           state.folderCreateError = "Folder create preview is missing metadataHash.";
@@ -2746,7 +2849,6 @@
         state.folderCreateError = "";
         render();
         try {
-          const input = folderCreateInput();
           const { response, json } = await postJson("/api/folders/create/apply", {
             ...input,
             metadataHash,
@@ -2760,6 +2862,7 @@
           state.activeProject = nextProject;
           state.activeFilter = "all";
           state.selectedId = null;
+          resetFolderDeleteState();
           state.folderCreateDraft = {
             slug: "",
             name: "",
@@ -2782,27 +2885,31 @@
       }
 
       async function previewFolderDelete() {
+        state.openFolderPanel = "delete";
         if (state.activeProject === "all") {
           state.folderDeleteError = "All Folders에서는 삭제할 수 없습니다. 단일 Folder를 선택하세요.";
+          state.folderDeletePreview = null;
           render();
           return;
         }
+        const requestPayload = folderDeletePreviewPayload();
+        if (!requestPayload) return;
         state.folderDeleteError = "";
+        state.folderDeletePreview = null;
         render();
         try {
-          const { response, json } = await postJson("/api/folders/delete/preview", {
-            project: state.activeProject,
-            removeSourceSetupFolder: state.removeSourceSetupFolder,
-          });
+          const { response, json } = await postJson("/api/folders/delete/preview", requestPayload);
+          if (!folderDeletePreviewMatches(requestPayload)) return;
           if (!response.ok) {
             state.folderDeletePreview = null;
             state.folderDeleteError = mutationErrorMessage(json, "Folder delete preview failed.");
             render();
             return;
           }
-          state.folderDeletePreview = json;
+          state.folderDeletePreview = { ...json, requestPayload };
           state.folderDeleteError = "";
         } catch (error) {
+          if (!folderDeletePreviewMatches(requestPayload)) return;
           state.folderDeletePreview = null;
           state.folderDeleteError = error.message;
         }
@@ -2810,7 +2917,8 @@
       }
 
       async function applyFolderDelete() {
-        if (state.activeProject === "all" || !state.folderDeletePreview?.canApply || state.mutationApplying) return;
+        if (state.activeProject === "all" || !folderDeletePreviewCanApply() || state.mutationApplying) return;
+        const requestPayload = state.folderDeletePreview.requestPayload;
         const metadataHash = state.folderDeletePreview.metadataHash;
         if (!metadataHash) {
           state.folderDeleteError = "Folder delete preview is missing metadataHash.";
@@ -2822,8 +2930,8 @@
         render();
         try {
           const { response, json } = await postJson("/api/folders/delete/apply", {
-            project: state.activeProject,
-            removeSourceSetupFolder: state.removeSourceSetupFolder,
+            project: requestPayload.project,
+            removeSourceSetupFolder: requestPayload.removeSourceSetupFolder,
             confirmation: state.deleteConfirmation,
             metadataHash,
           });
@@ -2835,9 +2943,7 @@
           state.activeProject = "all";
           state.activeFilter = "all";
           state.selectedId = null;
-          state.folderDeletePreview = null;
-          state.deleteConfirmation = "";
-          state.removeSourceSetupFolder = false;
+          resetFolderDeleteState();
           await loadInventory();
         } catch (error) {
           state.folderDeleteError = error.message;
@@ -2909,6 +3015,13 @@
         }
       }
 
+      document.addEventListener("toggle", (event) => {
+        const panel = event.target?.dataset?.folderPanel;
+        if (!panel) return;
+        if (event.target.open) state.openFolderPanel = panel;
+        else if (state.openFolderPanel === panel) state.openFolderPanel = "";
+      }, true);
+
       document.addEventListener("click", (event) => {
         const projectButton = event.target.closest("[data-project]");
         if (projectButton) {
@@ -2919,9 +3032,7 @@
           state.safeEditDraft = null;
           state.safeEditPreview = null;
           state.safeEditError = "";
-          state.folderDeletePreview = null;
-          state.folderDeleteError = "";
-          state.deleteConfirmation = "";
+          resetFolderDeleteState();
           state.runnerPreflight = null;
           state.runnerResult = null;
           state.runnerPreflightError = null;
