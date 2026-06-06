@@ -130,15 +130,11 @@ function locateSourcePost({ root, project, slug, env }) {
   const config = loadBlogOpsConfig({ root, env });
   const source = sourceForProject(config, project);
   const candidates = listCandidateFiles(source);
-  const basenameMatch = candidates.find((file) => basenameSlug(file) === slug);
-
-  if (basenameMatch) {
-    return { config, source, post: readPostFile(basenameMatch) };
-  }
 
   for (const file of candidates) {
     const post = readPostFile(file);
-    if (post.frontmatter.slug === slug) return { config, source, post };
+    const effectiveSlug = post.frontmatter.slug ?? basenameSlug(file);
+    if (effectiveSlug === slug) return { config, source, post };
   }
 
   throw codedError("source-not-found", `source-not-found: source post '${project}/${slug}' was not found.`);

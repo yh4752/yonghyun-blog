@@ -185,6 +185,13 @@ relatedPosts:
   return file;
 }
 
+function writePostWithFrontmatterSlug(sourceDir, filename, slug) {
+  const file = writePost(sourceDir, filename);
+  const raw = fs.readFileSync(file, "utf8");
+  fs.writeFileSync(file, raw.replace('date: "2026-06-06"', `date: "2026-06-06"\nslug: "${slug}"`), "utf8");
+  return file;
+}
+
 test("summaryLengthState returns error warning and good states", () => {
   assert.deepEqual(summaryLengthState(""), {
     status: "error",
@@ -225,6 +232,27 @@ test("readEditablePost returns editable and readonly frontmatter state", (t) => 
   });
   assert.deepEqual(result.allowedTypes, ["dev-log", "deep-dive", "debugging", "architecture", "performance", "research"]);
   assert.deepEqual(result.allowedTags, ["Documentation", "Tooling", "Testing", "PostgreSQL"]);
+});
+
+test("readEditablePost locates posts by frontmatter slug when present", (t) => {
+  const { root, sourceDir } = makeBlogHub(t);
+  const file = writePostWithFrontmatterSlug(sourceDir, "2026-06-06-demo.md", "custom-slug");
+
+  const result = readEditablePost({ root, project: "demo", slug: "custom-slug" });
+
+  assert.equal(result.slug, "custom-slug");
+  assert.equal(result.sourcePath, path.relative(root, file).split(path.sep).join("/"));
+  assert.equal(result.readonly.slug, "custom-slug");
+});
+
+test("readEditablePost does not locate a post by basename when frontmatter slug overrides it", (t) => {
+  const { root, sourceDir } = makeBlogHub(t);
+  writePostWithFrontmatterSlug(sourceDir, "2026-06-06-demo.md", "custom-slug");
+
+  assert.throws(
+    () => readEditablePost({ root, project: "demo", slug: "2026-06-06-demo" }),
+    (error) => error.code === "source-not-found",
+  );
 });
 
 test("previewPostFrontmatterEdit changes only allowed fields and does not write", (t) => {
