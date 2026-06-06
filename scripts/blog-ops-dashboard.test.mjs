@@ -144,6 +144,45 @@ test("createDashboardServer serves inventory without private note content", asyn
   assert.equal(Object.hasOwn(json.posts[0], "privateBody"), false);
 });
 
+test("createDashboardServer serves inventory when query params are present", async () => {
+  const server = createDashboardServer({
+    inventoryProvider: () => ({
+      projects: [{ slug: "sigak" }],
+      posts: [],
+      warnings: [],
+    }),
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/inventory?refresh=1`);
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(json.projects, [{ slug: "sigak" }]);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("createDashboardServer returns JSON 404 for unknown API routes", async () => {
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/nope`);
+    const json = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.match(response.headers.get("content-type"), /application\/json/);
+    assert.equal(json.error, "not-found");
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("runner preflight returns safe actions for one folder", async () => {
   const server = createDashboardServer({
     inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
@@ -292,6 +331,100 @@ test("runner run endpoint rejects invalid JSON bodies", async () => {
     assert.equal(json.error, "invalid-json");
     assert.equal(runnerCalled, false);
   } finally {
+    await closeServer(server);
+  }
+});
+
+test("runner run endpoint rejects null JSON bodies", async () => {
+  let runnerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    runnerProvider: async () => {
+      runnerCalled = true;
+      return { status: "success" };
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/runner/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "null",
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(runnerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("runner run endpoint does not hold busy lock while reading a partial body", async () => {
+  let runnerInput;
+  let markPartialRequestReceived;
+  const requestReceived = new Promise((resolve) => {
+    markPartialRequestReceived = resolve;
+  });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    runnerProvider: async ({ action, project }) => {
+      runnerInput = { action, project };
+      return {
+        action,
+        project,
+        status: "success",
+        exitCode: 0,
+        stdout: "ok",
+        stderr: "",
+        stdoutTruncated: false,
+        stderrTruncated: false,
+      };
+    },
+  });
+  server.on("request", (request) => {
+    if (request.method === "POST" && request.url === "/api/runner/run") {
+      markPartialRequestReceived();
+    }
+  });
+
+  const port = await listen(server);
+  let partialRequest;
+  const partialResponse = new Promise((resolve, reject) => {
+    partialRequest = http.request(
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: "/api/runner/run",
+        method: "POST",
+        headers: { "content-type": "application/json" },
+      },
+      (response) => {
+        response.resume();
+        response.on("end", () => resolve(response));
+      },
+    );
+    partialRequest.on("error", reject);
+    partialRequest.write('{"action":"validate-source","project":"sigak"');
+  });
+
+  try {
+    await requestReceived;
+    const response = await fetch(`http://127.0.0.1:${port}/api/runner/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "validate-source", project: "sigak" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.status, "success");
+    assert.deepEqual(runnerInput, { action: "validate-source", project: "sigak" });
+  } finally {
+    partialRequest.end();
+    await partialResponse.catch(() => {});
     await closeServer(server);
   }
 });

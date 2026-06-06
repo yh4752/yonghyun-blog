@@ -16,6 +16,10 @@ function sendJson(response, status, value) {
   response.end(JSON.stringify(value));
 }
 
+function clientError(message, { status = 400, code } = {}) {
+  return Object.assign(new Error(message), { status, code });
+}
+
 function readJsonBody(request, { limitBytes = 16 * 1024 } = {}) {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -26,7 +30,7 @@ function readJsonBody(request, { limitBytes = 16 * 1024 } = {}) {
       raw += chunk.toString();
       if (Buffer.byteLength(raw) > limitBytes) {
         settled = true;
-        reject(Object.assign(new Error("Request body is too large."), { status: 413, code: "body-too-large" }));
+        reject(clientError("Request body is too large.", { status: 413, code: "body-too-large" }));
       }
     });
 
@@ -41,7 +45,7 @@ function readJsonBody(request, { limitBytes = 16 * 1024 } = {}) {
       try {
         resolve(JSON.parse(raw));
       } catch {
-        reject(Object.assign(new Error("Request body must be valid JSON."), { status: 400, code: "invalid-json" }));
+        reject(clientError("Request body must be valid JSON.", { status: 400, code: "invalid-json" }));
       }
     });
 
@@ -53,9 +57,30 @@ function readJsonBody(request, { limitBytes = 16 * 1024 } = {}) {
   });
 }
 
+function isJsonObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function statusForRunnerResult(result) {
   if (result?.status === "rejected") return 400;
   return 200;
+}
+
+function sendMethodNotAllowed(response, allow) {
+  response.writeHead(405, {
+    allow,
+    "content-type": "application/json; charset=utf-8",
+  });
+  response.end(
+    JSON.stringify({
+      error: "method-not-allowed",
+      message: "Method not allowed.",
+    }),
+  );
+}
+
+function isApiPath(pathname) {
+  return pathname === "/api" || pathname.startsWith("/api/");
 }
 
 export function createDashboardServer({
@@ -68,7 +93,12 @@ export function createDashboardServer({
   return http.createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
 
-    if (request.method === "GET" && request.url === "/api/inventory") {
+    if (url.pathname === "/api/inventory") {
+      if (request.method !== "GET") {
+        sendMethodNotAllowed(response, "GET");
+        return;
+      }
+
       try {
         sendJson(response, 200, inventoryProvider());
       } catch (error) {
@@ -77,7 +107,12 @@ export function createDashboardServer({
       return;
     }
 
-    if (request.method === "GET" && url.pathname === "/api/runner/preflight") {
+    if (url.pathname === "/api/runner/preflight") {
+      if (request.method !== "GET") {
+        sendMethodNotAllowed(response, "GET");
+        return;
+      }
+
       try {
         const project = url.searchParams.get("project") ?? "";
         sendJson(response, 200, runnerPreflightProvider({ project }));
@@ -87,7 +122,33 @@ export function createDashboardServer({
       return;
     }
 
-    if (request.method === "POST" && url.pathname === "/api/runner/run") {
+    if (url.pathname === "/api/runner/run") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      let body;
+      try {
+        body = await readJsonBody(request);
+        if (!isJsonObject(body)) {
+          throw clientError("Request body must be a JSON object.", { code: "invalid-request-body" });
+        }
+        if (!body.project) {
+          sendJson(response, 400, {
+            error: "project-required",
+            message: "Select one Folder before running actions.",
+          });
+          return;
+        }
+      } catch (error) {
+        sendJson(response, error.status ?? 500, {
+          error: error.code ?? "runner-error",
+          message: error.message,
+        });
+        return;
+      }
+
       if (runnerBusy) {
         sendJson(response, 409, {
           error: "runner-busy",
@@ -98,15 +159,6 @@ export function createDashboardServer({
 
       runnerBusy = true;
       try {
-        const body = await readJsonBody(request);
-        if (!body.project) {
-          sendJson(response, 400, {
-            error: "project-required",
-            message: "Select one Folder before running actions.",
-          });
-          return;
-        }
-
         const result = await runnerProvider({
           action: body.action,
           project: body.project,
@@ -120,6 +172,14 @@ export function createDashboardServer({
       } finally {
         runnerBusy = false;
       }
+      return;
+    }
+
+    if (isApiPath(url.pathname)) {
+      sendJson(response, 404, {
+        error: "not-found",
+        message: "API endpoint not found.",
+      });
       return;
     }
 
