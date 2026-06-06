@@ -52,6 +52,40 @@ v1.3에서는 아래를 하지 않는다.
 
 반면 `sync:posts`나 full `publish:posts`는 발행본을 바꿀 수 있다. 이 기능은 diff preview와 예상 변경 파일 목록이 더 정교해진 뒤에 넣어야 한다. v1.3에서 실행 기반을 먼저 분리하면, v1.4의 safe edit이나 이후 sync 실행을 붙일 때 위험을 작게 만들 수 있다.
 
+## 검토된 대안과 v1.3 결정
+
+### Smart View 대상 실행
+
+Smart View별 실행은 v1.3에 넣지 않는다.
+
+`Dev Logs` Smart View를 보고 있을 때 그 subset만 validation하고 싶은 요구는 이해할 수 있다. 하지만 현재 CLI 계약은 `--project <project>` 기준이다. Smart View는 Dashboard 내부의 UI 필터이고, source folder에는 Smart View라는 개념이 없다.
+
+Smart View subset validation을 넣으려면 아래 중 하나가 필요하다.
+
+- `validate:posts`가 파일 목록이나 type filter를 인자로 받는다.
+- Dashboard가 임시 파일 목록을 만들어 validation에 넘긴다.
+- Smart View별 command contract를 새로 만든다.
+
+세 방식 모두 v1.3의 "작고 안전한 실행 기반" 범위를 넘는다. 따라서 v1.3에서는 Runner 패널에 "Smart View는 표시 필터이고 실행은 Folder 전체 기준"이라는 문구를 명확히 표시한다. Smart View별 실행 요구가 반복되면 별도 v1.x 기능으로 CLI contract부터 설계한다.
+
+### 전체 로그 파일 다운로드
+
+전체 로그 파일 저장과 다운로드는 v1.3에 넣지 않는다.
+
+이 기능은 유용할 수 있지만, 실행 결과를 파일로 저장하면 Dashboard가 로컬 파일을 생성한다. v1.3은 파일을 변경하지 않는 실행 단계이므로 원칙과 충돌한다. 또한 로그에는 로컬 경로, 환경 정보, private note 경고 같은 민감한 힌트가 섞일 수 있다.
+
+대신 v1.3에서는 stdout/stderr tail을 보여주고, 잘렸는지 여부를 응답 필드로 표시한다. 사용자가 전체 로그가 필요하면 패널의 copy command로 같은 명령을 터미널에서 직접 실행한다.
+
+전체 로그 저장이 필요해지면 후속 단계에서 `.local/blog-ops-runs/` 같은 git ignored 경로에만 저장하고, 보존 기간과 삭제 정책을 함께 설계한다.
+
+### queue와 polling
+
+v1.3은 queue와 polling을 도입하지 않는다.
+
+허용 action 두 개는 짧은 검증 명령이어야 한다. 실행 중복은 single-run lock과 `409 runner-busy`로 막는다. 긴 작업을 큐에 넣는 구조는 full publish, test, build, PR assistant처럼 시간이 오래 걸리는 action을 Dashboard에서 실행할 때 다시 검토한다.
+
+후속 단계에서 queue가 필요해지면 endpoint는 `POST /api/runner/jobs`, `GET /api/runner/jobs/<id>` 형태로 분리한다. v1.3의 `POST /api/runner/run`은 즉시 실행/즉시 응답 모델로 유지한다.
+
 ## 아키텍처
 
 v1.3은 Dashboard 서버에 작은 runner endpoint와 runner 모듈을 추가한다.
@@ -178,6 +212,8 @@ npm run validate:posts -- --source --project sigak
   "status": "success",
   "stdout": "Validated 18 source posts for sigak.",
   "stderr": "",
+  "stdoutTruncated": false,
+  "stderrTruncated": false,
   "startedAt": "2026-06-06T10:30:00.000Z",
   "endedAt": "2026-06-06T10:30:01.000Z",
   "nextAction": "Source posts are valid. You can run publish dry-run next."
@@ -195,6 +231,8 @@ npm run validate:posts -- --source --project sigak
   "status": "failed",
   "stdout": "",
   "stderr": "Error: src post has an invalid tag 'Demo'.",
+  "stdoutTruncated": false,
+  "stderrTruncated": false,
   "startedAt": "2026-06-06T10:30:00.000Z",
   "endedAt": "2026-06-06T10:30:01.000Z",
   "nextAction": "Fix the source post frontmatter or editorial warnings before syncing."
@@ -262,6 +300,10 @@ timeout이 발생하면 process를 종료하고 status를 `timed-out`으로 반�
 stdout과 stderr는 각각 마지막 32KB만 반환한다.
 
 검증 실패 원인은 보이되, 지나치게 긴 로그가 Dashboard를 망가뜨리거나 브라우저 메모리를 과도하게 쓰지 않게 한다.
+
+응답에는 `stdoutTruncated`와 `stderrTruncated`를 포함한다. 값이 `true`이면 Dashboard는 "로그가 잘렸습니다. 전체 로그가 필요하면 같은 명령을 터미널에서 직접 실행하세요."를 표시한다.
+
+v1.3은 전체 로그 파일을 만들지 않는다. 로그 파일 저장은 로컬 파일 변경이므로 `.local/blog-ops-runs/` 같은 ignored 경로, 보존 기간, 삭제 정책을 별도 단계에서 설계한 뒤 도입한다.
 
 ### 동시 실행 제한
 
@@ -339,6 +381,18 @@ npm run validate:posts -- --source --project sigak
 
 이는 Sigak source folder 전체를 검증한다. Smart View subset만 검증하는 명령은 v1.3에서 제공하지 않는다.
 
+UI에는 아래 문구를 Runner 패널에 표시한다.
+
+```text
+Runner uses the selected Folder, not the current Smart View.
+```
+
+한국어 화면 문구:
+
+```text
+실행 범위는 현재 Smart View가 아니라 선택한 Folder 전체입니다.
+```
+
 ## 에러와 다음 행동 문구
 
 | 실패 지점 | next action |
@@ -366,6 +420,8 @@ npm run validate:posts -- --source --project sigak
 - request가 command 문자열을 포함해도 무시된다.
 - timeout이면 `timed-out` 결과를 반환한다.
 - stdout/stderr가 32KB로 제한된다.
+- stdout/stderr가 잘리면 `stdoutTruncated` 또는 `stderrTruncated`가 `true`가 된다.
+- Smart View 관련 값이 request에 들어와도 command argv에 반영되지 않는다.
 
 테스트에서는 실제 npm 명령을 실행하지 않는다. `spawnRunner`에 fake spawn 함수를 주입해 command와 args를 검증한다.
 
@@ -392,6 +448,8 @@ npm run validate:posts -- --source --project sigak
 - `Copy dry-run`과 `Copy publish`는 유지된다.
 - All Folders 상태에서는 실행 안내가 비활성화된다.
 - 로그 패널 markup이 존재한다.
+- Smart View가 실행 범위를 바꾸지 않는다는 문구가 존재한다.
+- 로그가 잘렸을 때 전체 로그는 터미널에서 직접 실행하라는 문구가 존재한다.
 
 ## 구현 파일
 
@@ -432,6 +490,28 @@ v1.4 후보:
 
 v1.3에서 만든 runner API는 v1.4의 검증 단계에 재사용할 수 있다. 하지만 v1.4의 파일 수정 endpoint는 별도 설계가 필요하다. runner endpoint가 파일 수정까지 담당하지 않는다.
 
+### v1.4 확장 규칙
+
+v1.4에서 파일 수정이 들어오더라도 v1.3 runner endpoint를 임의 파일 수정 endpoint로 확장하지 않는다.
+
+역할을 아래처럼 나눈다.
+
+| 영역 | endpoint 책임 |
+| --- | --- |
+| Runner | allow-list 검증 명령 실행 |
+| Safe Edit | source post frontmatter 읽기/preview/write |
+| Diff Preview | 저장 전후 변경 요약 생성 |
+
+v1.4에서 safe edit 저장 후 validation을 자동 실행하고 싶다면 Safe Edit endpoint가 저장을 끝낸 뒤 내부적으로 `validate-source` action을 호출하거나, 클라이언트가 저장 성공 후 `POST /api/runner/run`을 다시 호출한다.
+
+파일을 변경하는 action을 Runner에 추가하는 경우에는 아래 조건이 먼저 필요하다.
+
+- `mutatesFiles: true`가 action metadata에 명시된다.
+- 실행 전 diff preview 또는 예상 변경 파일 목록이 있다.
+- dirty state 차단 기준이 action별로 정의된다.
+- 실행 후 inventory refresh가 보장된다.
+- 실패 시 되돌릴 수 없는 변경이 생기지 않는지 설명한다.
+
 ## 완료 기준
 
 v1.3은 아래 조건을 만족하면 완료로 본다.
@@ -454,3 +534,5 @@ v1.3은 아래 조건을 만족하면 완료로 본다.
 - 기존 정책과 일관성: Runner 범위는 v1.2와 같이 Folder 기준이며 Smart View subset을 따르지 않는다.
 - 안전성: request body command 실행을 금지하고, action key 기반 allow-list와 `shell: false`를 명시했다.
 - v1.4 연결: v1.4는 Safe Edit로 분리하고, v1.3 runner는 저장 후 검증 단계에만 재사용하도록 경계를 정했다.
+- 로그 정책: v1.3은 stdout/stderr tail과 truncation flag만 제공하고, 전체 로그 파일 저장은 ignored 경로와 삭제 정책을 설계한 뒤 후속 단계에서 다룬다.
+- 실행 모델: v1.3은 즉시 실행/즉시 응답으로 유지하고, queue와 polling은 긴 작업을 Dashboard에서 실행할 때 별도 endpoint로 설계한다.
