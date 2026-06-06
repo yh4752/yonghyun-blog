@@ -67,12 +67,9 @@
    - 변경 전 diff 또는 preview를 보여준다.
 
 6. [ ] Dashboard action runner
-   - `validate:posts --source --project <project>`
-   - `sync:posts`
-   - `validate:posts`
-   - `npm test`
-   - `npm run build`
-   - v1.1에서는 실제 실행보다 dry-run, command preview, copy command를 먼저 둔다.
+   - v1.1에서는 dry-run, command preview, copy command를 먼저 뒀다.
+   - v1.3에서는 `validate-source`와 `publish-dry-run`만 allow-list로 직접 실행한다.
+   - `sync:posts`, full publish, `npm test`, `npm run build`는 파일 변경과 긴 실행 시간이 섞이므로 후속 단계에서 다룬다.
 
 7. [ ] PR assistant
    - branch 생성, commit, push, PR 생성까지 도와준다.
@@ -200,8 +197,9 @@ Dashboard에서 글별 학습 상태를 추적하는 방식은 [Learning Ops Das
 - [x] test/build 실행
 - [x] `publish:posts`로 검증 체인 묶기
 - [x] Dashboard action runner v1.1 범위 확정
-- [ ] Dashboard에서 runner dry-run과 command preview 표시
-- [ ] Dashboard에서 allow-list 기반 실제 runner 실행
+- [x] Dashboard에서 runner dry-run과 command preview 표시
+- [x] Dashboard에서 allow-list 기반 `validate-source`, `publish-dry-run` 실제 실행
+- [ ] Safe Edit 저장 후 runner validation 재사용
 - [ ] branch 생성
 - [ ] commit 생성
 - [ ] push와 PR 생성
@@ -216,20 +214,21 @@ Dashboard에서 글별 학습 상태를 추적하는 방식은 [Learning Ops Das
 
 ## 당장 다음 작업
 
-다음 작업은 Phase 3과 Phase 4 사이의 작은 v1.1이다.
+다음 작업은 Phase 3의 작은 v1.4다.
 
-확정된 v1.1 범위는 **Action Runner Preview**다.
+완료된 v1.3 범위는 **Controlled Runner**다.
 
-- Dashboard는 선택한 프로젝트의 발행 검증 계획을 보여준다.
-- `npm run publish:posts -- --project <project> --dry-run`과 실제 실행 명령을 preview로 표시한다.
-- 사용자는 command를 복사해서 터미널에서 실행한다.
-- Dashboard가 직접 명령을 실행하거나 파일을 변경하지 않는다.
+- Dashboard는 선택한 Folder의 발행 검증 계획을 보여준다.
+- `validate-source`와 `publish-dry-run`은 Dashboard에서 직접 실행할 수 있다.
+- full publish는 여전히 command copy-only다.
+- Smart View는 화면 필터일 뿐 runner 실행 범위가 아니다.
+- Dashboard는 브라우저에서 임의 command를 받지 않고, 서버 allow-list action만 실행한다.
 
 다음 순서:
 
-1. `publish:posts --dry-run` 결과를 Dashboard에서 command preview로 보여준다.
-2. copy command를 제공한다.
-3. 실제 실행 버튼은 allow-list, dirty state check, diff preview 정책이 구현된 뒤 붙인다.
+1. v1.3 Controlled Runner를 실제 Dashboard에서 source validation과 publish dry-run으로 한 번씩 dogfooding한다.
+2. v1.4 Safe Edit 범위를 확정한다.
+3. draft/frontmatter 수정은 저장 전 diff preview를 먼저 보여준다.
 4. Learning Ops에서 오늘 복습할 글 1개를 고르고 private note/progress manifest 흐름을 확인한다.
 5. 작업이 끝나면 6/5 dev-log로 운영 루틴 적용 결과를 기록한다.
 
