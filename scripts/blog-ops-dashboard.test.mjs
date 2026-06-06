@@ -30,10 +30,23 @@ test("renderDashboardHtml renders progress manifest learning columns", () => {
   assert.match(html, /learningWarnings/);
 });
 
-test("renderDashboardHtml includes copy-only Action Runner Preview commands", () => {
+test("renderDashboardHtml includes Controlled Runner actions and copy commands", () => {
   const html = renderDashboardHtml();
 
-  assert.match(html, /Action Runner Preview/);
+  assert.match(html, /Controlled Runner/);
+  assert.match(html, /runnerPreflight/);
+  assert.match(html, /runnerResult/);
+  assert.match(html, /runnerRunning/);
+  assert.match(html, /runnerError/);
+  assert.match(html, /\/api\/runner\/preflight\?project=/);
+  assert.match(html, /\/api\/runner\/run/);
+  assert.match(html, /data-run-action=/);
+  assert.match(html, /data-run-action=\\?"validate-source\\?"/);
+  assert.match(html, /data-run-action=\\?"publish-dry-run\\?"/);
+  assert.match(html, /validate-source/);
+  assert.match(html, /publish-dry-run/);
+  assert.match(html, /Smart Views는 화면 필터일 뿐이며 runner action은 선택한 Folder 기준으로 실행됩니다\./);
+  assert.match(html, /출력은 최근 32KB만 표시됩니다/);
   assert.match(html, /publishPreviewCommands/);
   assert.match(html, /npm run publish:posts -- --project /);
   assert.match(html, /--dry-run/);
@@ -41,6 +54,9 @@ test("renderDashboardHtml includes copy-only Action Runner Preview commands", ()
   assert.match(html, /Copy publish/);
   assert.match(html, /renderCommand\("Copy dry-run", \{ agentPrompt: preview\.dryRun \}\)/);
   assert.match(html, /renderCommand\("Copy publish", \{ agentPrompt: preview\.publish \}\)/);
+  assert.doesNotMatch(html, /data-run-command/);
+  assert.doesNotMatch(html, /<textarea/i);
+  assert.doesNotMatch(html, /<input[^>]+command/i);
 });
 
 test("renderDashboardHtml labels project navigation as folders", () => {
