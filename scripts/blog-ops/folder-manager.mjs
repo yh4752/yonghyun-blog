@@ -58,6 +58,33 @@ function writeMetadata({ configFile, projectsFile, config, projects }) {
   fs.writeFileSync(projectsFile, `${JSON.stringify(projects, null, 2)}\n`, "utf8");
 }
 
+function noteRollbackError(error, rollbackError) {
+  if (!error.rollbackErrors) error.rollbackErrors = [];
+  error.rollbackErrors.push(rollbackError);
+}
+
+function tryRollback(error, fn) {
+  try {
+    fn();
+  } catch (rollbackError) {
+    noteRollbackError(error, rollbackError);
+  }
+}
+
+function restoreMetadata(metadata) {
+  fs.writeFileSync(metadata.configFile, metadata.configText, "utf8");
+  fs.writeFileSync(metadata.projectsFile, metadata.projectsText, "utf8");
+}
+
+function writeMetadataWithRollback(metadata, { config, projects }) {
+  try {
+    writeMetadata({ ...metadata, config, projects });
+  } catch (error) {
+    tryRollback(error, () => restoreMetadata(metadata));
+    throw error;
+  }
+}
+
 function readTextIfFile(file) {
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return "";
   return fs.readFileSync(file, "utf8");
@@ -102,15 +129,19 @@ function readDirtyFiles({ root, metadataDirtyProvider }) {
   return metadataDirtyProvider({ root }).map((file) => String(file).split(path.sep).join("/")).sort();
 }
 
-function parseNullable(value) {
-  return value === undefined ? null : value;
+function parseNullableUrl(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
 function parseBoolean(value) {
-  return Boolean(value);
+  return value === true;
 }
 
 function ensureFileIsNotDirectory(file, blockers) {
+  if (!file) return;
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
     blockers.push({
       code: "setup-file-is-directory",
@@ -118,6 +149,83 @@ function ensureFileIsNotDirectory(file, blockers) {
       message: `${file} exists as a directory. Expected a file or no entry.`,
     });
   }
+}
+
+function validateProjectRoot(value, env) {
+  if (value === undefined || value === null) {
+    return {
+      code: "project-root-required",
+      message: "Project root is required before creating a Folder.",
+    };
+  }
+  if (typeof value !== "string") {
+    return {
+      code: "project-root-invalid",
+      message: "Project root must be a path string.",
+    };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return {
+      code: "project-root-required",
+      message: "Project root is required before creating a Folder.",
+    };
+  }
+  const home = env.HOME ?? env.USERPROFILE;
+  if (!home && (/^~(?=\/|$)/.test(trimmed) || /\$\{HOME\}|\$HOME(?=\/|$)/.test(trimmed))) {
+    return {
+      code: "project-root-invalid",
+      message: "Project root uses HOME expansion, but HOME or USERPROFILE is unavailable.",
+    };
+  }
+  return null;
+}
+
+function validateFeatured(value, blockers) {
+  if (value !== undefined && typeof value !== "boolean") {
+    blockers.push({
+      code: "featured-invalid",
+      field: "featured",
+      message: "featured must be true, false, or omitted.",
+    });
+  }
+}
+
+function validateOptionalUrl(value, field, blockers) {
+  if (value === undefined || value === null) return;
+  const code = field === "repositoryUrl" ? "repository-url-invalid" : "demo-url-invalid";
+  if (typeof value !== "string") {
+    blockers.push({
+      code,
+      field,
+      message: `${field} must be a URL string, empty string, null, or omitted.`,
+    });
+    return;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  try {
+    new URL(trimmed);
+  } catch {
+    blockers.push({
+      code,
+      field,
+      message: `${field} must be a valid URL string.`,
+    });
+  }
+}
+
+function validDeleteProject(project) {
+  return typeof project === "string" && SLUG_PATTERN.test(project);
+}
+
+function cleanupFlagBlocker(value) {
+  if (typeof value === "boolean") return null;
+  return {
+    code: "remove-source-setup-folder-invalid",
+    field: "removeSourceSetupFolder",
+    message: "removeSourceSetupFolder must be true or false.",
+  };
 }
 
 export function suggestSlug(value) {
@@ -134,12 +242,14 @@ export function suggestSlug(value) {
 
 function expandProjectRoot(value, { root, env }) {
   const home = env.HOME ?? env.USERPROFILE;
-  if (!home) throw codedError("home-required", "HOME or USERPROFILE environment variable is required.");
+  const raw = String(value ?? "").trim();
+  if (!home && (/^~(?=\/|$)/.test(raw) || /\$\{HOME\}|\$HOME(?=\/|$)/.test(raw))) {
+    throw codedError("home-required", "HOME or USERPROFILE environment variable is required.");
+  }
 
-  const expanded = String(value ?? "")
-    .replace(/^~(?=\/|$)/, home)
-    .replace(/\$\{HOME\}/g, home)
-    .replace(/\$HOME(?=\/|$)/g, home);
+  const expanded = home
+    ? raw.replace(/^~(?=\/|$)/, home).replace(/\$\{HOME\}/g, home).replace(/\$HOME(?=\/|$)/g, home)
+    : raw;
 
   return path.isAbsolute(expanded) ? path.normalize(expanded) : path.resolve(root, expanded);
 }
@@ -200,12 +310,12 @@ function projectEntryFromInput(input) {
     stack: Array.isArray(input.stack) ? input.stack.map(String) : [],
     status: input.status ? String(input.status) : "active",
     featured: parseBoolean(input.featured),
-    repositoryUrl: parseNullable(input.repositoryUrl),
-    demoUrl: parseNullable(input.demoUrl),
+    repositoryUrl: parseNullableUrl(input.repositoryUrl),
+    demoUrl: parseNullableUrl(input.demoUrl),
   };
 }
 
-function validateCreateInput({ input, metadata, blogDir, readmePath, topicQueuePath }) {
+function validateCreateInput({ input, metadata, blogDir, readmePath, topicQueuePath, projectRootBlocker }) {
   const blockers = [];
   const slug = String(input?.slug ?? "");
 
@@ -228,10 +338,14 @@ function validateCreateInput({ input, metadata, blogDir, readmePath, topicQueueP
       message: `Project already exists in src/data/projects.json: ${slug}`,
     });
   }
+  if (projectRootBlocker) blockers.push(projectRootBlocker);
+  validateFeatured(input?.featured, blockers);
+  validateOptionalUrl(input?.repositoryUrl, "repositoryUrl", blockers);
+  validateOptionalUrl(input?.demoUrl, "demoUrl", blockers);
 
   ensureFileIsNotDirectory(readmePath, blockers);
   ensureFileIsNotDirectory(topicQueuePath, blockers);
-  if (fs.existsSync(blogDir) && !fs.statSync(blogDir).isDirectory()) {
+  if (blogDir && fs.existsSync(blogDir) && !fs.statSync(blogDir).isDirectory()) {
     blockers.push({ code: "blog-path-is-file", message: `${blogDir} exists and is not a directory.` });
   }
 
@@ -246,46 +360,56 @@ export function previewCreateFolder({
 } = {}) {
   const metadata = readMetadata(root, env);
   const dirtyFiles = readDirtyFiles({ root, metadataDirtyProvider });
-  const projectRoot = expandProjectRoot(input?.projectRoot, { root, env });
-  const blogDir = path.join(projectRoot, "docs", "blog");
-  const readmePath = path.join(blogDir, "README.md");
-  const topicQueuePath = path.join(blogDir, "topic-queue.md");
+  const projectRootBlocker = validateProjectRoot(input?.projectRoot, env);
+  const projectRoot = projectRootBlocker ? null : expandProjectRoot(input.projectRoot, { root, env });
+  const blogDir = projectRoot ? path.join(projectRoot, "docs", "blog") : null;
+  const readmePath = blogDir ? path.join(blogDir, "README.md") : null;
+  const topicQueuePath = blogDir ? path.join(blogDir, "topic-queue.md") : null;
   const projectEntry = projectEntryFromInput(input ?? {});
   const configEntry = {
     project: projectEntry.slug,
     label: projectEntry.name,
-    path: portableBlogPath(projectRoot, env),
+    path: projectRoot ? portableBlogPath(projectRoot, env) : "",
     include: ["*.md"],
     exclude: ["README.md", "topic-queue.md"],
   };
-  const blockers = validateCreateInput({ input, metadata, blogDir, readmePath, topicQueuePath });
+  const blockers = validateCreateInput({ input, metadata, blogDir, readmePath, topicQueuePath, projectRootBlocker });
   const nextConfig = { ...metadata.config, sources: [...(metadata.config.sources ?? []), configEntry] };
   const nextProjects = [...metadata.projects, projectEntry];
 
   if (dirtyFiles.length > 0) blockers.unshift(dirtyBlocker(dirtyFiles));
 
+  const setupOperations = projectRoot
+    ? [
+        { type: "mkdir", target: blogDir, path: slashRelative(root, blogDir), label: `Create directory: ${blogDir}` },
+        {
+          type: "create-file-if-missing",
+          target: readmePath,
+          path: slashRelative(root, readmePath),
+          content: readmeFor(projectEntry),
+          label: `Create file if missing: ${readmePath}`,
+        },
+        {
+          type: "create-file-if-missing",
+          target: topicQueuePath,
+          path: slashRelative(root, topicQueuePath),
+          content: topicQueueFor(projectEntry),
+          label: `Create file if missing: ${topicQueuePath}`,
+        },
+      ]
+    : [];
   const operations = [
-    { type: "mkdir", target: blogDir, path: slashRelative(root, blogDir), label: `Create directory: ${blogDir}` },
-    {
-      type: "create-file-if-missing",
-      target: readmePath,
-      path: slashRelative(root, readmePath),
-      content: readmeFor(projectEntry),
-      label: `Create file if missing: ${readmePath}`,
-    },
-    {
-      type: "create-file-if-missing",
-      target: topicQueuePath,
-      path: slashRelative(root, topicQueuePath),
-      content: topicQueueFor(projectEntry),
-      label: `Create file if missing: ${topicQueuePath}`,
-    },
+    ...setupOperations,
     { type: "update-config", target: metadata.configFile, path: "posts.config.yml", entry: configEntry },
     { type: "update-projects", target: metadata.projectsFile, path: "src/data/projects.json", entry: projectEntry },
   ];
   const filePreviews = [
-    createSetupFilePreview({ root, file: readmePath, content: readmeFor(projectEntry) }),
-    createSetupFilePreview({ root, file: topicQueuePath, content: topicQueueFor(projectEntry) }),
+    ...(projectRoot
+      ? [
+          createSetupFilePreview({ root, file: readmePath, content: readmeFor(projectEntry) }),
+          createSetupFilePreview({ root, file: topicQueuePath, content: topicQueueFor(projectEntry) }),
+        ]
+      : []),
     ...metadataFilePreviews({ root, metadata, config: nextConfig, projects: nextProjects }),
   ];
 
@@ -322,23 +446,42 @@ export function applyCreateFolder({
     throw codedError("stale-metadata", "stale-metadata: project metadata changed after preview.");
   }
 
-  for (const operation of preview.operations) {
-    if (operation.type === "mkdir") {
-      fs.mkdirSync(operation.target, { recursive: true });
-    } else if (operation.type === "create-file-if-missing") {
-      if (!fs.existsSync(operation.target)) {
-        fs.mkdirSync(path.dirname(operation.target), { recursive: true });
-        fs.writeFileSync(operation.target, operation.content, "utf8");
+  const createdFiles = [];
+  const createdDirs = [];
+
+  try {
+    for (const operation of preview.operations) {
+      if (operation.type === "mkdir") {
+        const existed = fs.existsSync(operation.target);
+        fs.mkdirSync(operation.target, { recursive: true });
+        if (!existed) createdDirs.push(operation.target);
+      } else if (operation.type === "create-file-if-missing") {
+        if (!fs.existsSync(operation.target)) {
+          fs.mkdirSync(path.dirname(operation.target), { recursive: true });
+          fs.writeFileSync(operation.target, operation.content, "utf8");
+          createdFiles.push(operation.target);
+        }
       }
     }
-  }
 
-  const metadata = readMetadata(root, env);
-  writeMetadata({
-    ...metadata,
-    config: { ...metadata.config, sources: [...(metadata.config.sources ?? []), preview.configEntry] },
-    projects: [...metadata.projects, preview.projectEntry],
-  });
+    writeMetadataWithRollback(initial, {
+      config: { ...initial.config, sources: [...(initial.config.sources ?? []), preview.configEntry] },
+      projects: [...initial.projects, preview.projectEntry],
+    });
+  } catch (error) {
+    for (const file of createdFiles.slice().reverse()) {
+      tryRollback(error, () => {
+        if (fs.existsSync(file)) fs.rmSync(file);
+      });
+    }
+    for (const dir of createdDirs.slice().reverse()) {
+      tryRollback(error, () => {
+        if (fs.existsSync(dir)) fs.rmdirSync(dir);
+      });
+    }
+    tryRollback(error, () => restoreMetadata(initial));
+    throw error;
+  }
 
   return {
     status: "applied",
@@ -552,6 +695,39 @@ function metadataMismatchBlocker(project, sourceCount, projectCount) {
   };
 }
 
+function invalidProjectBlocker(project) {
+  return {
+    code: "invalid-project",
+    message: `Project slug must match ${SLUG_PATTERN.source}.`,
+    project,
+  };
+}
+
+function emptyDeleteScan() {
+  return {
+    sourceDir: null,
+    readiness: [],
+  };
+}
+
+function snapshotFile(file) {
+  if (!fs.existsSync(file)) return { file, existed: false };
+  const stat = fs.statSync(file);
+  if (!stat.isFile()) return { file, existed: true, type: "other" };
+  return { file, existed: true, type: "file", content: fs.readFileSync(file, "utf8") };
+}
+
+function restoreFileSnapshots(error, snapshots) {
+  for (const snapshot of snapshots) {
+    if (snapshot.existed && snapshot.type === "file") {
+      tryRollback(error, () => {
+        fs.mkdirSync(path.dirname(snapshot.file), { recursive: true });
+        fs.writeFileSync(snapshot.file, snapshot.content, "utf8");
+      });
+    }
+  }
+}
+
 export function previewDeleteFolder({
   root = process.cwd(),
   env = process.env,
@@ -562,20 +738,32 @@ export function previewDeleteFolder({
   const metadata = readMetadata(root, env);
   const dirtyFiles = readDirtyFiles({ root, metadataDirtyProvider });
   const sources = metadata.config.sources ?? [];
-  const matchingSources = sources.filter((source) => source.project === project);
-  const matchingResolvedSources = metadata.resolvedSources.filter((source) => source.project === project);
-  const matchingProjects = metadata.projects.filter((item) => item.slug === project);
+  const projectIsValid = validDeleteProject(project);
+  const cleanupBlocker = cleanupFlagBlocker(removeSourceSetupFolder);
+  const matchingSources = projectIsValid ? sources.filter((source) => source.project === project) : [];
+  const matchingResolvedSources = projectIsValid
+    ? metadata.resolvedSources.filter((source) => source.project === project)
+    : [];
+  const matchingProjects = projectIsValid ? metadata.projects.filter((item) => item.slug === project) : [];
   const source = matchingSources[0];
   const resolvedSource = matchingResolvedSources[0];
   const blockers = [];
 
   if (dirtyFiles.length > 0) blockers.push(dirtyBlocker(dirtyFiles));
-  if (matchingSources.length !== 1 || matchingProjects.length !== 1) {
+  if (!projectIsValid) {
+    blockers.push(invalidProjectBlocker(project));
+  }
+  if (cleanupBlocker) blockers.push(cleanupBlocker);
+  const hasMetadataMismatch = projectIsValid && (matchingSources.length !== 1 || matchingProjects.length !== 1);
+  if (hasMetadataMismatch) {
     blockers.push(metadataMismatchBlocker(project, matchingSources.length, matchingProjects.length));
   }
 
-  const scan = deleteReadiness({ root, env, metadata, project, source, resolvedSource });
-  blockers.push(...scan.readiness.filter((item) => item.status === "blocked").map(blockerForReadiness));
+  const shouldScan = projectIsValid && !hasMetadataMismatch;
+  const scan = shouldScan ? deleteReadiness({ root, env, metadata, project, source, resolvedSource }) : emptyDeleteScan();
+  if (shouldScan) {
+    blockers.push(...scan.readiness.filter((item) => item.status === "blocked").map(blockerForReadiness));
+  }
   const nextConfig = {
     ...metadata.config,
     sources: sources.filter((item) => item.project !== project),
@@ -588,7 +776,7 @@ export function previewDeleteFolder({
   ];
   const filePreviews = metadataFilePreviews({ root, metadata, config: nextConfig, projects: nextProjects });
 
-  if (removeSourceSetupFolder && blockers.length === 0 && scan.sourceDir) {
+  if (removeSourceSetupFolder === true && blockers.length === 0 && scan.sourceDir) {
     const readmePath = path.join(scan.sourceDir, "README.md");
     const topicQueuePath = path.join(scan.sourceDir, "topic-queue.md");
     for (const file of [readmePath, topicQueuePath]) {
@@ -647,24 +835,32 @@ export function applyDeleteFolder({
     throw codedError("stale-metadata", "stale-metadata: project metadata changed after preview.");
   }
 
-  if (removeSourceSetupFolder) {
-    const removable = preview.operations.filter((operation) => operation.type === "remove-file");
-    for (const operation of removable) {
-      if (fs.existsSync(operation.target)) fs.rmSync(operation.target);
-    }
-    const emptyDir = preview.operations.find((operation) => operation.type === "remove-empty-dir");
-    if (emptyDir && fs.existsSync(emptyDir.target)) fs.rmdirSync(emptyDir.target);
-  }
+  const removable = removeSourceSetupFolder === true ? preview.operations.filter((operation) => operation.type === "remove-file") : [];
+  const cleanupSnapshots = removable.map((operation) => snapshotFile(operation.target));
+  let metadataUpdated = false;
 
-  const metadata = readMetadata(root, env);
-  writeMetadata({
-    ...metadata,
-    config: {
-      ...metadata.config,
-      sources: (metadata.config.sources ?? []).filter((source) => source.project !== project),
-    },
-    projects: metadata.projects.filter((item) => item.slug !== project),
-  });
+  try {
+    writeMetadataWithRollback(initial, {
+      config: {
+        ...initial.config,
+        sources: (initial.config.sources ?? []).filter((source) => source.project !== project),
+      },
+      projects: initial.projects.filter((item) => item.slug !== project),
+    });
+    metadataUpdated = true;
+
+    if (removeSourceSetupFolder === true) {
+      for (const operation of removable) {
+        if (fs.existsSync(operation.target)) fs.rmSync(operation.target);
+      }
+      const emptyDir = preview.operations.find((operation) => operation.type === "remove-empty-dir");
+      if (emptyDir && fs.existsSync(emptyDir.target)) fs.rmdirSync(emptyDir.target);
+    }
+  } catch (error) {
+    if (metadataUpdated) tryRollback(error, () => restoreMetadata(initial));
+    restoreFileSnapshots(error, cleanupSnapshots);
+    throw error;
+  }
 
   return {
     status: "applied",
