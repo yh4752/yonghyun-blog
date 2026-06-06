@@ -27,8 +27,11 @@
 - [x] 운영 문서를 현재 구현 상태에 맞춰 최신화
 - [x] Dashboard action runner v1.1 범위 확정
 - [x] `publish:posts --dry-run` command preview를 Dashboard에 연결
+- [x] Dashboard action runner v1.3 Controlled Runner 구현
+- [x] Blog Ops Dashboard v1.4 Safe Mutations 구현
 - [ ] Learning Ops 운영 대상 글 1개 선정
-- [ ] 2026-06-05 dev-log 작성
+- [ ] 2026-06-06 dev-log에 v1.4 Safe Mutations dogfooding 결과와 후속 조치 기록
+- [ ] v1.5 우선순위 결정: 새 글 생성 UI와 missing frontmatter quick fix 중 먼저 집을 것
 
 ## 이번 주 후보
 
@@ -53,11 +56,16 @@ Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 �
 - [x] project-scoped `sync:posts` 구현
 - [x] project-scoped `publish:posts` 구현
 - [x] Dashboard runner는 먼저 dry-run/command preview로 시작
+- [x] Dashboard runner v1.3에서 `validate-source`, `publish-dry-run` allow-list 실행을 지원
+- [x] v1.4 Safe Mutations에서 frontmatter 편집, draft toggle, tag 선택/검증, Folder 추가, Empty Folder 삭제를 지원
+- [x] v1.4 Safe Mutations에서 저장 전 preview/diff-before-apply를 보여준다
 - [ ] v1.2 Folder 용어가 실제 사용 중 project와 혼동되는지 관찰한다
 - [ ] v1.2 모바일 Folder 통계가 작은 화면에서 읽기 좋은지 QA 결과를 기록한다
 - [ ] Smart View를 단일 선택으로 충분히 쓰는지, 조합형 view 요청이 반복되는지 기록한다
-- [ ] `type: note`, Folder 추가 wizard, Empty Folder 삭제 요구가 실제로 반복되는지 기록한다
-- [ ] 실제 실행 버튼은 allow-list, dirty state check, diff preview 이후에만 추가
+- [ ] `type: note` 요구가 실제로 반복되는지 기록한다
+- [ ] 2026-06-06 dev-log에 v1.4 dogfooding 결과, 불편했던 점, 후속 조치를 남긴다
+- [ ] v1.5 후보로 새 글 생성 UI를 먼저 할지 판단한다
+- [ ] v1.5 후보로 missing frontmatter quick fix를 먼저 할지 판단한다
 
 ## 오늘 집어 들 작업
 
@@ -66,8 +74,10 @@ Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 �
 - [x] 운영 문서를 현재 구현 상태에 맞춰 최신화한다.
 - [x] Dashboard action runner v1.1의 최소 범위를 정한다.
 - [x] 구현한다면 `publish:posts --dry-run` command preview부터 시작한다.
+- [x] v1.3 Controlled Runner로 파일을 바꾸지 않는 두 action을 Dashboard에서 실행한다.
+- [x] v1.4 Safe Mutations로 작은 safe CRUD 범위를 구현한다.
 - [ ] Learning Ops 대상 글 1개를 고른다.
-- [ ] 마지막에 6/5 dev-log로 남긴다.
+- [ ] 마지막에 6/6 dev-log로 v1.4 dogfooding 결과를 남긴다.
 
 ## Dashboard action runner v1.1 확정 범위
 
@@ -92,6 +102,28 @@ v1.1은 **Action Runner Preview**로 제한한다.
 - 자동 commit, push, PR 생성
 
 실제 실행 버튼은 allow-list, dirty state check, diff preview, 로그 panel이 구현된 뒤 별도 후속 단계에서 검토한다.
+
+## Dashboard action runner v1.3 구현 상태
+
+v1.3은 **Controlled Runner**로 구현했다.
+
+Dashboard에서 직접 실행할 수 있는 action은 아래 두 개로 제한한다.
+
+- `validate-source`: `npm run validate:posts -- --source --project <project>`
+- `publish-dry-run`: `npm run publish:posts -- --project <project> --dry-run`
+
+안전 기준:
+
+- 실행 범위는 Smart View가 아니라 선택한 Folder 전체다.
+- `All Folders`에서는 실행하지 않는다.
+- 브라우저는 `{ action, project }`만 서버로 보낸다.
+- 서버는 allow-list argv만 실행하고, 임의 command string은 받지 않는다.
+- 실행 로그는 stdout/stderr 최근 32KB tail만 보여준다.
+- full publish는 여전히 copy-only다.
+
+v1.4 Safe Mutations도 구현했다. 이 단계는 draft/frontmatter 같은 작은 수정, tag 선택/검증, Folder 추가, Empty Folder 삭제를 다루며 저장 전 preview/diff를 먼저 보여준다.
+
+다음 단계는 v1.4 dogfooding 결과를 2026-06-06 dev-log에 남기고, v1.5에서 새 글 생성 UI와 missing frontmatter quick fix 중 무엇을 먼저 할지 결정하는 것이다.
 
 ## 블로그 작성 스킬 목표
 
