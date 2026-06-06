@@ -100,7 +100,9 @@
       }
 
       button,
-      select {
+      input,
+      select,
+      textarea {
         font: inherit;
       }
 
@@ -677,6 +679,246 @@
         font-size: 10.5px;
         letter-spacing: 0.6px;
         text-transform: uppercase;
+      }
+
+      .mutation-section {
+        border-top: 1px solid var(--divider);
+        padding: 16px 0 0;
+        margin-top: 16px;
+      }
+
+      .mutation-section:first-child {
+        border-top: 0;
+        margin-top: 0;
+        padding-top: 0;
+      }
+
+      .mutation-section h2 {
+        margin-bottom: 8px;
+      }
+
+      .mutation-fields {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .mutation-fields label,
+      .mutation-label {
+        display: grid;
+        gap: 5px;
+        color: var(--text-sec);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .mutation-fields input[type="text"],
+      .mutation-fields input[type="url"],
+      .mutation-fields select,
+      .mutation-fields textarea,
+      .confirmation-input {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        font-size: 12.5px;
+        padding: 7px 9px;
+      }
+
+      .mutation-fields textarea {
+        min-height: 78px;
+        resize: vertical;
+      }
+
+      .readonly-grid {
+        display: grid;
+        grid-template-columns: 70px minmax(0, 1fr);
+        gap: 6px 10px;
+        margin: 10px 0 12px;
+        color: var(--text-tertiary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .readonly-grid strong {
+        min-width: 0;
+        color: var(--text-sec);
+        font-weight: 500;
+        overflow-wrap: anywhere;
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .button {
+        min-height: 30px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 10px;
+      }
+
+      .button.primary {
+        border-color: transparent;
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      .muted {
+        margin: 7px 0 0;
+        color: var(--text-sec);
+        font-size: 11.5px;
+        line-height: 1.45;
+      }
+
+      .summary-count {
+        border-radius: 7px;
+        padding: 7px 9px;
+        background: var(--quiet-bg);
+        color: var(--quiet);
+        font-size: 11.5px;
+        line-height: 1.45;
+      }
+
+      .summary-count.good {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+
+      .summary-count.warning {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+
+      .summary-count.error {
+        background: var(--error-bg);
+        color: var(--error);
+      }
+
+      .tag-picker {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .tag-option,
+      .mutation-check {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 6px;
+        color: var(--text-sec);
+        font-size: 11.5px;
+        line-height: 1.3;
+      }
+
+      .tag-option {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        padding: 5px 7px;
+      }
+
+      .mutation-check input,
+      .tag-option input {
+        width: auto;
+        margin: 0;
+      }
+
+      .mutation-preview {
+        margin-top: 12px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .mutation-message {
+        padding: 8px 9px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text-sec);
+        font-size: 11.5px;
+        line-height: 1.45;
+      }
+
+      .mutation-message.good {
+        border-color: var(--ok-bg);
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+
+      .mutation-message.warning {
+        border-color: var(--warn-bg);
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+
+      .mutation-message.error {
+        border-color: var(--error-bg);
+        background: var(--error-bg);
+        color: var(--error);
+      }
+
+      .mutation-list,
+      .readiness-list {
+        display: grid;
+        gap: 6px;
+        margin: 7px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .mutation-list li,
+      .readiness-list li {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .mutation-list code {
+        color: inherit;
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .readiness-list li {
+        display: grid;
+        gap: 2px;
+        border-left: 2px solid var(--border-strong);
+        padding-left: 8px;
+      }
+
+      .readiness-list li.passed {
+        border-left-color: var(--ok);
+      }
+
+      .readiness-list li.blocked {
+        border-left-color: var(--error);
+      }
+
+      .folder-management details {
+        border-top: 1px solid var(--divider);
+        padding-top: 12px;
+        margin-top: 12px;
+      }
+
+      .folder-management summary {
+        cursor: pointer;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 650;
       }
 
       .meta-row {
@@ -1263,6 +1505,29 @@
         runnerRunId: 0,
         runnerPreflightError: null,
         runnerRunError: null,
+        safeEdit: null,
+        safeEditDraft: null,
+        safeEditPreview: null,
+        safeEditError: "",
+        safeEditApplying: false,
+        folderCreateDraft: {
+          slug: "",
+          name: "",
+          projectRoot: "",
+          description: "",
+          stack: "",
+          status: "active",
+          featured: false,
+          repositoryUrl: "",
+          demoUrl: "",
+        },
+        folderCreatePreview: null,
+        folderCreateError: "",
+        folderDeletePreview: null,
+        folderDeleteError: "",
+        deleteConfirmation: "",
+        removeSourceSetupFolder: false,
+        mutationApplying: false,
         theme: localStorage.getItem("blogOpsTheme") || "light",
       };
 
@@ -1350,6 +1615,59 @@
           .replaceAll(">", "&gt;")
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#39;");
+      }
+
+      function escapeAttribute(value) {
+        return escapeHtml(value).replaceAll('"', "&quot;");
+      }
+
+      function summaryLengthStatus(summary) {
+        const count = String(summary || "").length;
+        if (count === 0) {
+          return {
+            status: "error",
+            label: "0 / 160 recommended",
+            message: "summary는 비어 있을 수 없습니다.",
+          };
+        }
+        if (count < 80) {
+          return {
+            status: "warning",
+            label: count + " / 160 recommended",
+            message: "조금 짧습니다. 문제, 결정, 결과가 드러나도록 80자 이상을 권장합니다.",
+          };
+        }
+        if (count <= 160) {
+          return {
+            status: "good",
+            label: count + " / 160 recommended",
+            message: "권장 길이 안에 있습니다.",
+          };
+        }
+        if (count <= 220) {
+          return {
+            status: "warning",
+            label: count + " / 160 recommended",
+            message: "조금 깁니다. 목록과 공유 카드에서 잘릴 수 있습니다.",
+          };
+        }
+        return {
+          status: "error",
+          label: count + " / 220 max",
+          message: "summary가 너무 깁니다. 220자 이하로 줄이세요.",
+        };
+      }
+
+      function renderTagOptions(allowedTags, selectedTags) {
+        const selected = new Set(selectedTags || []);
+        const tags = allowedTags || [];
+        if (!tags.length) return "<p class=\"muted\">허용된 tag 정책을 불러오지 못했습니다.</p>";
+        return tags
+          .map((tag) => {
+            const checked = selected.has(tag) ? " checked" : "";
+            return "<label class=\"tag-option\"><input type=\"checkbox\" data-safe-edit-tag=\"" + escapeAttribute(tag) + "\"" + checked + "> " + escapeHtml(tag) + "</label>";
+          })
+          .join("");
       }
 
       function cssTone(tone) {
@@ -1646,10 +1964,296 @@
         return "<div class=\"meta-row\"><dt>" + escapeHtml(label) + "</dt><dd>" + value + "</dd></div>";
       }
 
+      function postSlug(post) {
+        if (post?.slug) return post.slug;
+        const id = String(post?.id || "");
+        const slashIndex = id.lastIndexOf("/");
+        return slashIndex >= 0 ? id.slice(slashIndex + 1) : id;
+      }
+
+      function editableDraft(editable = {}) {
+        return {
+          title: editable.title ?? "",
+          summary: editable.summary ?? "",
+          type: editable.type ?? "",
+          tags: Array.isArray(editable.tags) ? [...editable.tags] : [],
+          draft: editable.draft,
+          featured: editable.featured,
+        };
+      }
+
+      function valuesEqual(left, right) {
+        return JSON.stringify(left) === JSON.stringify(right);
+      }
+
+      function safeEditChanges() {
+        const current = state.safeEdit?.editable || {};
+        const draft = state.safeEditDraft || {};
+        const changes = {};
+        for (const field of ["title", "summary", "type", "tags", "draft", "featured"]) {
+          if (!valuesEqual(current[field], draft[field])) changes[field] = draft[field];
+        }
+        return changes;
+      }
+
+      function folderCreateInput() {
+        const draft = state.folderCreateDraft;
+        return {
+          slug: draft.slug,
+          name: draft.name,
+          projectRoot: draft.projectRoot,
+          description: draft.description,
+          stack: String(draft.stack || "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean),
+          status: draft.status || "active",
+          featured: draft.featured === true,
+          repositoryUrl: draft.repositoryUrl,
+          demoUrl: draft.demoUrl,
+        };
+      }
+
+      function formatMutationValue(value) {
+        if (value === undefined) return "unset";
+        if (typeof value === "string") return value || "empty";
+        return JSON.stringify(value);
+      }
+
+      function mutationIssueLine(issue) {
+        const code = issue?.code ? "<code>" + escapeHtml(issue.code) + "</code> " : "";
+        const field = issue?.field ? "<code>" + escapeHtml(issue.field) + "</code> " : "";
+        const message = escapeHtml(issue?.message || issue?.detail || issue || "Unknown issue.");
+        const nextAction = issue?.nextAction ? "<br><span>nextAction: " + escapeHtml(issue.nextAction) + "</span>" : "";
+        const suggestions = issue?.suggestions?.length
+          ? "<br><span>suggestions: " + issue.suggestions.map((suggestion) => escapeHtml(suggestion.suggestion || suggestion.tag || suggestion)).join(", ") + "</span>"
+          : "";
+        return "<li>" + code + field + message + nextAction + suggestions + "</li>";
+      }
+
+      function renderMutationIssues(title, issues, tone = "error") {
+        if (!issues?.length) return "";
+        return "<div class=\"mutation-message " + tone + "\"><strong>" + escapeHtml(title) + "</strong><ul class=\"mutation-list\">" + issues.map(mutationIssueLine).join("") + "</ul></div>";
+      }
+
+      function renderOperations(operations = []) {
+        if (!operations.length) return "";
+        return "<div class=\"mutation-message\"><strong>Planned file changes</strong><ul class=\"mutation-list\">" +
+          operations
+            .map((operation) => {
+              const type = operation.type || operation.operation || "change";
+              const path = operation.path || operation.target || "-";
+              return "<li><code>" + escapeHtml(type) + "</code> " + escapeHtml(path) + "</li>";
+            })
+            .join("") +
+          "</ul></div>";
+      }
+
+      function renderFilePreviews(files = []) {
+        if (!files.length) return "";
+        return "<div class=\"mutation-message\"><strong>Preview files</strong><ul class=\"mutation-list\">" +
+          files
+            .map((file) => {
+              const changed = file.changed === false ? "unchanged" : file.operation || "modify";
+              const hash = file.beforeHash && file.afterHash ? " · " + file.beforeHash + " → " + file.afterHash : "";
+              return "<li><code>" + escapeHtml(changed) + "</code> " + escapeHtml(file.path || file.absolutePath || "-") + escapeHtml(hash) + "</li>";
+            })
+            .join("") +
+          "</ul></div>";
+      }
+
+      function renderChangedFields(fields = []) {
+        if (!fields.length) {
+          return "<div class=\"mutation-message warning\">변경된 frontmatter field가 없습니다.</div>";
+        }
+        return "<div class=\"mutation-message\"><strong>Changed fields</strong><ul class=\"mutation-list\">" +
+          fields
+            .map((field) => {
+              return "<li><code>" + escapeHtml(field.field) + "</code> " + escapeHtml(formatMutationValue(field.before)) + " → " + escapeHtml(formatMutationValue(field.after)) + "</li>";
+            })
+            .join("") +
+          "</ul></div>";
+      }
+
+      function renderSafeEditPreview() {
+        const error = state.safeEditError ? "<div class=\"mutation-message error\">" + escapeHtml(state.safeEditError) + "</div>" : "";
+        const preview = state.safeEditPreview;
+        if (!preview) return error;
+        const status = preview.canApply
+          ? "<div class=\"mutation-message good\">Preview ready. Apply changes is enabled for this source hash.</div>"
+          : "<div class=\"mutation-message error\">Preview blocked. Resolve errors before applying.</div>";
+        const nextAction = preview.nextAction ? "<div class=\"mutation-message\"><strong>nextAction</strong><br>" + escapeHtml(preview.nextAction) + "</div>" : "";
+        return "<div class=\"mutation-preview\" data-safe-edit-preview-output>" +
+          error +
+          status +
+          renderMutationIssues("Errors", preview.errors, "error") +
+          renderMutationIssues("Warnings", preview.warnings, "warning") +
+          renderChangedFields(preview.changedFields || []) +
+          renderFilePreviews(preview.files || []) +
+          nextAction +
+        "</div>";
+      }
+
+      function renderSafeEditPanel(post) {
+        const slug = postSlug(post);
+        const loaded = state.safeEdit && state.safeEdit.project === post.project && state.safeEdit.slug === slug;
+        const error = state.safeEditError ? "<div class=\"mutation-message error\">" + escapeHtml(state.safeEditError) + "</div>" : "";
+
+        if (!post?.sourcePath) {
+          return "<section class=\"mutation-section safe-edit-panel\"><h2>Safe Edit</h2><p class=\"muted\">source post가 있는 글만 수정 가능.</p>" + error + "</section>";
+        }
+
+        if (!loaded) {
+          return "<section class=\"mutation-section safe-edit-panel\"><h2>Safe Edit</h2>" +
+            "<button class=\"button\" data-safe-edit-open type=\"button\">Edit frontmatter</button>" +
+            "<p class=\"muted\">발행본은 직접 수정하지 않습니다. source post만 preview 후 apply합니다.</p>" +
+            error +
+          "</section>";
+        }
+
+        const draft = state.safeEditDraft || editableDraft(state.safeEdit.editable);
+        const summaryState = summaryLengthStatus(draft.summary);
+        const allowedTypes = state.safeEdit.allowedTypes?.length ? state.safeEdit.allowedTypes : [draft.type].filter(Boolean);
+        const typeOptions = allowedTypes
+          .map((type) => "<option value=\"" + escapeAttribute(type) + "\"" + (draft.type === type ? " selected" : "") + ">" + escapeHtml(type) + "</option>")
+          .join("");
+        const canApply = Boolean(state.safeEditPreview?.canApply) && !state.safeEditApplying && !state.mutationApplying;
+
+        return "<section class=\"mutation-section safe-edit-panel\">" +
+          "<h2>Safe Edit</h2>" +
+          "<div class=\"readonly-grid\">" +
+            "<span>Folder</span><strong>" + escapeHtml(state.safeEdit.project) + "</strong>" +
+            "<span>Slug</span><strong>" + escapeHtml(state.safeEdit.slug) + "</strong>" +
+            "<span>Source</span><strong>" + escapeHtml(state.safeEdit.sourcePath || post.sourcePath) + "</strong>" +
+          "</div>" +
+          "<div class=\"mutation-fields\">" +
+            "<label>Title<input type=\"text\" data-safe-edit-field=\"title\" value=\"" + escapeAttribute(draft.title || "") + "\"></label>" +
+            "<label>Summary<input type=\"text\" data-safe-edit-field=\"summary\" value=\"" + escapeAttribute(draft.summary || "") + "\"></label>" +
+            "<div class=\"summary-count " + summaryState.status + "\" data-summary-count><strong>summaryCount</strong> " + escapeHtml(summaryState.label) + " · " + escapeHtml(summaryState.message) + "</div>" +
+            "<label>Type<select data-safe-edit-field=\"type\">" + typeOptions + "</select></label>" +
+            "<div class=\"mutation-label\"><span>Tags</span><div class=\"tag-picker\">" + renderTagOptions(state.safeEdit.allowedTags, draft.tags) + "</div></div>" +
+            "<p class=\"muted\">Tag policy update required: 새 tag가 필요하면 tag 정책을 먼저 갱신하세요.</p>" +
+            "<label class=\"mutation-check\"><input type=\"checkbox\" data-safe-edit-field=\"draft\"" + (draft.draft === true ? " checked" : "") + "> Draft</label>" +
+            "<label class=\"mutation-check\"><input type=\"checkbox\" data-safe-edit-field=\"featured\"" + (draft.featured === true ? " checked" : "") + "> Featured</label>" +
+          "</div>" +
+          "<div class=\"button-row\">" +
+            "<button class=\"button\" data-safe-edit-preview type=\"button\"" + (state.safeEditApplying ? " disabled" : "") + ">Preview changes</button>" +
+            "<button class=\"button primary\" data-safe-edit-apply type=\"button\"" + (canApply ? "" : " disabled") + ">" + (state.safeEditApplying ? "Applying..." : "Apply changes") + "</button>" +
+          "</div>" +
+          renderSafeEditPreview() +
+        "</section>";
+      }
+
+      function renderFolderCreatePreview() {
+        const error = state.folderCreateError ? "<div class=\"mutation-message error\">" + escapeHtml(state.folderCreateError) + "</div>" : "";
+        const preview = state.folderCreatePreview;
+        if (!preview) return error;
+        const status = preview.canApply
+          ? "<div class=\"mutation-message good\">Folder preview ready. Metadata hash captured for apply.</div>"
+          : "<div class=\"mutation-message error\">Folder changes are blocked. Resolve blockers before applying.</div>";
+        return "<div class=\"mutation-preview\" data-folder-create-preview-output>" +
+          error +
+          status +
+          renderMutationIssues("Folder changes are blocked", preview.blockers, "error") +
+          renderOperations(preview.operations || []) +
+          renderFilePreviews(preview.filePreviews || []) +
+        "</div>";
+      }
+
+      function renderDeleteReadiness(readiness = []) {
+        if (!readiness.length) {
+          return "<div class=\"mutation-message\"><strong>Delete readiness</strong><p class=\"muted\">Preview delete를 실행하면 delete readiness checklist가 표시됩니다.</p></div>";
+        }
+        return "<div class=\"mutation-message\"><strong>Delete readiness</strong><ul class=\"readiness-list\">" +
+          readiness
+            .map((item) => {
+              const status = item.status || "blocked";
+              return "<li class=\"" + escapeAttribute(status) + "\"><span><code>" + escapeHtml(status) + "</code> " + escapeHtml(item.label || item.code || "readiness") + "</span><span>" + escapeHtml(item.detail || "") + "</span><span>nextAction: " + escapeHtml(item.nextAction || "-") + "</span></li>";
+            })
+            .join("") +
+          "</ul></div>";
+      }
+
+      function renderFolderDeletePreview() {
+        const error = state.folderDeleteError ? "<div class=\"mutation-message error\">" + escapeHtml(state.folderDeleteError) + "</div>" : "";
+        const preview = state.folderDeletePreview;
+        if (!preview) return error + renderDeleteReadiness([]);
+        const status = preview.canApply
+          ? "<div class=\"mutation-message good\">Delete preview ready. Confirmation is still required before apply.</div>"
+          : "<div class=\"mutation-message error\">Folder changes are blocked. Resolve delete blockers before applying.</div>";
+        return "<div class=\"mutation-preview\" data-folder-delete-preview-output>" +
+          error +
+          status +
+          renderDeleteReadiness(preview.readiness || []) +
+          renderMutationIssues("Folder changes are blocked", preview.blockers, "error") +
+          renderOperations(preview.operations || []) +
+          renderFilePreviews(preview.filePreviews || []) +
+        "</div>";
+      }
+
+      function renderFolderDeletePanel() {
+        if (state.activeProject === "all") {
+          return "<p class=\"muted\">All Folders에서는 삭제할 수 없습니다. 단일 Folder를 선택하세요.</p>" +
+            "<div class=\"button-row\">" +
+              "<button class=\"button\" data-folder-delete-preview type=\"button\" disabled>Preview delete</button>" +
+              "<button class=\"button primary\" data-folder-delete-apply type=\"button\" disabled>Apply delete</button>" +
+            "</div>";
+        }
+
+        const requiredConfirmation = "delete " + state.activeProject;
+        const canApply = Boolean(state.folderDeletePreview?.canApply) && state.deleteConfirmation === requiredConfirmation && !state.mutationApplying;
+        return "<p class=\"muted\">Current Folder: <code>" + escapeHtml(state.activeProject) + "</code></p>" +
+          "<label class=\"mutation-check\"><input type=\"checkbox\" data-folder-delete-remove-setup" + (state.removeSourceSetupFolder ? " checked" : "") + "> Remove empty source setup folder</label>" +
+          renderFolderDeletePreview() +
+          "<label class=\"mutation-label\" style=\"margin-top: 10px\">Confirmation<input class=\"confirmation-input\" type=\"text\" data-folder-delete-confirmation value=\"" + escapeAttribute(state.deleteConfirmation) + "\" placeholder=\"" + escapeAttribute(requiredConfirmation) + "\"></label>" +
+          "<p class=\"muted\">deleteConfirmation must exactly match <code>" + escapeHtml(requiredConfirmation) + "</code>.</p>" +
+          "<div class=\"button-row\">" +
+            "<button class=\"button\" data-folder-delete-preview type=\"button\"" + (state.mutationApplying ? " disabled" : "") + ">Preview delete</button>" +
+            "<button class=\"button primary\" data-folder-delete-apply type=\"button\"" + (canApply ? "" : " disabled") + ">" + (state.mutationApplying ? "Applying..." : "Apply delete") + "</button>" +
+          "</div>";
+      }
+
+      function renderFolderManagementPanel() {
+        const draft = state.folderCreateDraft;
+        const canCreateApply = Boolean(state.folderCreatePreview?.canApply) && !state.mutationApplying;
+        return "<section class=\"mutation-section folder-management\">" +
+          "<h2>Folder Management</h2>" +
+          "<p class=\"muted\">Folder changes are blocked when metadata or readiness checks report blockers.</p>" +
+          "<details>" +
+            "<summary>New Folder</summary>" +
+            "<div class=\"mutation-fields\">" +
+              "<label>Slug<input type=\"text\" data-folder-create-field=\"slug\" value=\"" + escapeAttribute(draft.slug) + "\"></label>" +
+              "<label>Name<input type=\"text\" data-folder-create-field=\"name\" value=\"" + escapeAttribute(draft.name) + "\"></label>" +
+              "<label>Project root<input type=\"text\" data-folder-create-field=\"projectRoot\" value=\"" + escapeAttribute(draft.projectRoot) + "\"></label>" +
+              "<label>Description<input type=\"text\" data-folder-create-field=\"description\" value=\"" + escapeAttribute(draft.description) + "\"></label>" +
+              "<label>Stack<input type=\"text\" data-folder-create-field=\"stack\" value=\"" + escapeAttribute(draft.stack) + "\" placeholder=\"Astro, TypeScript\"></label>" +
+              "<label>Status<select data-folder-create-field=\"status\">" +
+                "<option value=\"active\"" + (draft.status === "active" ? " selected" : "") + ">active</option>" +
+                "<option value=\"archived\"" + (draft.status === "archived" ? " selected" : "") + ">archived</option>" +
+              "</select></label>" +
+              "<label class=\"mutation-check\"><input type=\"checkbox\" data-folder-create-field=\"featured\"" + (draft.featured ? " checked" : "") + "> Featured</label>" +
+              "<label>Repository URL<input type=\"url\" data-folder-create-field=\"repositoryUrl\" value=\"" + escapeAttribute(draft.repositoryUrl) + "\"></label>" +
+              "<label>Demo URL<input type=\"url\" data-folder-create-field=\"demoUrl\" value=\"" + escapeAttribute(draft.demoUrl) + "\"></label>" +
+            "</div>" +
+            "<div class=\"button-row\">" +
+              "<button class=\"button\" data-folder-create-preview type=\"button\"" + (state.mutationApplying ? " disabled" : "") + ">Preview Folder</button>" +
+              "<button class=\"button primary\" data-folder-create-apply type=\"button\"" + (canCreateApply ? "" : " disabled") + ">Apply Folder</button>" +
+            "</div>" +
+            renderFolderCreatePreview() +
+          "</details>" +
+          "<details>" +
+            "<summary>Delete Empty Folder</summary>" +
+            renderFolderDeletePanel() +
+          "</details>" +
+        "</section>";
+      }
+
       function renderInspector() {
         const post = selectedPost();
         if (!post) {
-          document.querySelector("#inspector").innerHTML = "<div class=\"inspector-body\">선택한 글이 없습니다.</div>";
+          document.querySelector("#inspector").innerHTML =
+            "<div class=\"inspector-head\"><div class=\"inspector-title-row\"><span class=\"eyebrow\">Folder tools</span></div><h2>Blog Ops</h2></div>" +
+            "<div class=\"inspector-body\"><p class=\"muted\">선택한 글이 없습니다.</p>" + renderFolderManagementPanel() + "</div>";
           return;
         }
         const warnings = warningCodes(post);
@@ -1683,6 +2287,8 @@
             "<div class=\"divider\"></div>" +
             "<p class=\"section-title\">Command suggestions</p>" +
             "<div class=\"command-list\">" + (commands.length ? commands.map((command) => renderCommand(command, post)).join("") : "<span class=\"mono-cell\">조치 불필요 — 준비 완료</span>") + "</div>" +
+            renderSafeEditPanel(post) +
+            renderFolderManagementPanel() +
           "</div>";
       }
 
@@ -1957,12 +2563,365 @@
         }
       }
 
+      async function readJsonResponse(response) {
+        try {
+          return await response.json();
+        } catch {
+          return {};
+        }
+      }
+
+      function mutationErrorMessage(json, fallback) {
+        return json?.message || json?.error || fallback;
+      }
+
+      async function postJson(url, body) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        return { response, json: await readJsonResponse(response) };
+      }
+
+      function updateSafeEditApplyButton() {
+        const button = document.querySelector("[data-safe-edit-apply]");
+        if (button) button.disabled = !(state.safeEditPreview?.canApply && !state.safeEditApplying && !state.mutationApplying);
+      }
+
+      function updateFolderCreateApplyButton() {
+        const button = document.querySelector("[data-folder-create-apply]");
+        if (button) button.disabled = !(state.folderCreatePreview?.canApply && !state.mutationApplying);
+      }
+
+      function updateFolderDeleteApplyButton() {
+        const button = document.querySelector("[data-folder-delete-apply]");
+        const requiredConfirmation = "delete " + state.activeProject;
+        if (button) {
+          button.disabled = !(
+            state.activeProject !== "all" &&
+            state.folderDeletePreview?.canApply &&
+            state.deleteConfirmation === requiredConfirmation &&
+            !state.mutationApplying
+          );
+        }
+      }
+
+      function updateSummaryCountElement() {
+        const element = document.querySelector("[data-summary-count]");
+        if (!element || !state.safeEditDraft) return;
+        const status = summaryLengthStatus(state.safeEditDraft.summary);
+        element.className = "summary-count " + status.status;
+        element.innerHTML = "<strong>summaryCount</strong> " + escapeHtml(status.label) + " · " + escapeHtml(status.message);
+      }
+
+      function markSafeEditDirty() {
+        state.safeEditPreview = null;
+        updateSafeEditApplyButton();
+      }
+
+      function markFolderCreateDirty() {
+        state.folderCreatePreview = null;
+        updateFolderCreateApplyButton();
+      }
+
+      function markFolderDeleteDirty() {
+        state.folderDeletePreview = null;
+        updateFolderDeleteApplyButton();
+      }
+
+      async function openSafeEdit() {
+        const post = selectedPost();
+        const slug = postSlug(post);
+        if (!post?.sourcePath || !post.project || !slug) return;
+        state.safeEditError = "";
+        state.safeEditPreview = null;
+        render();
+        try {
+          const response = await fetch(
+            "/api/safe-edit/post?project=" + encodeURIComponent(post.project) + "&slug=" + encodeURIComponent(slug),
+          );
+          const json = await readJsonResponse(response);
+          if (!response.ok) {
+            state.safeEditError = mutationErrorMessage(json, "Safe Edit read failed.");
+            render();
+            return;
+          }
+          state.safeEdit = json;
+          state.safeEditDraft = editableDraft(json.editable);
+          state.safeEditPreview = null;
+          state.safeEditError = "";
+        } catch (error) {
+          state.safeEditError = error.message;
+        }
+        render();
+      }
+
+      async function previewSafeEdit() {
+        if (!state.safeEdit || state.safeEditApplying) return;
+        state.safeEditError = "";
+        render();
+        try {
+          const { response, json } = await postJson("/api/safe-edit/post/preview", {
+            project: state.safeEdit.project,
+            slug: state.safeEdit.slug,
+            sourceHash: state.safeEdit.sourceHash,
+            changes: safeEditChanges(),
+          });
+          if (!response.ok) {
+            state.safeEditPreview = null;
+            state.safeEditError = mutationErrorMessage(json, "Safe Edit preview failed.");
+            render();
+            return;
+          }
+          state.safeEditPreview = json;
+          state.safeEditError = "";
+        } catch (error) {
+          state.safeEditPreview = null;
+          state.safeEditError = error.message;
+        }
+        render();
+      }
+
+      async function applySafeEdit() {
+        if (!state.safeEdit || !state.safeEditPreview?.canApply || state.safeEditApplying) return;
+        state.safeEditApplying = true;
+        state.mutationApplying = true;
+        state.safeEditError = "";
+        render();
+        try {
+          const { response, json } = await postJson("/api/safe-edit/post/apply", {
+            project: state.safeEdit.project,
+            slug: state.safeEdit.slug,
+            sourceHash: state.safeEdit.sourceHash,
+            changes: safeEditChanges(),
+          });
+          if (!response.ok) {
+            state.safeEditError = mutationErrorMessage(json, "Safe Edit apply failed.");
+            render();
+            return;
+          }
+          state.safeEdit = null;
+          state.safeEditDraft = null;
+          state.safeEditPreview = null;
+          await loadInventory();
+        } catch (error) {
+          state.safeEditError = error.message;
+        } finally {
+          state.safeEditApplying = false;
+          state.mutationApplying = false;
+          render();
+        }
+      }
+
+      async function previewFolderCreate() {
+        state.folderCreateError = "";
+        render();
+        try {
+          const { response, json } = await postJson("/api/folders/create/preview", folderCreateInput());
+          if (!response.ok) {
+            state.folderCreatePreview = null;
+            state.folderCreateError = mutationErrorMessage(json, "Folder create preview failed.");
+            render();
+            return;
+          }
+          state.folderCreatePreview = json;
+          state.folderCreateError = "";
+        } catch (error) {
+          state.folderCreatePreview = null;
+          state.folderCreateError = error.message;
+        }
+        render();
+      }
+
+      async function applyFolderCreate() {
+        if (!state.folderCreatePreview?.canApply || state.mutationApplying) return;
+        const metadataHash = state.folderCreatePreview.metadataHash;
+        if (!metadataHash) {
+          state.folderCreateError = "Folder create preview is missing metadataHash.";
+          render();
+          return;
+        }
+        state.mutationApplying = true;
+        state.folderCreateError = "";
+        render();
+        try {
+          const input = folderCreateInput();
+          const { response, json } = await postJson("/api/folders/create/apply", {
+            ...input,
+            metadataHash,
+          });
+          if (!response.ok) {
+            state.folderCreateError = mutationErrorMessage(json, "Folder create apply failed.");
+            render();
+            return;
+          }
+          const nextProject = json.project || input.slug;
+          state.activeProject = nextProject;
+          state.activeFilter = "all";
+          state.selectedId = null;
+          state.folderCreateDraft = {
+            slug: "",
+            name: "",
+            projectRoot: "",
+            description: "",
+            stack: "",
+            status: "active",
+            featured: false,
+            repositoryUrl: "",
+            demoUrl: "",
+          };
+          state.folderCreatePreview = null;
+          await loadInventory();
+        } catch (error) {
+          state.folderCreateError = error.message;
+        } finally {
+          state.mutationApplying = false;
+          render();
+        }
+      }
+
+      async function previewFolderDelete() {
+        if (state.activeProject === "all") {
+          state.folderDeleteError = "All Folders에서는 삭제할 수 없습니다. 단일 Folder를 선택하세요.";
+          render();
+          return;
+        }
+        state.folderDeleteError = "";
+        render();
+        try {
+          const { response, json } = await postJson("/api/folders/delete/preview", {
+            project: state.activeProject,
+            removeSourceSetupFolder: state.removeSourceSetupFolder,
+          });
+          if (!response.ok) {
+            state.folderDeletePreview = null;
+            state.folderDeleteError = mutationErrorMessage(json, "Folder delete preview failed.");
+            render();
+            return;
+          }
+          state.folderDeletePreview = json;
+          state.folderDeleteError = "";
+        } catch (error) {
+          state.folderDeletePreview = null;
+          state.folderDeleteError = error.message;
+        }
+        render();
+      }
+
+      async function applyFolderDelete() {
+        if (state.activeProject === "all" || !state.folderDeletePreview?.canApply || state.mutationApplying) return;
+        const metadataHash = state.folderDeletePreview.metadataHash;
+        if (!metadataHash) {
+          state.folderDeleteError = "Folder delete preview is missing metadataHash.";
+          render();
+          return;
+        }
+        state.mutationApplying = true;
+        state.folderDeleteError = "";
+        render();
+        try {
+          const { response, json } = await postJson("/api/folders/delete/apply", {
+            project: state.activeProject,
+            removeSourceSetupFolder: state.removeSourceSetupFolder,
+            confirmation: state.deleteConfirmation,
+            metadataHash,
+          });
+          if (!response.ok) {
+            state.folderDeleteError = mutationErrorMessage(json, "Folder delete apply failed.");
+            render();
+            return;
+          }
+          state.activeProject = "all";
+          state.activeFilter = "all";
+          state.selectedId = null;
+          state.folderDeletePreview = null;
+          state.deleteConfirmation = "";
+          state.removeSourceSetupFolder = false;
+          await loadInventory();
+        } catch (error) {
+          state.folderDeleteError = error.message;
+        } finally {
+          state.mutationApplying = false;
+          render();
+        }
+      }
+
+      function updateSafeEditField(element) {
+        if (!state.safeEditDraft) return;
+        const field = element.dataset.safeEditField;
+        const value = element.type === "checkbox" ? element.checked : element.value;
+        state.safeEditDraft = { ...state.safeEditDraft, [field]: value };
+        markSafeEditDirty();
+        if (field === "summary") updateSummaryCountElement();
+      }
+
+      function updateSafeEditTag(element) {
+        if (!state.safeEditDraft) return;
+        const tag = element.dataset.safeEditTag;
+        const tags = new Set(state.safeEditDraft.tags || []);
+        if (element.checked) tags.add(tag);
+        else tags.delete(tag);
+        state.safeEditDraft = { ...state.safeEditDraft, tags: [...tags] };
+        markSafeEditDirty();
+      }
+
+      function updateFolderCreateField(element) {
+        const field = element.dataset.folderCreateField;
+        const value = element.type === "checkbox" ? element.checked : element.value;
+        state.folderCreateDraft = { ...state.folderCreateDraft, [field]: value };
+        markFolderCreateDirty();
+      }
+
+      function handleMutationFieldEvent(event, { rerender = false } = {}) {
+        const target = event.target;
+        if (!target?.matches) return;
+
+        if (target.matches("[data-safe-edit-field]")) {
+          updateSafeEditField(target);
+          if (rerender) render();
+          return;
+        }
+
+        if (target.matches("[data-safe-edit-tag]")) {
+          updateSafeEditTag(target);
+          if (rerender) render();
+          return;
+        }
+
+        if (target.matches("[data-folder-create-field]")) {
+          updateFolderCreateField(target);
+          if (rerender) render();
+          return;
+        }
+
+        if (target.matches("[data-folder-delete-remove-setup]")) {
+          state.removeSourceSetupFolder = target.checked;
+          markFolderDeleteDirty();
+          if (rerender) render();
+          return;
+        }
+
+        if (target.matches("[data-folder-delete-confirmation]")) {
+          state.deleteConfirmation = target.value;
+          updateFolderDeleteApplyButton();
+          if (rerender) render();
+        }
+      }
+
       document.addEventListener("click", (event) => {
         const projectButton = event.target.closest("[data-project]");
         if (projectButton) {
           state.activeProject = projectButton.dataset.project;
           state.activeFilter = "all";
           state.selectedId = null;
+          state.safeEdit = null;
+          state.safeEditDraft = null;
+          state.safeEditPreview = null;
+          state.safeEditError = "";
+          state.folderDeletePreview = null;
+          state.folderDeleteError = "";
+          state.deleteConfirmation = "";
           state.runnerPreflight = null;
           state.runnerResult = null;
           state.runnerPreflightError = null;
@@ -2004,6 +2963,10 @@
         const postButton = event.target.closest("[data-post]");
         if (postButton) {
           state.selectedId = postButton.dataset.post;
+          state.safeEdit = null;
+          state.safeEditDraft = null;
+          state.safeEditPreview = null;
+          state.safeEditError = "";
           render();
           return;
         }
@@ -2014,11 +2977,49 @@
           return;
         }
 
+        if (event.target.closest("[data-safe-edit-open]")) {
+          openSafeEdit();
+          return;
+        }
+
+        if (event.target.closest("[data-safe-edit-preview]")) {
+          previewSafeEdit();
+          return;
+        }
+
+        if (event.target.closest("[data-safe-edit-apply]")) {
+          applySafeEdit();
+          return;
+        }
+
+        if (event.target.closest("[data-folder-create-preview]")) {
+          previewFolderCreate();
+          return;
+        }
+
+        if (event.target.closest("[data-folder-create-apply]")) {
+          applyFolderCreate();
+          return;
+        }
+
+        if (event.target.closest("[data-folder-delete-preview]")) {
+          previewFolderDelete();
+          return;
+        }
+
+        if (event.target.closest("[data-folder-delete-apply]")) {
+          applyFolderDelete();
+          return;
+        }
+
         const runnerButton = event.target.closest("[data-run-action]");
         if (runnerButton) {
           runRunnerAction(runnerButton.dataset.runAction);
         }
       });
+
+      document.addEventListener("input", (event) => handleMutationFieldEvent(event));
+      document.addEventListener("change", (event) => handleMutationFieldEvent(event, { rerender: true }));
 
       document.querySelector("#refresh").addEventListener("click", loadInventory);
       document.querySelector("#theme-toggle").addEventListener("click", () => {

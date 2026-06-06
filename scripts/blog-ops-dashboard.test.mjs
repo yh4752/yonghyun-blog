@@ -139,6 +139,33 @@ test("renderDashboardHtml does not default All Folders publish preview to first 
   assert.match(html, /All Folders에서는 실행할 수 없습니다\. 단일 Folder를 선택하세요\./);
 });
 
+test("renderDashboardHtml includes Safe Mutations UI", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /Safe Edit/);
+  assert.match(html, /Edit frontmatter/);
+  assert.match(html, /Preview changes/);
+  assert.match(html, /Apply changes/);
+  assert.match(html, /summaryCount/);
+  assert.match(html, /summaryLengthStatus/);
+  assert.match(html, /Tag policy update required/);
+  assert.match(html, /Folder Management/);
+  assert.match(html, /New Folder/);
+  assert.match(html, /Delete Empty Folder/);
+  assert.match(html, /delete readiness/i);
+  assert.match(html, /deleteConfirmation/);
+  assert.match(html, /Folder changes are blocked/);
+  assert.match(html, /\/api\/safe-edit\/post/);
+  assert.match(html, /\/api\/folders\/create\/preview/);
+  assert.match(html, /\/api\/folders\/create\/apply/);
+  assert.match(html, /\/api\/folders\/delete\/preview/);
+  assert.match(html, /\/api\/folders\/delete\/apply/);
+  assert.match(html, /data-safe-edit-open/);
+  assert.match(html, /data-folder-create-preview/);
+  assert.match(html, /data-folder-delete-preview/);
+  assert.doesNotMatch(html, /src\/content\/blog[^\n]*Apply changes/);
+});
+
 test("createDashboardServer serves inventory without private note content", async () => {
   const server = createDashboardServer({
     inventoryProvider: () => ({
