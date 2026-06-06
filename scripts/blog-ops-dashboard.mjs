@@ -138,6 +138,10 @@ async function readJsonObjectBody(request) {
   return body;
 }
 
+function awaitProvider(value) {
+  return Promise.resolve(value);
+}
+
 function sendMutationError(response, error) {
   sendJson(response, statusForMutationError(error), {
     error: error.code ?? "mutation-error",
@@ -258,7 +262,7 @@ export function createDashboardServer({
         const project = url.searchParams.get("project") ?? "";
         const slug = url.searchParams.get("slug") ?? "";
         requireFields({ project, slug }, ["project", "slug"]);
-        sendJson(response, 200, await safeEditProvider.readPost({ project, slug }));
+        sendJson(response, 200, await awaitProvider(safeEditProvider.readPost({ project, slug })));
       } catch (error) {
         sendMutationError(response, error);
       }
@@ -277,12 +281,14 @@ export function createDashboardServer({
         sendJson(
           response,
           200,
-          await safeEditProvider.previewPost({
-            project: body.project,
-            slug: body.slug,
-            sourceHash: body.sourceHash,
-            changes: body.changes ?? {},
-          }),
+          await awaitProvider(
+            safeEditProvider.previewPost({
+              project: body.project,
+              slug: body.slug,
+              sourceHash: body.sourceHash,
+              changes: body.changes ?? {},
+            }),
+          ),
         );
       } catch (error) {
         sendMutationError(response, error);
@@ -302,12 +308,14 @@ export function createDashboardServer({
         sendJson(
           response,
           200,
-          await safeEditProvider.applyPost({
-            project: body.project,
-            slug: body.slug,
-            sourceHash: body.sourceHash,
-            changes: body.changes ?? {},
-          }),
+          await awaitProvider(
+            safeEditProvider.applyPost({
+              project: body.project,
+              slug: body.slug,
+              sourceHash: body.sourceHash,
+              changes: body.changes ?? {},
+            }),
+          ),
         );
       } catch (error) {
         sendMutationError(response, error);
@@ -323,7 +331,7 @@ export function createDashboardServer({
 
       try {
         const body = await readJsonObjectBody(request);
-        sendJson(response, 200, await folderProvider.previewCreate({ input: body }));
+        sendJson(response, 200, await awaitProvider(folderProvider.previewCreate({ input: body })));
       } catch (error) {
         sendMutationError(response, error);
       }
@@ -343,10 +351,12 @@ export function createDashboardServer({
         sendJson(
           response,
           200,
-          await folderProvider.applyCreate({
-            input,
-            metadataHash,
-          }),
+          await awaitProvider(
+            folderProvider.applyCreate({
+              input,
+              metadataHash,
+            }),
+          ),
         );
       } catch (error) {
         sendMutationError(response, error);
@@ -366,10 +376,12 @@ export function createDashboardServer({
         sendJson(
           response,
           200,
-          await folderProvider.previewDelete({
-            project: body.project,
-            removeSourceSetupFolder: body.removeSourceSetupFolder,
-          }),
+          await awaitProvider(
+            folderProvider.previewDelete({
+              project: body.project,
+              removeSourceSetupFolder: body.removeSourceSetupFolder,
+            }),
+          ),
         );
       } catch (error) {
         sendMutationError(response, error);
@@ -389,12 +401,14 @@ export function createDashboardServer({
         sendJson(
           response,
           200,
-          await folderProvider.applyDelete({
-            project: body.project,
-            removeSourceSetupFolder: body.removeSourceSetupFolder,
-            confirmation: body.confirmation,
-            metadataHash: body.metadataHash,
-          }),
+          await awaitProvider(
+            folderProvider.applyDelete({
+              project: body.project,
+              removeSourceSetupFolder: body.removeSourceSetupFolder,
+              confirmation: body.confirmation,
+              metadataHash: body.metadataHash,
+            }),
+          ),
         );
       } catch (error) {
         sendMutationError(response, error);
