@@ -29,9 +29,10 @@
 - [x] `publish:posts --dry-run` command preview를 Dashboard에 연결
 - [x] Dashboard action runner v1.3 Controlled Runner 구현
 - [x] Blog Ops Dashboard v1.4 Safe Mutations 구현
+- [x] Dashboard에서 발견한 Sigak `2026-06-05-dev-log.md` frontmatter 누락 정리
+- [x] v1.4 Safe Mutations disposable Folder dogfooding 결과 기록
 - [ ] Learning Ops 운영 대상 글 1개 선정
-- [ ] 2026-06-06 dev-log에 v1.4 Safe Mutations dogfooding 결과와 후속 조치 기록
-- [ ] v1.5 우선순위 결정: 새 글 생성 UI와 missing frontmatter quick fix 중 먼저 집을 것
+- [ ] v1.5 우선순위 결정: missing frontmatter quick fix, 새 글 생성 UI, 새로 만든 빈 Folder rollback/delete UX 중 먼저 집을 것
 
 ## 이번 주 후보
 
@@ -63,9 +64,10 @@ Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 �
 - [ ] v1.2 모바일 Folder 통계가 작은 화면에서 읽기 좋은지 QA 결과를 기록한다
 - [ ] Smart View를 단일 선택으로 충분히 쓰는지, 조합형 view 요청이 반복되는지 기록한다
 - [ ] `type: note` 요구가 실제로 반복되는지 기록한다
-- [ ] 2026-06-06 dev-log에 v1.4 dogfooding 결과, 불편했던 점, 후속 조치를 남긴다
+- [x] 2026-06-06 dev-log에 v1.4 dogfooding 결과, 불편했던 점, 후속 조치를 남긴다
 - [ ] v1.5 후보로 새 글 생성 UI를 먼저 할지 판단한다
 - [ ] v1.5 후보로 missing frontmatter quick fix를 먼저 할지 판단한다
+- [ ] v1.5 후보로 새로 만든 빈 Folder rollback/delete UX를 먼저 할지 판단한다
 
 ## 오늘 집어 들 작업
 
@@ -76,8 +78,10 @@ Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 �
 - [x] 구현한다면 `publish:posts --dry-run` command preview부터 시작한다.
 - [x] v1.3 Controlled Runner로 파일을 바꾸지 않는 두 action을 Dashboard에서 실행한다.
 - [x] v1.4 Safe Mutations로 작은 safe CRUD 범위를 구현한다.
+- [x] Dashboard에서 발견한 Sigak `2026-06-05-dev-log.md` source frontmatter 누락을 정리한다.
+- [x] v1.4 Safe Mutations disposable Folder dogfooding 결과를 6/6 dev-log에 남긴다.
 - [ ] Learning Ops 대상 글 1개를 고른다.
-- [ ] 마지막에 6/6 dev-log로 v1.4 dogfooding 결과를 남긴다.
+- [ ] v1.5 후보 우선순위를 정한다.
 
 ## Dashboard action runner v1.1 확정 범위
 
@@ -123,7 +127,7 @@ Dashboard에서 직접 실행할 수 있는 action은 아래 두 개로 제한�
 
 v1.4 Safe Mutations도 구현했다. 이 단계는 draft/frontmatter 같은 작은 수정, tag 선택/검증, Folder 추가, Empty Folder 삭제를 다루며 저장 전 preview/diff를 먼저 보여준다.
 
-다음 단계는 v1.4 dogfooding 결과를 2026-06-06 dev-log에 남기고, v1.5에서 새 글 생성 UI와 missing frontmatter quick fix 중 무엇을 먼저 할지 결정하는 것이다.
+v1.4 disposable Folder dogfooding 결과, 생성 apply는 성공했지만 생성 직후 삭제는 `metadata-dirty`로 차단됐다. 다음 단계는 v1.5에서 missing frontmatter quick fix, 새 글 생성 UI, 새로 만든 빈 Folder rollback/delete UX 중 무엇을 먼저 할지 결정하는 것이다.
 
 ## 블로그 작성 스킬 목표
 
