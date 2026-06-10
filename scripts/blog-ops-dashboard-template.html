@@ -1668,6 +1668,10 @@
         },
       ];
 
+      const MISSING_FRONTMATTER_CODE = "missing-frontmatter";
+      const MISSING_FRONTMATTER_TEXT_PATTERN =
+        /missing[-\s]?frontmatter|frontmatter\s+(is\s+)?missing|no\s+frontmatter|frontmatter가 없습니다|frontmatter 없음|frontmatter를 추가/iu;
+
       function escapeHtml(value) {
         return String(value ?? "")
           .replaceAll("&", "&amp;")
@@ -1872,10 +1876,34 @@
         return visiblePosts.find((post) => post.id === state.selectedId) || visiblePosts[0] || null;
       }
 
+      function normalizePostIssueCode(item) {
+        if (typeof item === "string") return item;
+        return String(item?.code || item?.type || item?.id || "");
+      }
+
+      function normalizePostIssueText(item) {
+        if (typeof item === "string") return item;
+        return [item?.code, item?.type, item?.id, item?.message, item?.detail, item?.reason]
+          .filter(Boolean)
+          .join(" ");
+      }
+
+      function issueMentionsMissingFrontmatter(item) {
+        const code = normalizePostIssueCode(item);
+        const text = normalizePostIssueText(item);
+        if (code === MISSING_FRONTMATTER_CODE || code === "frontmatter-missing") return true;
+        if (code === "frontmatter-error" && !MISSING_FRONTMATTER_TEXT_PATTERN.test(text)) return false;
+        return MISSING_FRONTMATTER_TEXT_PATTERN.test(text);
+      }
+
+      function hasMissingFrontmatterOnlySignal(items = []) {
+        return (Array.isArray(items) ? items : []).some(issueMentionsMissingFrontmatter);
+      }
+
       function postHasMissingFrontmatter(post) {
         return Boolean(
-          post?.quickFixSuggestions?.some((item) => item.code === "missing-frontmatter") ||
-            post?.warnings?.some((item) => item.code === "frontmatter-error"),
+          hasMissingFrontmatterOnlySignal(post?.quickFixSuggestions) ||
+            hasMissingFrontmatterOnlySignal(post?.warnings),
         );
       }
 
@@ -2101,6 +2129,11 @@
         );
       }
 
+      function selectedPostMatchesFrontmatterSkeletonRequest(project, slug) {
+        const post = selectedPost();
+        return Boolean(post && post.project === project && postSlug(post) === slug);
+      }
+
       function safeEditChanges() {
         const current = state.safeEdit?.editable || {};
         const draft = state.safeEditDraft || {};
@@ -2272,15 +2305,26 @@
           "</ul>";
       }
 
+      function skeletonTagBaseOptions(candidate) {
+        const suggestions = Array.isArray(candidate?.tagSuggestions) ? candidate.tagSuggestions : [];
+        if (suggestions.length) return suggestions;
+        return Array.isArray(candidate?.allowedTags) ? candidate.allowedTags : [];
+      }
+
       function renderSkeletonTagOptions(tags = [], selectedTags = []) {
-        const selected = new Set(selectedTags || []);
-        const options = [...new Set([...(Array.isArray(tags) ? tags : []), ...selected])];
+        const selected = new Set(Array.isArray(selectedTags) ? selectedTags : []);
+        const baseOptions = Array.isArray(tags) ? tags : [];
+        const invalidSelectedTags = [...selected].filter((tag) => !baseOptions.includes(tag));
+        const options = [...new Set([...baseOptions, ...invalidSelectedTags])];
         if (!options.length) return "<p class=\"muted\">tagSuggestions를 불러오지 못했습니다.</p>";
         return options
           .map((tag) => {
             const checked = selected.has(tag) ? " checked" : "";
-            return "<label class=\"tag-option\"><input type=\"checkbox\" data-frontmatter-skeleton-tag=\"" +
-              escapeAttribute(tag) + "\"" + checked + "> " + escapeHtml(tag) + "</label>";
+            const invalid = invalidSelectedTags.includes(tag);
+            const className = invalid ? "tag-option warning" : "tag-option";
+            const warning = invalid ? " <span class=\"tag-warning\">not in tagSuggestions or allowedTags</span>" : "";
+            return "<label class=\"" + className + "\"><input type=\"checkbox\" data-frontmatter-skeleton-tag=\"" +
+              escapeAttribute(tag) + "\"" + checked + "> " + escapeHtml(tag) + warning + "</label>";
           })
           .join("");
       }
@@ -2384,6 +2428,7 @@
         const draft = state.frontmatterSkeletonDraft || skeletonDraft(state.frontmatterSkeleton);
         const summaryState = summaryLengthStatus(draft.summary);
         const allowedTypes = state.frontmatterSkeleton.allowedTypes?.length ? state.frontmatterSkeleton.allowedTypes : [draft.type].filter(Boolean);
+        const tagOptions = skeletonTagBaseOptions(state.frontmatterSkeleton);
         const typeOptions = "<option value=\"\"" + (draft.type ? "" : " selected") + ">Select type</option>" +
           allowedTypes
             .map((type) => "<option value=\"" + escapeAttribute(type) + "\"" + (draft.type === type ? " selected" : "") + ">" + escapeHtml(type) + "</option>")
@@ -2406,7 +2451,7 @@
             "<label>Summary<textarea data-frontmatter-skeleton-field=\"summary\">" + escapeHtml(draft.summary || "") + "</textarea></label>" +
             "<div class=\"summary-count " + summaryState.status + "\" data-frontmatter-skeleton-summary-count><strong>summaryCount</strong> " + escapeHtml(summaryState.label) + " · " + escapeHtml(summaryState.message) + "</div>" +
             "<div class=\"mutation-label\"><span>Type candidates</span>" + renderTypeCandidates(state.frontmatterSkeleton.typeCandidates || []) + "</div>" +
-            "<div class=\"mutation-label\"><span>Tags</span><div class=\"tag-picker\">" + renderSkeletonTagOptions(state.frontmatterSkeleton.tagSuggestions || state.frontmatterSkeleton.allowedTags || [], draft.tags) + "</div></div>" +
+            "<div class=\"mutation-label\"><span>Tags</span><div class=\"tag-picker\">" + renderSkeletonTagOptions(tagOptions, draft.tags) + "</div></div>" +
             "<label class=\"mutation-check\"><input type=\"checkbox\" data-frontmatter-skeleton-field=\"draft\"" + (draft.draft === true ? " checked" : "") + "> Draft</label>" +
             "<label class=\"mutation-check\"><input type=\"checkbox\" data-frontmatter-skeleton-field=\"featured\"" + (draft.featured === true ? " checked" : "") + "> Featured</label>" +
           "</div>" +
@@ -3076,6 +3121,7 @@
         const post = selectedPost();
         const slug = postSlug(post);
         if (!post?.sourcePath || !post.project || !slug) return;
+        const project = post.project;
         state.frontmatterSkeleton = null;
         state.frontmatterSkeletonDraft = null;
         state.frontmatterSkeletonError = "";
@@ -3083,9 +3129,10 @@
         render();
         try {
           const response = await fetch(
-            "/api/safe-edit/frontmatter-skeleton?project=" + encodeURIComponent(post.project) + "&slug=" + encodeURIComponent(slug),
+            "/api/safe-edit/frontmatter-skeleton?project=" + encodeURIComponent(project) + "&slug=" + encodeURIComponent(slug),
           );
           const json = await readJsonResponse(response);
+          if (!selectedPostMatchesFrontmatterSkeletonRequest(project, slug)) return;
           if (!response.ok) {
             state.frontmatterSkeletonError = mutationErrorMessage(json, "Frontmatter read failed.");
             render();
@@ -3096,6 +3143,7 @@
           state.frontmatterSkeletonPreview = null;
           state.frontmatterSkeletonError = "";
         } catch (error) {
+          if (!selectedPostMatchesFrontmatterSkeletonRequest(project, slug)) return;
           state.frontmatterSkeletonError = error.message;
         }
         render();
