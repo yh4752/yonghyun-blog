@@ -1356,6 +1356,150 @@ test("frontmatter skeleton apply endpoint maps stale source to 409", async () =>
   }
 });
 
+test("frontmatter skeleton apply endpoint returns provider result", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: ({ project, slug, sourceHash, frontmatter }) => {
+        providerInput = { project, slug, sourceHash, frontmatter };
+        return { status: "applied", changedFields: ["title"] };
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const frontmatter = { title: "Title", type: "dev-log", tags: ["Documentation"] };
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post", sourceHash: "sha256:abc", frontmatter }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.status, "applied");
+    assert.deepEqual(providerInput, { project: "demo", slug: "post", sourceHash: "sha256:abc", frontmatter });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton apply endpoint maps skeleton validation failures to 400", async () => {
+  const invalid = Object.assign(new Error("type-confirmation-required"), { code: "type-confirmation-required" });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        throw invalid;
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post", sourceHash: "sha256:abc", frontmatter: {} }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "type-confirmation-required");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton apply rejects missing required fields before provider call", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        providerCalled = true;
+        return {};
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton apply rejects non-object frontmatter before provider call", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        providerCalled = true;
+        return {};
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project: "demo",
+        slug: "post",
+        sourceHash: "sha256:abc",
+        frontmatter: "not-object",
+      }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("frontmatter skeleton preview rejects missing required fields before provider call", async () => {
   let providerCalled = false;
   const server = createDashboardServer({
