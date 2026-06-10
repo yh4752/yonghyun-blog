@@ -245,7 +245,7 @@ function validateSkeleton({ frontmatter, expectedDate, project, allowedTags, kno
   const warnings = [];
 
   if (typeof frontmatter.title !== "string" || frontmatter.title.trim() === "") {
-    errors.push({ code: "title-empty", field: "title", message: "title은 비어 있을 수 없습니다." });
+    errors.push({ code: "invalid-title", field: "title", message: "title은 비어 있을 수 없습니다." });
   }
 
   if (frontmatter.date !== expectedDate) {
@@ -265,7 +265,7 @@ function validateSkeleton({ frontmatter, expectedDate, project, allowedTags, kno
   }
 
   if (!Array.isArray(frontmatter.tags) || frontmatter.tags.length === 0) {
-    errors.push({ code: "empty-tags", field: "tags", message: "tags는 1개 이상이어야 합니다." });
+    errors.push({ code: "invalid-tags", field: "tags", message: "tags는 1개 이상이어야 합니다." });
   } else {
     const seen = new Set();
     const duplicate = frontmatter.tags.find((tag) => {
@@ -274,18 +274,18 @@ function validateSkeleton({ frontmatter, expectedDate, project, allowedTags, kno
       return false;
     });
     if (duplicate !== undefined) {
-      errors.push({ code: "duplicate-tag", field: "tags", message: `중복된 tag '${duplicate}'가 있습니다.` });
+      errors.push({ code: "invalid-tags", field: "tags", message: `중복된 tag '${duplicate}'가 있습니다.` });
     }
 
     const invalidTag = frontmatter.tags.find((tag) => !allowedTags.has(tag));
     if (invalidTag !== undefined) {
-      errors.push({ code: "invalid-tag", field: "tags", message: `허용되지 않은 tag '${invalidTag}'가 있습니다.` });
+      errors.push({ code: "invalid-tags", field: "tags", message: `허용되지 않은 tag '${invalidTag}'가 있습니다.` });
     }
   }
 
   const summaryState = summaryLengthState(frontmatter.summary ?? "");
   if (summaryState.status === "error") {
-    errors.push({ code: summaryState.code, field: "summary", message: summaryState.message });
+    errors.push({ code: "invalid-summary", field: "summary", message: summaryState.message });
   } else if (summaryState.status === "warning") {
     warnings.push({ code: summaryState.code, field: "summary", message: summaryState.message });
   }

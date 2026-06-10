@@ -197,7 +197,7 @@ test("previewFrontmatterSkeleton blocks empty summary but still returns file pre
   });
 
   assert.equal(preview.canApply, false);
-  assert.equal(preview.errors[0].code, "summary-empty");
+  assert.equal(preview.errors[0].code, "invalid-summary");
   assert.equal(preview.files.length, 1);
   assert.equal(preview.files[0].displayMode, "unified-diff");
   assert.match(preview.files[0].afterPreview, /^---\n/);
@@ -223,7 +223,7 @@ test("previewFrontmatterSkeleton validates type tags date and summary length", (
   assert.equal(preview.canApply, false);
   assert.deepEqual(
     preview.errors.map((error) => error.code),
-    ["invalid-date", "invalid-type", "invalid-tag", "summary-too-long"],
+    ["invalid-date", "invalid-type", "invalid-tags", "invalid-summary"],
   );
 });
 
