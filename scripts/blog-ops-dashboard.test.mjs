@@ -166,6 +166,44 @@ test("renderDashboardHtml includes Safe Mutations UI", () => {
   assert.doesNotMatch(html, /src\/content\/blog[^\n]*Apply changes/);
 });
 
+test("renderDashboardHtml includes missing frontmatter quick fix UI", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /Add frontmatter/);
+  assert.match(html, /frontmatterSkeleton/);
+  assert.match(html, /frontmatterSkeletonDraft/);
+  assert.match(html, /frontmatterSkeletonPreview/);
+  assert.match(html, /data-frontmatter-skeleton-open/);
+  assert.match(html, /data-frontmatter-skeleton-preview/);
+  assert.match(html, /data-frontmatter-skeleton-apply/);
+  assert.match(html, /\/api\/safe-edit\/frontmatter-skeleton/);
+  assert.match(html, /\/api\/safe-edit\/frontmatter-skeleton\/preview/);
+  assert.match(html, /\/api\/safe-edit\/frontmatter-skeleton\/apply/);
+});
+
+test("renderDashboardHtml renders type candidates tag suggestions and unified diff preview", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /renderTypeCandidates/);
+  assert.match(html, /confidence/);
+  assert.match(html, /reason/);
+  assert.match(html, /renderSkeletonTagOptions/);
+  assert.match(html, /tagSuggestions/);
+  assert.match(html, /renderUnifiedDiffPreview/);
+  assert.match(html, /diff-line added/);
+  assert.match(html, /line-number/);
+  assert.match(html, /displayMode === "unified-diff"/);
+});
+
+test("renderDashboardHtml routes missing-frontmatter posts away from regular Safe Edit", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /function postHasMissingFrontmatter/);
+  assert.match(html, /quickFixSuggestions/);
+  assert.match(html, /missing-frontmatter/);
+  assert.match(html, /if \(postHasMissingFrontmatter\(post\)\)/);
+});
+
 test("renderDashboardHtml keeps safe mutation previews authoritative", () => {
   const html = renderDashboardHtml();
 

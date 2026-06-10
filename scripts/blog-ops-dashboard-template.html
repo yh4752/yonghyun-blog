@@ -855,6 +855,49 @@
         gap: 8px;
       }
 
+      .diff-preview {
+        max-width: 100%;
+        overflow-x: auto;
+        border: 1px solid var(--code-border);
+        border-radius: 7px;
+        background: var(--code-bg);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .diff-line {
+        display: grid;
+        grid-template-columns: 42px 22px minmax(0, 1fr);
+        min-width: 520px;
+        border-bottom: 1px solid var(--divider);
+      }
+
+      .diff-line:last-child {
+        border-bottom: 0;
+      }
+
+      .diff-line.added {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .diff-line.context {
+        color: var(--text-sec);
+      }
+
+      .line-number,
+      .diff-marker {
+        padding: 4px 8px;
+        color: var(--text-tertiary);
+        user-select: none;
+      }
+
+      .diff-line code {
+        min-width: 0;
+        padding: 4px 8px;
+        white-space: pre;
+      }
+
       .mutation-message {
         padding: 8px 9px;
         border: 1px solid var(--border);
@@ -1521,6 +1564,11 @@
         safeEditPreview: null,
         safeEditError: "",
         safeEditApplying: false,
+        frontmatterSkeleton: null,
+        frontmatterSkeletonDraft: null,
+        frontmatterSkeletonPreview: null,
+        frontmatterSkeletonError: "",
+        frontmatterSkeletonApplying: false,
         folderCreateDraft: {
           slug: "",
           name: "",
@@ -1824,6 +1872,13 @@
         return visiblePosts.find((post) => post.id === state.selectedId) || visiblePosts[0] || null;
       }
 
+      function postHasMissingFrontmatter(post) {
+        return Boolean(
+          post?.quickFixSuggestions?.some((item) => item.code === "missing-frontmatter") ||
+            post?.warnings?.some((item) => item.code === "frontmatter-error"),
+        );
+      }
+
       function warningCodes(post) {
         const codes = [...(post.warnings || []).map((warning) => warning.code || warning)];
         if (post.tagStatus === "invalid") codes.push("invalid-tags");
@@ -2003,6 +2058,49 @@
         return JSON.stringify(left) === JSON.stringify(right);
       }
 
+      function skeletonDraft(candidate) {
+        return {
+          title: candidate?.inferred?.title || "",
+          date: candidate?.inferred?.date || "",
+          type: candidate?.inferred?.type || "",
+          project: candidate?.inferred?.project || candidate?.project || "",
+          tags: Array.isArray(candidate?.inferred?.tags) ? [...candidate.inferred.tags] : ["Documentation"],
+          summary: candidate?.inferred?.summary || "",
+          draft: candidate?.inferred?.draft !== false,
+          featured: candidate?.inferred?.featured === true,
+          canonicalProjectPath: candidate?.inferred?.canonicalProjectPath || "",
+        };
+      }
+
+      function frontmatterSkeletonPayload() {
+        if (!state.frontmatterSkeleton) return null;
+        return {
+          project: state.frontmatterSkeleton.project,
+          slug: state.frontmatterSkeleton.slug,
+          sourceHash: state.frontmatterSkeleton.sourceHash,
+          frontmatter: { ...state.frontmatterSkeletonDraft },
+        };
+      }
+
+      function frontmatterSkeletonPreviewMatches(requestPayload) {
+        return Boolean(
+          requestPayload &&
+            state.frontmatterSkeleton &&
+            state.frontmatterSkeleton.project === requestPayload.project &&
+            state.frontmatterSkeleton.slug === requestPayload.slug &&
+            state.frontmatterSkeleton.sourceHash === requestPayload.sourceHash &&
+            valuesEqual(state.frontmatterSkeletonDraft, requestPayload.frontmatter),
+        );
+      }
+
+      function frontmatterSkeletonPreviewCanApply() {
+        return Boolean(
+          state.frontmatterSkeletonPreview?.canApply &&
+            state.frontmatterSkeletonPreview.requestPayload &&
+            frontmatterSkeletonPreviewMatches(state.frontmatterSkeletonPreview.requestPayload),
+        );
+      }
+
       function safeEditChanges() {
         const current = state.safeEdit?.editable || {};
         const draft = state.safeEditDraft || {};
@@ -2158,6 +2256,77 @@
           "</ul></div>";
       }
 
+      function renderTypeCandidates(candidates = []) {
+        if (!candidates.length) {
+          return "<p class=\"muted\">type 후보가 없습니다. 직접 선택하세요.</p>";
+        }
+        return "<ul class=\"mutation-list\">" +
+          candidates
+            .map((candidate) => {
+              return "<li><code>" + escapeHtml(candidate.type) + "</code> " +
+                "<span class=\"chip\">" + escapeHtml(candidate.confidence) + "</span> " +
+                escapeHtml(candidate.reason || "") +
+              "</li>";
+            })
+            .join("") +
+          "</ul>";
+      }
+
+      function renderSkeletonTagOptions(tags = [], selectedTags = []) {
+        const selected = new Set(selectedTags || []);
+        const options = [...new Set([...(Array.isArray(tags) ? tags : []), ...selected])];
+        if (!options.length) return "<p class=\"muted\">tagSuggestions를 불러오지 못했습니다.</p>";
+        return options
+          .map((tag) => {
+            const checked = selected.has(tag) ? " checked" : "";
+            return "<label class=\"tag-option\"><input type=\"checkbox\" data-frontmatter-skeleton-tag=\"" +
+              escapeAttribute(tag) + "\"" + checked + "> " + escapeHtml(tag) + "</label>";
+          })
+          .join("");
+      }
+
+      function renderUnifiedDiffPreview(file) {
+        if (file.displayMode === "unified-diff") {
+          const beforeLines = String(file.beforePreview || "").split("\n");
+          const afterLines = String(file.afterPreview || "").split("\n");
+          const frontmatterEnd = afterLines.findIndex((line, index) => index > 0 && line === "---");
+          const addedLimit = frontmatterEnd === -1 ? 0 : frontmatterEnd + 2;
+          return "<div class=\"mutation-message\"><strong>" + escapeHtml(file.path || file.absolutePath || "-") + "</strong>" +
+            "<div class=\"diff-preview\">" +
+              afterLines
+                .map((line, index) => {
+                  const added = index < addedLimit;
+                  const className = added ? "diff-line added" : "diff-line context";
+                  const marker = added ? "+" : " ";
+                  return "<div class=\"" + className + "\"><span class=\"line-number\">" + (index + 1) +
+                    "</span><span class=\"diff-marker\">" + marker + "</span><code>" + escapeHtml(line) + "</code></div>";
+                })
+                .join("") +
+            "</div><p class=\"muted\">Before: " + beforeLines.length + " lines, After: " + afterLines.length + " lines</p></div>";
+        }
+        return renderFilePreviews([file]);
+      }
+
+      function renderSkeletonPreview() {
+        const error = state.frontmatterSkeletonError
+          ? "<div class=\"mutation-message error\">" + escapeHtml(state.frontmatterSkeletonError) + "</div>"
+          : "";
+        const preview = state.frontmatterSkeletonPreview;
+        if (!preview) return error;
+        const status = preview.canApply
+          ? "<div class=\"mutation-message good\">Frontmatter preview ready. Apply is enabled for this source hash.</div>"
+          : "<div class=\"mutation-message error\">Frontmatter preview blocked. Resolve errors before applying.</div>";
+        const nextAction = preview.nextAction ? "<div class=\"mutation-message\"><strong>nextAction</strong><br>" + escapeHtml(preview.nextAction) + "</div>" : "";
+        return "<div class=\"mutation-preview\" data-frontmatter-skeleton-preview-output>" +
+          error +
+          status +
+          renderMutationIssues("Errors", preview.errors, "error") +
+          renderMutationIssues("Warnings", preview.warnings, "warning") +
+          (preview.files || []).map(renderUnifiedDiffPreview).join("") +
+          nextAction +
+        "</div>";
+      }
+
       function renderChangedFields(fields = []) {
         if (!fields.length) {
           return "<div class=\"mutation-message warning\">변경된 frontmatter field가 없습니다.</div>";
@@ -2188,6 +2357,66 @@
           renderFilePreviews(preview.files || []) +
           nextAction +
         "</div>";
+      }
+
+      function renderFrontmatterSkeletonPanel(post) {
+        const slug = postSlug(post);
+        const loaded =
+          state.frontmatterSkeleton &&
+          state.frontmatterSkeleton.project === post.project &&
+          state.frontmatterSkeleton.slug === slug;
+        const error = state.frontmatterSkeletonError
+          ? "<div class=\"mutation-message error\">" + escapeHtml(state.frontmatterSkeletonError) + "</div>"
+          : "";
+
+        if (!post?.sourcePath) {
+          return "<section class=\"mutation-section frontmatter-skeleton-panel\"><h2>Missing Frontmatter</h2><p class=\"muted\">source post가 있는 글만 frontmatter를 복구할 수 있습니다.</p>" + error + "</section>";
+        }
+
+        if (!loaded) {
+          return "<section class=\"mutation-section frontmatter-skeleton-panel\"><h2>Missing Frontmatter</h2>" +
+            "<button class=\"button\" data-frontmatter-skeleton-open type=\"button\">Add frontmatter</button>" +
+            "<p class=\"muted\">source 글에만 frontmatter skeleton을 추가합니다. 발행본은 수정하지 않습니다.</p>" +
+            error +
+          "</section>";
+        }
+
+        const draft = state.frontmatterSkeletonDraft || skeletonDraft(state.frontmatterSkeleton);
+        const summaryState = summaryLengthStatus(draft.summary);
+        const allowedTypes = state.frontmatterSkeleton.allowedTypes?.length ? state.frontmatterSkeleton.allowedTypes : [draft.type].filter(Boolean);
+        const typeOptions = "<option value=\"\"" + (draft.type ? "" : " selected") + ">Select type</option>" +
+          allowedTypes
+            .map((type) => "<option value=\"" + escapeAttribute(type) + "\"" + (draft.type === type ? " selected" : "") + ">" + escapeHtml(type) + "</option>")
+            .join("");
+        const canApply = frontmatterSkeletonPreviewCanApply() && !state.frontmatterSkeletonApplying && !state.mutationApplying;
+        const firstHeading = state.frontmatterSkeleton.bodyHelper?.firstHeading || "";
+        const firstParagraph = state.frontmatterSkeleton.bodyHelper?.firstParagraph || "";
+
+        return "<section class=\"mutation-section frontmatter-skeleton-panel\">" +
+          "<h2>Missing Frontmatter</h2>" +
+          "<div class=\"readonly-grid\">" +
+            "<span>Folder</span><strong>" + escapeHtml(state.frontmatterSkeleton.project) + "</strong>" +
+            "<span>Slug</span><strong>" + escapeHtml(state.frontmatterSkeleton.slug) + "</strong>" +
+            "<span>Source</span><strong>" + escapeHtml(state.frontmatterSkeleton.sourcePath || post.sourcePath || "") + "</strong>" +
+          "</div>" +
+          "<div class=\"mutation-fields\">" +
+            "<label>Title<input type=\"text\" data-frontmatter-skeleton-field=\"title\" value=\"" + escapeAttribute(draft.title || "") + "\"></label>" +
+            "<label>Date<input type=\"text\" data-frontmatter-skeleton-field=\"date\" value=\"" + escapeAttribute(draft.date || "") + "\" readonly></label>" +
+            "<label>Type<select data-frontmatter-skeleton-field=\"type\">" + typeOptions + "</select></label>" +
+            "<label>Summary<textarea data-frontmatter-skeleton-field=\"summary\">" + escapeHtml(draft.summary || "") + "</textarea></label>" +
+            "<div class=\"summary-count " + summaryState.status + "\" data-frontmatter-skeleton-summary-count><strong>summaryCount</strong> " + escapeHtml(summaryState.label) + " · " + escapeHtml(summaryState.message) + "</div>" +
+            "<div class=\"mutation-label\"><span>Type candidates</span>" + renderTypeCandidates(state.frontmatterSkeleton.typeCandidates || []) + "</div>" +
+            "<div class=\"mutation-label\"><span>Tags</span><div class=\"tag-picker\">" + renderSkeletonTagOptions(state.frontmatterSkeleton.tagSuggestions || state.frontmatterSkeleton.allowedTags || [], draft.tags) + "</div></div>" +
+            "<label class=\"mutation-check\"><input type=\"checkbox\" data-frontmatter-skeleton-field=\"draft\"" + (draft.draft === true ? " checked" : "") + "> Draft</label>" +
+            "<label class=\"mutation-check\"><input type=\"checkbox\" data-frontmatter-skeleton-field=\"featured\"" + (draft.featured === true ? " checked" : "") + "> Featured</label>" +
+          "</div>" +
+          "<div class=\"mutation-message\"><strong>Body helper</strong><p class=\"muted\">" + escapeHtml(firstHeading) + "</p><p class=\"muted\">" + escapeHtml(firstParagraph || "본문 첫 문단을 찾지 못했습니다.") + "</p></div>" +
+          "<div class=\"button-row\">" +
+            "<button class=\"button\" data-frontmatter-skeleton-preview type=\"button\"" + (state.frontmatterSkeletonApplying ? " disabled" : "") + ">Preview frontmatter</button>" +
+            "<button class=\"button primary\" data-frontmatter-skeleton-apply type=\"button\"" + (canApply ? "" : " disabled") + ">" + (state.frontmatterSkeletonApplying ? "Applying..." : "Apply frontmatter") + "</button>" +
+          "</div>" +
+          renderSkeletonPreview() +
+        "</section>";
       }
 
       function renderSafeEditPanel(post) {
@@ -2355,6 +2584,10 @@
         const warnings = warningCodes(post);
         const learningWarnings = post.learningWarnings || [];
         const commands = commandSuggestions(post);
+        let mutationPanel = renderSafeEditPanel(post);
+        if (postHasMissingFrontmatter(post)) {
+          mutationPanel = renderFrontmatterSkeletonPanel(post);
+        }
         document.querySelector("#inspector").innerHTML =
           "<div class=\"inspector-head\">" +
             "<div class=\"inspector-title-row\"><span class=\"eyebrow\">Post detail</span>" + chip(post.publishStatus) + "</div>" +
@@ -2383,7 +2616,7 @@
             "<div class=\"divider\"></div>" +
             "<p class=\"section-title\">Command suggestions</p>" +
             "<div class=\"command-list\">" + (commands.length ? commands.map((command) => renderCommand(command, post)).join("") : "<span class=\"mono-cell\">조치 불필요 — 준비 완료</span>") + "</div>" +
-            renderSafeEditPanel(post) +
+            mutationPanel +
             renderFolderManagementPanel() +
           "</div>";
       }
@@ -2685,6 +2918,17 @@
         if (button) button.disabled = !(safeEditPreviewCanApply() && !state.safeEditApplying && !state.mutationApplying);
       }
 
+      function updateFrontmatterSkeletonApplyButton() {
+        const button = document.querySelector("[data-frontmatter-skeleton-apply]");
+        if (button) {
+          button.disabled = !(
+            frontmatterSkeletonPreviewCanApply() &&
+            !state.frontmatterSkeletonApplying &&
+            !state.mutationApplying
+          );
+        }
+      }
+
       function updateFolderCreateApplyButton() {
         const button = document.querySelector("[data-folder-create-apply]");
         if (button) button.disabled = !(folderCreatePreviewCanApply() && !state.mutationApplying);
@@ -2711,9 +2955,22 @@
         element.innerHTML = "<strong>summaryCount</strong> " + escapeHtml(status.label) + " · " + escapeHtml(status.message);
       }
 
+      function updateFrontmatterSkeletonSummaryElement() {
+        const element = document.querySelector("[data-frontmatter-skeleton-summary-count]");
+        if (!element || !state.frontmatterSkeletonDraft) return;
+        const status = summaryLengthStatus(state.frontmatterSkeletonDraft.summary);
+        element.className = "summary-count " + status.status;
+        element.innerHTML = "<strong>summaryCount</strong> " + escapeHtml(status.label) + " · " + escapeHtml(status.message);
+      }
+
       function markSafeEditDirty() {
         state.safeEditPreview = null;
         updateSafeEditApplyButton();
+      }
+
+      function markFrontmatterSkeletonDirty() {
+        state.frontmatterSkeletonPreview = null;
+        updateFrontmatterSkeletonApplyButton();
       }
 
       function markFolderCreateDirty() {
@@ -2801,11 +3058,98 @@
           state.safeEdit = null;
           state.safeEditDraft = null;
           state.safeEditPreview = null;
+          state.frontmatterSkeleton = null;
+          state.frontmatterSkeletonDraft = null;
+          state.frontmatterSkeletonPreview = null;
+          state.frontmatterSkeletonError = "";
           await loadInventory();
         } catch (error) {
           state.safeEditError = error.message;
         } finally {
           state.safeEditApplying = false;
+          state.mutationApplying = false;
+          render();
+        }
+      }
+
+      async function openFrontmatterSkeleton() {
+        const post = selectedPost();
+        const slug = postSlug(post);
+        if (!post?.sourcePath || !post.project || !slug) return;
+        state.frontmatterSkeleton = null;
+        state.frontmatterSkeletonDraft = null;
+        state.frontmatterSkeletonError = "";
+        state.frontmatterSkeletonPreview = null;
+        render();
+        try {
+          const response = await fetch(
+            "/api/safe-edit/frontmatter-skeleton?project=" + encodeURIComponent(post.project) + "&slug=" + encodeURIComponent(slug),
+          );
+          const json = await readJsonResponse(response);
+          if (!response.ok) {
+            state.frontmatterSkeletonError = mutationErrorMessage(json, "Frontmatter read failed.");
+            render();
+            return;
+          }
+          state.frontmatterSkeleton = json;
+          state.frontmatterSkeletonDraft = skeletonDraft(json);
+          state.frontmatterSkeletonPreview = null;
+          state.frontmatterSkeletonError = "";
+        } catch (error) {
+          state.frontmatterSkeletonError = error.message;
+        }
+        render();
+      }
+
+      async function previewFrontmatterSkeleton() {
+        if (!state.frontmatterSkeleton || state.frontmatterSkeletonApplying) return;
+        const requestPayload = frontmatterSkeletonPayload();
+        if (!requestPayload) return;
+        state.frontmatterSkeletonError = "";
+        state.frontmatterSkeletonPreview = null;
+        render();
+        try {
+          const { response, json } = await postJson("/api/safe-edit/frontmatter-skeleton/preview", requestPayload);
+          if (!frontmatterSkeletonPreviewMatches(requestPayload)) return;
+          if (!response.ok) {
+            state.frontmatterSkeletonPreview = null;
+            state.frontmatterSkeletonError = mutationErrorMessage(json, "Frontmatter preview failed.");
+            render();
+            return;
+          }
+          state.frontmatterSkeletonPreview = { ...json, requestPayload };
+          state.frontmatterSkeletonError = "";
+        } catch (error) {
+          if (!frontmatterSkeletonPreviewMatches(requestPayload)) return;
+          state.frontmatterSkeletonPreview = null;
+          state.frontmatterSkeletonError = error.message;
+        }
+        render();
+      }
+
+      async function applyFrontmatterSkeleton() {
+        if (!frontmatterSkeletonPreviewCanApply() || state.frontmatterSkeletonApplying) return;
+        const requestPayload = state.frontmatterSkeletonPreview.requestPayload;
+        state.frontmatterSkeletonApplying = true;
+        state.mutationApplying = true;
+        state.frontmatterSkeletonError = "";
+        render();
+        try {
+          const { response, json } = await postJson("/api/safe-edit/frontmatter-skeleton/apply", requestPayload);
+          if (!response.ok) {
+            state.frontmatterSkeletonError = mutationErrorMessage(json, "Frontmatter apply failed.");
+            render();
+            return;
+          }
+          state.frontmatterSkeleton = null;
+          state.frontmatterSkeletonDraft = null;
+          state.frontmatterSkeletonPreview = null;
+          state.frontmatterSkeletonError = "";
+          await loadInventory();
+        } catch (error) {
+          state.frontmatterSkeletonError = error.message;
+        } finally {
+          state.frontmatterSkeletonApplying = false;
           state.mutationApplying = false;
           render();
         }
@@ -2972,6 +3316,25 @@
         markSafeEditDirty();
       }
 
+      function updateFrontmatterSkeletonField(element) {
+        if (!state.frontmatterSkeletonDraft) return;
+        const field = element.dataset.frontmatterSkeletonField;
+        const value = element.type === "checkbox" ? element.checked : element.value;
+        state.frontmatterSkeletonDraft = { ...state.frontmatterSkeletonDraft, [field]: value };
+        markFrontmatterSkeletonDirty();
+        if (field === "summary") updateFrontmatterSkeletonSummaryElement();
+      }
+
+      function toggleFrontmatterSkeletonTag(element) {
+        if (!state.frontmatterSkeletonDraft) return;
+        const tag = element.dataset.frontmatterSkeletonTag;
+        const tags = new Set(state.frontmatterSkeletonDraft.tags || []);
+        if (element.checked) tags.add(tag);
+        else tags.delete(tag);
+        state.frontmatterSkeletonDraft = { ...state.frontmatterSkeletonDraft, tags: [...tags] };
+        markFrontmatterSkeletonDirty();
+      }
+
       function updateFolderCreateField(element) {
         const field = element.dataset.folderCreateField;
         const value = element.type === "checkbox" ? element.checked : element.value;
@@ -2991,6 +3354,18 @@
 
         if (target.matches("[data-safe-edit-tag]")) {
           updateSafeEditTag(target);
+          if (rerender) render();
+          return;
+        }
+
+        if (target.matches("[data-frontmatter-skeleton-field]")) {
+          updateFrontmatterSkeletonField(target);
+          if (rerender) render();
+          return;
+        }
+
+        if (target.matches("[data-frontmatter-skeleton-tag]")) {
+          toggleFrontmatterSkeletonTag(target);
           if (rerender) render();
           return;
         }
@@ -3032,6 +3407,10 @@
           state.safeEditDraft = null;
           state.safeEditPreview = null;
           state.safeEditError = "";
+          state.frontmatterSkeleton = null;
+          state.frontmatterSkeletonDraft = null;
+          state.frontmatterSkeletonPreview = null;
+          state.frontmatterSkeletonError = "";
           resetFolderDeleteState();
           state.runnerPreflight = null;
           state.runnerResult = null;
@@ -3078,6 +3457,10 @@
           state.safeEditDraft = null;
           state.safeEditPreview = null;
           state.safeEditError = "";
+          state.frontmatterSkeleton = null;
+          state.frontmatterSkeletonDraft = null;
+          state.frontmatterSkeletonPreview = null;
+          state.frontmatterSkeletonError = "";
           render();
           return;
         }
@@ -3100,6 +3483,21 @@
 
         if (event.target.closest("[data-safe-edit-apply]")) {
           applySafeEdit();
+          return;
+        }
+
+        if (event.target.closest("[data-frontmatter-skeleton-open]")) {
+          openFrontmatterSkeleton();
+          return;
+        }
+
+        if (event.target.closest("[data-frontmatter-skeleton-preview]")) {
+          previewFrontmatterSkeleton();
+          return;
+        }
+
+        if (event.target.closest("[data-frontmatter-skeleton-apply]")) {
+          applyFrontmatterSkeleton();
           return;
         }
 
