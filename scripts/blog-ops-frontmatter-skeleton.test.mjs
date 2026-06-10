@@ -227,6 +227,54 @@ test("previewFrontmatterSkeleton validates type tags date and summary length", (
   );
 });
 
+test("previewFrontmatterSkeleton rejects non-array tags without throwing", (t) => {
+  const { root, sourceDir } = makeBlogHub(t);
+  writeMissingPost(sourceDir);
+  const candidate = readFrontmatterSkeletonCandidate({ root, project: "demo", slug: "2026-06-10-dev-log" });
+  const input = {
+    root,
+    project: "demo",
+    slug: "2026-06-10-dev-log",
+    sourceHash: candidate.sourceHash,
+    frontmatter: validFrontmatter({ tags: "Documentation" }),
+  };
+
+  assert.doesNotThrow(() => previewFrontmatterSkeleton(input));
+  const preview = previewFrontmatterSkeleton(input);
+
+  assert.equal(preview.canApply, false);
+  assert.ok(preview.errors.some((error) => error.code === "invalid-tags"));
+  assert.equal(preview.files.length, 1);
+  assert.throws(
+    () => applyFrontmatterSkeleton(input),
+    (error) => error.code === "frontmatter-skeleton-invalid",
+  );
+});
+
+test("previewFrontmatterSkeleton rejects non-string summary without throwing", (t) => {
+  const { root, sourceDir } = makeBlogHub(t);
+  writeMissingPost(sourceDir);
+  const candidate = readFrontmatterSkeletonCandidate({ root, project: "demo", slug: "2026-06-10-dev-log" });
+  const input = {
+    root,
+    project: "demo",
+    slug: "2026-06-10-dev-log",
+    sourceHash: candidate.sourceHash,
+    frontmatter: validFrontmatter({ summary: { text: "not string" } }),
+  };
+
+  assert.doesNotThrow(() => previewFrontmatterSkeleton(input));
+  const preview = previewFrontmatterSkeleton(input);
+
+  assert.equal(preview.canApply, false);
+  assert.ok(preview.errors.some((error) => error.code === "invalid-summary"));
+  assert.equal(preview.files.length, 1);
+  assert.throws(
+    () => applyFrontmatterSkeleton(input),
+    (error) => error.code === "frontmatter-skeleton-invalid",
+  );
+});
+
 test("previewFrontmatterSkeleton warns for short summary and does not mutate disk", (t) => {
   const { root, sourceDir } = makeBlogHub(t);
   const file = writeMissingPost(sourceDir);

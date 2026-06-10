@@ -209,7 +209,10 @@ export function inferTypeCandidates({ filename, title } = {}) {
 
 function renderValue(field, value) {
   if (field === "tags") {
-    return `tags: [${value.map((tag) => JSON.stringify(tag)).join(", ")}]`;
+    if (Array.isArray(value)) {
+      return `tags: [${value.map((tag) => JSON.stringify(tag)).join(", ")}]`;
+    }
+    return `tags: ${JSON.stringify(value)}`;
   }
   if (typeof value === "boolean") {
     return `${field}: ${value ? "true" : "false"}`;
@@ -283,11 +286,17 @@ function validateSkeleton({ frontmatter, expectedDate, project, allowedTags, kno
     }
   }
 
-  const summaryState = summaryLengthState(frontmatter.summary ?? "");
-  if (summaryState.status === "error") {
-    errors.push({ code: "invalid-summary", field: "summary", message: summaryState.message });
-  } else if (summaryState.status === "warning") {
-    warnings.push({ code: summaryState.code, field: "summary", message: summaryState.message });
+  let summaryState = null;
+  if (typeof frontmatter.summary !== "string") {
+    summaryState = summaryLengthState("");
+    errors.push({ code: "invalid-summary", field: "summary", message: "summary는 string이어야 합니다." });
+  } else {
+    summaryState = summaryLengthState(frontmatter.summary);
+    if (summaryState.status === "error") {
+      errors.push({ code: "invalid-summary", field: "summary", message: summaryState.message });
+    } else if (summaryState.status === "warning") {
+      warnings.push({ code: summaryState.code, field: "summary", message: summaryState.message });
+    }
   }
 
   for (const field of ["draft", "featured"]) {
