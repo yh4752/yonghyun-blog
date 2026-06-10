@@ -29,7 +29,10 @@ v1.5는 **Missing Frontmatter Quick Fix**로 한정한다.
 - inspector에서 `Add frontmatter` quick fix 표시
 - frontmatter skeleton preview 생성
 - 사용자가 `summary`, `type`, `tags`, `draft`를 확인 또는 수정
+- 확신도 기반 type 후보 추천
+- 최근 사용 tag와 보수적 기본 tag 추천
 - preview 단계에서 파일 diff 표시
+- diff의 추가/유지 구간을 시각적으로 구분
 - apply 단계에서 source hash를 다시 확인하고 stale source면 차단
 - apply 후 inventory refresh
 - apply 후 `validate-source` 실행 안내
@@ -43,6 +46,7 @@ v1.5는 **Missing Frontmatter Quick Fix**로 한정한다.
 - slug, date, project 변경
 - source 파일명 변경
 - AI summary 자동 생성
+- 추출형 summary 자동 완성
 - tag 정책 자동 변경
 - 여러 글 일괄 수정
 - sync, publish, commit, push, PR 자동 실행
@@ -107,6 +111,21 @@ Dashboard는 글을 읽고 의미를 완성한 척하지 않는다.
 
 `title`, `date`, `canonicalProjectPath`처럼 구조적으로 추론 가능한 값은 제안한다. `summary`, `type`, `tags`처럼 글의 의도를 담는 값은 보수적으로 제안하거나 사용자가 직접 확인하게 한다.
 
+### suggestion, not silent decision
+
+v1.5의 자동화는 "저장값을 몰래 결정"하는 방식이 아니라 "후보를 보여주고 확인받는" 방식이다.
+
+```txt
+확실한 구조 정보:
+자동 입력 가능
+
+의미 해석이 필요한 정보:
+후보 추천 가능
+사용자 확인 필요
+```
+
+이 원칙 때문에 type 후보와 tag 후보는 UI에 표시할 수 있지만, apply 조건은 여전히 "현재 선택된 값이 허용 목록 안에 있고 사용자가 preview했다"로 유지한다.
+
 ## Frontmatter Skeleton 정책
 
 ### 생성되는 필드
@@ -139,9 +158,9 @@ canonicalProjectPath: "docs/blog/2026-06-10-example.md"
 | --- | --- | --- |
 | `title` | 첫 번째 H1에서 추출, 없으면 파일명 humanize | 비어 있으면 차단 |
 | `date` | 파일명 앞의 `YYYY-MM-DD` | 파일명에서 추출 실패 시 차단 |
-| `type` | 파일명이 `dev-log`이거나 제목에 `개발 로그`가 있으면 `dev-log` | 추론 실패 시 사용자가 허용 type 중 선택해야 함 |
+| `type` | 확신도 높은 패턴은 자동 선택, 그 외는 후보 추천 | 사용자가 허용 type 중 하나를 확인해야 함 |
 | `project` | 선택한 source folder의 project key | inventory와 `posts.config.yml`에 존재해야 함 |
-| `tags` | `["Documentation"]`을 제안 | 허용 tag만 저장 가능, 최소 1개 필요 |
+| `tags` | `["Documentation"]`과 최근 사용 tag를 제안 | 허용 tag만 저장 가능, 최소 1개 필요 |
 | `summary` | 자동 작성하지 않음 | 사용자가 직접 작성해야 함 |
 | `draft` | `true` | 사용자가 `false`로 바꿀 수 있음 |
 | `featured` | `false` | boolean만 허용 |
@@ -149,9 +168,40 @@ canonicalProjectPath: "docs/blog/2026-06-10-example.md"
 
 `type` 추론이 실패하면 `research` 같은 임의 기본값을 넣지 않는다. 글의 성격을 잘못 분류하는 것보다 사용자가 선택하게 하는 편이 안전하다.
 
-`tags`는 `Documentation`을 보수적 기본 제안으로 둔다. 단, 사용자가 apply 전에 확인할 수 있어야 하며, 허용 목록에 없는 tag는 저장할 수 없다.
+### type 후보 추천 규칙
+
+type 추천은 확신도와 함께 반환한다.
+
+| 신호 | 추천 type | 확신도 | v1.5 동작 |
+| --- | --- | --- | --- |
+| filename에 `dev-log` | `dev-log` | high | 자동 선택 |
+| title에 `개발 로그` | `dev-log` | high | 자동 선택 |
+| filename/title에 `debug`, `bug`, `error`, `오류`, `장애`, `실패`, `fallback` | `debugging` | medium | 후보 표시, 확인 필요 |
+| filename/title에 `architecture`, `design`, `설계`, `구조`, `아키텍처` | `architecture` | medium | 후보 표시, 확인 필요 |
+| filename/title에 `performance`, `latency`, `성능`, `최적화` | `performance` | medium | 후보 표시, 확인 필요 |
+| filename/title에 `research`, `compare`, `조사`, `비교`, `검토` | `research` | medium | 후보 표시, 확인 필요 |
+| filename/title에 `deep-dive`, `adoption`, `도입`, `분석` | `deep-dive` | medium | 후보 표시, 확인 필요 |
+
+medium 후보가 하나만 있어도 자동 apply 조건을 만족한 것으로 보지 않는다. UI는 후보를 선택된 상태로 보여줄 수 있지만, 사용자가 Preview를 눌러 해당 값을 확인해야 한다.
+
+### tag 후보 추천 규칙
+
+`tags`는 `Documentation`을 보수적 기본 제안으로 둔다. 여기에 선택한 folder에서 최근 사용한 허용 tag를 최대 5개까지 함께 보여준다.
+
+```txt
+Suggested tags
+- Documentation
+- 최근 이 folder에서 많이 쓴 허용 tag
+- 최근 전체 블로그에서 많이 쓴 허용 tag
+```
+
+최근 tag 추천은 저장값을 자동으로 늘리지 않는다. 기본 저장 후보는 `Documentation` 하나이며, 사용자가 선택한 tag만 frontmatter에 들어간다.
+
+허용 목록에 없는 tag는 저장할 수 없다. tag 추천은 `src/data/tags.json`의 허용 목록과 기존 source/published 글에서 실제 사용된 tag의 교집합만 사용한다.
 
 `summary`는 자동 생성하지 않는다. Dashboard는 본문 첫 문단을 읽기 전용 helper로 보여주되, summary textarea는 비워 둔다. 사용자는 글 목록과 공유 카드에 들어갈 문장을 직접 작성한다.
+
+향후 추출형 summary 후보를 도입할 수는 있다. 다만 v1.5에서는 넣지 않는다. summary는 글의 의도와 평가를 크게 좌우하므로, 첫 문장 잘라내기나 단순 키워드 조합이 잘못된 신뢰감을 줄 수 있다. 후속 버전에서 도입한다면 "자동 입력"이 아니라 "복사 가능한 후보 문장"으로 시작한다.
 
 `canonicalProjectPath`는 source folder가 `<projectRoot>/docs/blog` 형태일 때 `<projectRoot>` 기준 상대 경로로 계산한다. 예를 들어 `/Users/yonghyun/my-projects/sigak/docs/blog/a.md`는 `docs/blog/a.md`가 된다. 이 구조가 아니면 잘못된 경로를 만들지 않고 필드를 생략한다.
 
@@ -232,8 +282,17 @@ GET /api/safe-edit/frontmatter-skeleton?project=<project>&slug=<slug>
     "featured": false,
     "canonicalProjectPath": "docs/blog/2026-06-10-example.md"
   },
+  "typeCandidates": [
+    {
+      "type": "dev-log",
+      "confidence": "high",
+      "reason": "filename contains dev-log"
+    }
+  ],
+  "tagSuggestions": ["Documentation", "Tooling", "Astro"],
   "requirements": {
     "requiresTypeSelection": false,
+    "requiresTypeConfirmation": false,
     "requiresSummary": true
   },
   "bodyHelper": {
@@ -287,6 +346,7 @@ POST /api/safe-edit/frontmatter-skeleton/preview
         "pathLabel": "../sigak/docs/blog/2026-06-10-example.md",
         "changeType": "modify",
         "summary": "Add frontmatter skeleton",
+        "displayMode": "unified-diff",
         "before": "# 2026-06-10 개발 로그\n...",
         "after": "---\ntitle: ...\n---\n\n# 2026-06-10 개발 로그\n..."
       }
@@ -324,6 +384,7 @@ Apply는 preview와 같은 요청 body를 받는다. 서버는 다시 source fil
 | `invalid-title` | title 비어 있음 | 필드 오류 표시 |
 | `invalid-date` | 파일명에서 date 추론 실패 또는 입력 date 불일치 | 파일명 정책 안내 |
 | `invalid-type` | 허용 type이 아님 | type select 강조 |
+| `type-confirmation-required` | medium type 후보가 확인되지 않음 | Preview 재실행 안내 |
 | `invalid-tags` | 허용 tag가 아니거나 비어 있음 | tag picker 강조 |
 | `invalid-summary` | summary 비어 있거나 221자 이상 | summary textarea 강조 |
 | `unsafe-path` | 계산된 경로가 source root 밖 | 요청 거절 |
@@ -358,6 +419,51 @@ Review panel은 아래 순서로 배치한다.
 
 `date`, `project`, `canonicalProjectPath`는 기본적으로 읽기 전용이다. 사용자가 이 값을 바꾸고 싶다면 v1.5 quick fix가 아니라 rename 또는 source policy 변경 흐름이 필요하다.
 
+type select는 후보 추천 이유를 함께 보여준다.
+
+```txt
+Type
+dev-log       high    filename contains dev-log
+debugging     medium  title contains 오류
+architecture  medium  filename contains design
+```
+
+tag picker는 기본 tag와 최근 tag를 분리해서 보여준다.
+
+```txt
+Default
+[x] Documentation
+
+Recently used in this folder
+[ ] Tooling
+[ ] Astro
+```
+
+### Diff preview
+
+v1.5의 preview는 plain before/after 텍스트만 보여주지 않는다. Dashboard 안에서는 unified diff 형태로 추가된 frontmatter 줄을 강조한다.
+
+```diff
++ ---
++ title: "2026-06-10 개발 로그"
++ date: "2026-06-10"
++ type: "dev-log"
++ ...
++ ---
++
+  # 2026-06-10 개발 로그
+```
+
+UI 요구사항:
+
+- 추가 줄은 accent 색으로 표시한다.
+- 기존 본문 줄은 낮은 대비로 표시한다.
+- 줄 번호를 보여준다.
+- 변경 파일 path label을 diff 상단에 고정 표시한다.
+- 모바일에서는 diff 영역을 가로 스크롤한다.
+
+이 diff는 확인 보조 UI다. apply 판단은 diff 화면이 아니라 서버의 입력 검증과 source hash 검증이 담당한다.
+
 ### Apply button 상태
 
 Apply는 아래 조건을 모두 만족할 때만 활성화한다.
@@ -367,6 +473,7 @@ Apply는 아래 조건을 모두 만족할 때만 활성화한다.
 - title이 비어 있지 않다.
 - date가 파일명과 일치한다.
 - type이 허용 목록 안에 있다.
+- medium confidence type 후보를 사용했다면 preview로 확인했다.
 - tag가 1개 이상이며 모두 허용 목록 안에 있다.
 - summary가 1-220자다.
 - preview를 한 번 이상 실행했다.
@@ -394,7 +501,10 @@ Next: run validate-source for this folder.
 - frontmatter 없는 파일에서 title을 H1로 추론한다.
 - H1이 없으면 파일명을 humanize해서 title로 제안한다.
 - 파일명 `YYYY-MM-DD-*-dev-log.md`에서 date와 `dev-log` type을 추론한다.
+- debugging, architecture, performance, research, deep-dive 패턴은 medium 후보로만 반환한다.
 - type 추론 실패 시 `requiresTypeSelection`을 true로 반환한다.
+- medium type 후보는 `requiresTypeConfirmation`을 true로 반환한다.
+- tag suggestion은 허용 tag와 실제 사용 tag의 교집합만 반환한다.
 - summary가 비어 있으면 preview는 가능하되 `canApply`는 false다.
 - 221자 이상 summary는 apply 불가다.
 - 허용되지 않은 tag는 apply 불가다.
@@ -420,6 +530,9 @@ Next: run validate-source for this folder.
 - missing frontmatter warning이 있는 post에 `Add frontmatter` 버튼이 표시된다.
 - valid post에는 `Add frontmatter` 버튼이 표시되지 않는다.
 - skeleton panel에 type select, tag picker, summary textarea가 있다.
+- type 후보의 confidence와 reason이 표시된다.
+- tag picker가 default suggestion과 recently used suggestion을 구분한다.
+- diff preview가 추가 줄과 기존 본문 줄을 구분한다.
 - Apply 버튼은 preview 전에는 비활성화된다.
 
 ### 수동 QA
@@ -479,8 +592,30 @@ v1.5는 missing frontmatter 복구만 다룬다. 아래 기능은 별도 버전�
 | v1.7 New post wizard | Dashboard에서 새 글 파일 생성 |
 | v1.8 Tag policy assistant | 허용 tag 추천, 오탈자 교정, 정책 변경 PR 지원 |
 | v1.9 Rename flow | date, slug, folder 이동과 redirect 정책 |
+| v1.10 Summary suggestion | 본문 기반 summary 후보를 생성하되 자동 저장하지 않는 보조 기능 |
 
 v1.5는 v1.7 New post wizard의 일부처럼 보일 수 있지만 목적이 다르다. v1.5는 이미 존재하는 글을 발행 파이프라인에 태우기 위한 복구 기능이고, 새 글 작성 흐름은 템플릿 선택, 파일명 생성, topic queue 연결까지 포함한다.
+
+v1.6 이후 기능과 통합할 때도 skeleton flow의 책임은 바뀌지 않는다.
+
+```txt
+Missing frontmatter:
+v1.5 skeleton flow
+
+Broken YAML frontmatter:
+v1.6 repair flow
+
+No file yet:
+v1.7 new post wizard
+
+Bad or missing tags:
+v1.8 tag policy assistant
+
+Wrong date, slug, folder:
+v1.9 rename flow
+```
+
+각 flow는 문제 유형 하나만 해결한다. 여러 문제가 동시에 있는 글은 Dashboard가 가장 앞단의 막힘부터 하나씩 보여준다. 예를 들어 frontmatter가 없으면 tag repair를 먼저 보여주지 않는다.
 
 ## 성공 기준
 
@@ -489,6 +624,9 @@ v1.5가 완료되었다고 판단하는 기준은 아래와 같다.
 - frontmatter 없는 source post가 Dashboard inspector에서 명확히 드러난다.
 - 사용자는 파일을 직접 열지 않고도 frontmatter skeleton을 preview할 수 있다.
 - summary, type, tags는 사용자가 확인해야 apply된다.
+- type 후보는 확신도와 이유를 함께 보여준다.
+- tag 후보는 허용 목록 안에서만 추천된다.
+- diff preview는 추가될 frontmatter를 기존 본문과 시각적으로 구분한다.
 - apply는 source hash가 바뀐 경우 실패한다.
 - apply는 published copy를 수정하지 않는다.
 - apply 후 validate-source로 이어지는 안내가 보인다.
