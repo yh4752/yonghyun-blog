@@ -13,6 +13,11 @@ import {
   previewPostFrontmatterEdit,
   readEditablePost,
 } from "./blog-ops/frontmatter-editor.mjs";
+import {
+  applyFrontmatterSkeleton,
+  previewFrontmatterSkeleton,
+  readFrontmatterSkeletonCandidate,
+} from "./blog-ops/frontmatter-skeleton.mjs";
 import { buildBlogOpsInventory } from "./blog-ops/posts-inventory.mjs";
 
 const DEFAULT_PORT = 4317;
@@ -83,16 +88,30 @@ function statusForMutationError(error) {
     [
       "source-not-found",
       "frontmatter-missing",
+      "frontmatter-already-exists",
       "frontmatter-parse-error",
+      "frontmatter-skeleton-invalid",
       "source-hash-required",
       "duplicate-frontmatter-key",
       "unknown-field",
       "immutable-field",
       "frontmatter-edit-invalid",
+      "invalid-title",
+      "invalid-date",
+      "invalid-type",
+      "invalid-tags",
+      "invalid-summary",
+      "summary-empty",
+      "summary-too-long",
+      "type-confirmation-required",
+      "empty-tags",
+      "duplicate-tag",
+      "invalid-tag",
       "folder-create-invalid",
       "folder-delete-invalid",
       "invalid-request-body",
       "confirmation-mismatch",
+      "unsafe-path",
     ].includes(error.code)
   ) {
     return 400;
@@ -157,6 +176,11 @@ export function createDashboardServer({
     readPost: readEditablePost,
     previewPost: previewPostFrontmatterEdit,
     applyPost: applyPostFrontmatterEdit,
+  },
+  frontmatterSkeletonProvider = {
+    readCandidate: readFrontmatterSkeletonCandidate,
+    preview: previewFrontmatterSkeleton,
+    apply: applyFrontmatterSkeleton,
   },
   folderProvider = {
     previewCreate: previewCreateFolder,
@@ -314,6 +338,83 @@ export function createDashboardServer({
               slug: body.slug,
               sourceHash: body.sourceHash,
               changes: body.changes ?? {},
+            }),
+          ),
+        );
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/safe-edit/frontmatter-skeleton") {
+      if (request.method !== "GET") {
+        sendMethodNotAllowed(response, "GET");
+        return;
+      }
+
+      try {
+        const project = url.searchParams.get("project") ?? "";
+        const slug = url.searchParams.get("slug") ?? "";
+        requireFields({ project, slug }, ["project", "slug"]);
+        sendJson(response, 200, await awaitProvider(frontmatterSkeletonProvider.readCandidate({ project, slug })));
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/safe-edit/frontmatter-skeleton/preview") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const body = await readJsonObjectBody(request);
+        requireFields(body, ["project", "slug", "sourceHash"]);
+        if (!isJsonObject(body.frontmatter)) {
+          throw clientError("frontmatter must be a JSON object.", { code: "invalid-request-body" });
+        }
+        sendJson(
+          response,
+          200,
+          await awaitProvider(
+            frontmatterSkeletonProvider.preview({
+              project: body.project,
+              slug: body.slug,
+              sourceHash: body.sourceHash,
+              frontmatter: body.frontmatter,
+            }),
+          ),
+        );
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/safe-edit/frontmatter-skeleton/apply") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const body = await readJsonObjectBody(request);
+        requireFields(body, ["project", "slug", "sourceHash"]);
+        if (!isJsonObject(body.frontmatter)) {
+          throw clientError("frontmatter must be a JSON object.", { code: "invalid-request-body" });
+        }
+        sendJson(
+          response,
+          200,
+          await awaitProvider(
+            frontmatterSkeletonProvider.apply({
+              project: body.project,
+              slug: body.slug,
+              sourceHash: body.sourceHash,
+              frontmatter: body.frontmatter,
             }),
           ),
         );

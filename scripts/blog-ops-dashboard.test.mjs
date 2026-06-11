@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import test from "node:test";
+import vm from "node:vm";
 
 import { createDashboardServer, renderDashboardHtml, startDashboard } from "./blog-ops-dashboard.mjs";
 
@@ -11,6 +12,50 @@ async function closeServer(server) {
 async function listen(server) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   return server.address().port;
+}
+
+function runDashboardScriptExpression(expression) {
+  const html = renderDashboardHtml();
+  const match = html.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(match, "dashboard script should exist");
+
+  const element = {
+    addEventListener() {},
+    alert() {},
+    classList: { toggle() {} },
+    dataset: {},
+    innerHTML: "",
+    setAttribute() {},
+    textContent: "",
+  };
+  const context = {
+    alert() {},
+    console,
+    document: {
+      addEventListener() {},
+      documentElement: { dataset: {} },
+      querySelector() {
+        return element;
+      },
+      querySelectorAll() {
+        return [];
+      },
+    },
+    fetch() {
+      return new Promise(() => {});
+    },
+    localStorage: {
+      getItem() {
+        return null;
+      },
+      setItem() {},
+    },
+    navigator: { clipboard: { writeText: async () => {} } },
+    setTimeout() {},
+  };
+
+  vm.runInNewContext(`${match[1]}\nglobalThis.__dashboardScriptResult = (${expression});`, context);
+  return context.__dashboardScriptResult;
 }
 
 test("renderDashboardHtml includes Content Ops and Learning Ops tabs", () => {
@@ -164,6 +209,91 @@ test("renderDashboardHtml includes Safe Mutations UI", () => {
   assert.match(html, /data-folder-create-preview/);
   assert.match(html, /data-folder-delete-preview/);
   assert.doesNotMatch(html, /src\/content\/blog[^\n]*Apply changes/);
+});
+
+test("renderDashboardHtml includes missing frontmatter quick fix UI", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /Add frontmatter/);
+  assert.match(html, /frontmatterSkeleton/);
+  assert.match(html, /frontmatterSkeletonDraft/);
+  assert.match(html, /frontmatterSkeletonPreview/);
+  assert.match(html, /data-frontmatter-skeleton-open/);
+  assert.match(html, /data-frontmatter-skeleton-preview/);
+  assert.match(html, /data-frontmatter-skeleton-apply/);
+  assert.match(html, /\/api\/safe-edit\/frontmatter-skeleton/);
+  assert.match(html, /\/api\/safe-edit\/frontmatter-skeleton\/preview/);
+  assert.match(html, /\/api\/safe-edit\/frontmatter-skeleton\/apply/);
+});
+
+test("renderDashboardHtml renders type candidates tag suggestions and unified diff preview", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /renderTypeCandidates/);
+  assert.match(html, /confidence/);
+  assert.match(html, /reason/);
+  assert.match(html, /skeletonTagBaseOptions/);
+  assert.match(html, /renderSkeletonTagOptions/);
+  assert.match(html, /tagSuggestions/);
+  assert.match(html, /invalidSelectedTags/);
+  assert.match(html, /tag-option warning/);
+  assert.match(html, /not in tagSuggestions/);
+  assert.match(html, /renderUnifiedDiffPreview/);
+  assert.match(html, /diff-line added/);
+  assert.match(html, /line-number/);
+  assert.match(html, /displayMode === "unified-diff"/);
+});
+
+test("renderDashboardHtml routes missing-frontmatter posts away from regular Safe Edit", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /function postHasMissingFrontmatter/);
+  assert.match(html, /MISSING_FRONTMATTER_CODE/);
+  assert.match(html, /MISSING_FRONTMATTER_TEXT_PATTERN/);
+  assert.match(html, /normalizePostIssueCode/);
+  assert.match(html, /issueMentionsMissingFrontmatter/);
+  assert.match(html, /hasMissingFrontmatterOnlySignal/);
+  assert.match(html, /quickFixSuggestions/);
+  assert.match(html, /missing-frontmatter/);
+  assert.match(html, /code === "frontmatter-error" && !MISSING_FRONTMATTER_TEXT_PATTERN\.test\(text\)/);
+  assert.match(html, /if \(postHasMissingFrontmatter\(post\)\)/);
+});
+
+test("renderDashboardHtml keeps frontmatter skeleton preview authoritative and stale guarded", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /function frontmatterSkeletonPreviewMatches\(requestPayload\)/);
+  assert.match(html, /valuesEqual\(state\.frontmatterSkeletonDraft, requestPayload\.frontmatter\)/);
+  assert.match(html, /state\.frontmatterSkeletonPreview = \{ \.\.\.json, requestPayload \};/);
+  assert.match(html, /const requestPayload = state\.frontmatterSkeletonPreview\.requestPayload;/);
+  assert.match(html, /postJson\("\/api\/safe-edit\/frontmatter-skeleton\/apply", requestPayload\)/);
+  assert.match(html, /selectedPostMatchesFrontmatterSkeletonRequest/);
+});
+
+test("dashboard script routes only explicit missing-frontmatter signals to skeleton", () => {
+  const results = runDashboardScriptExpression(`[
+    postHasMissingFrontmatter({ quickFixSuggestions: [{ code: "missing-frontmatter" }], warnings: [] }),
+    postHasMissingFrontmatter({ quickFixSuggestions: ["missing-frontmatter"], warnings: [] }),
+    postHasMissingFrontmatter({ quickFixSuggestions: [], warnings: [{ code: "frontmatter-error", message: "frontmatter가 없습니다." }] }),
+    postHasMissingFrontmatter({ quickFixSuggestions: [], warnings: [{ code: "frontmatter-error", message: "YAML parse failed." }] }),
+    postHasMissingFrontmatter({ quickFixSuggestions: [], warnings: ["frontmatter-error"] }),
+  ]`);
+
+  assert.deepEqual(Array.from(results), [true, true, true, false, false]);
+});
+
+test("dashboard script falls back skeleton tags and marks invalid selected tags", () => {
+  const rendered = runDashboardScriptExpression(`
+    renderSkeletonTagOptions(
+      skeletonTagBaseOptions({ tagSuggestions: [], allowedTags: ["Documentation"] }),
+      ["Documentation", "Custom"]
+    )
+  `);
+
+  assert.match(rendered, /Documentation/);
+  assert.match(rendered, /Custom/);
+  assert.match(rendered, /tag-option warning/);
+  assert.match(rendered, /not in tagSuggestions/);
 });
 
 test("renderDashboardHtml keeps safe mutation previews authoritative", () => {
@@ -1248,5 +1378,329 @@ test("startDashboard tries the next port when the default is occupied", async ()
   } finally {
     console.log = originalLog;
     await new Promise((resolve, reject) => blocker.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("frontmatter skeleton candidate endpoint returns provider result", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: ({ project, slug }) => {
+        providerInput = { project, slug };
+        return {
+          project,
+          slug,
+          sourceHash: "sha256:abc",
+          inferred: { title: "Title", type: "dev-log", tags: ["Documentation"] },
+        };
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton?project=demo&slug=post`);
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.sourceHash, "sha256:abc");
+    assert.deepEqual(providerInput, { project: "demo", slug: "post" });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton preview endpoint returns provider result", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: ({ project, slug, sourceHash, frontmatter }) => {
+        providerInput = { project, slug, sourceHash, frontmatter };
+        return { canApply: true, files: [{ displayMode: "unified-diff" }] };
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const frontmatter = { title: "Title", type: "dev-log", tags: ["Documentation"] };
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post", sourceHash: "sha256:abc", frontmatter }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.canApply, true);
+    assert.deepEqual(providerInput, { project: "demo", slug: "post", sourceHash: "sha256:abc", frontmatter });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton apply endpoint maps stale source to 409", async () => {
+  const stale = Object.assign(new Error("stale-source"), { code: "stale-source" });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        throw stale;
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post", sourceHash: "sha256:old", frontmatter: {} }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(json.error, "stale-source");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton apply endpoint returns provider result", async () => {
+  let providerInput;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: ({ project, slug, sourceHash, frontmatter }) => {
+        providerInput = { project, slug, sourceHash, frontmatter };
+        return { status: "applied", changedFields: ["title"] };
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const frontmatter = { title: "Title", type: "dev-log", tags: ["Documentation"] };
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post", sourceHash: "sha256:abc", frontmatter }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.status, "applied");
+    assert.deepEqual(providerInput, { project: "demo", slug: "post", sourceHash: "sha256:abc", frontmatter });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton apply endpoint maps skeleton validation failures to 400", async () => {
+  const invalid = Object.assign(new Error("type-confirmation-required"), { code: "type-confirmation-required" });
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        throw invalid;
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post", sourceHash: "sha256:abc", frontmatter: {} }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "type-confirmation-required");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton apply rejects missing required fields before provider call", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        providerCalled = true;
+        return {};
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton apply rejects non-object frontmatter before provider call", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        providerCalled = true;
+        return {};
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project: "demo",
+        slug: "post",
+        sourceHash: "sha256:abc",
+        frontmatter: "not-object",
+      }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton preview rejects missing required fields before provider call", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        providerCalled = true;
+        return {};
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "demo", slug: "post" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("frontmatter skeleton preview rejects non-object frontmatter before provider call", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    inventoryProvider: () => ({ projects: [], posts: [], warnings: [] }),
+    frontmatterSkeletonProvider: {
+      readCandidate: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        providerCalled = true;
+        return {};
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/safe-edit/frontmatter-skeleton/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project: "demo",
+        slug: "post",
+        sourceHash: "sha256:abc",
+        frontmatter: [],
+      }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
   }
 });
