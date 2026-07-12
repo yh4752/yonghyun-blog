@@ -1,7 +1,7 @@
 ---
 import { render } from "astro:content";
 import BlogPostLayout from "../../../layouts/BlogPostLayout.astro";
-import { getPublishedPosts } from "../../../utils/posts";
+import { getPublishedPosts, getRelatedPosts } from "../../../utils/posts";
 
 export async function getStaticPaths() {
   const posts = await getPublishedPosts();
@@ -15,12 +15,13 @@ export async function getStaticPaths() {
       post,
       previous: posts[index + 1],
       next: posts[index - 1],
+      relatedPosts: getRelatedPosts(posts, post),
     },
   }));
 }
 
-const { post, previous, next } = Astro.props;
+const { post, previous, next, relatedPosts } = Astro.props;
 const { Content, headings } = await render(post);
 ---
 
-<BlogPostLayout post={post} Content={Content} headings={headings} previous={previous} next={next} />
+<BlogPostLayout post={post} Content={Content} headings={headings} previous={previous} next={next} relatedPosts={relatedPosts} />

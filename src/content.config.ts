@@ -15,6 +15,7 @@ const blog = defineCollection({
   schema: z.object({
     title: z.string().min(1),
     date: z.coerce.date(),
+    updated: z.coerce.date().optional(),
     type: postTypeSchema,
     project: z.string().min(1),
     tags: z.array(tagSchema).min(1),

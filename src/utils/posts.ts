@@ -55,3 +55,17 @@ export function filterPostsByType(posts: BlogPost[], type: BlogPost["data"]["typ
 export function filterPostsByProject(posts: BlogPost[], project: string): BlogPost[] {
   return filterPosts(posts, { project });
 }
+
+export function getRelatedPosts(posts: BlogPost[], post: BlogPost): BlogPost[] {
+  if (post.data.relatedPosts.length === 0) return [];
+
+  const postByReference = new Map(posts.map((candidate) => [`${candidate.project}/${candidate.slug}`, candidate]));
+  const seen = new Set<string>();
+
+  return post.data.relatedPosts.flatMap((reference) => {
+    const relatedPost = postByReference.get(reference);
+    if (!relatedPost || relatedPost.href === post.href || seen.has(reference)) return [];
+    seen.add(reference);
+    return [relatedPost];
+  });
+}

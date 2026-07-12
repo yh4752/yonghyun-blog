@@ -170,6 +170,7 @@ function firstPostContent({ title, date, postType, slug, template }) {
   return `---
 title: ${JSON.stringify(title)}
 date: ${JSON.stringify(date)}
+updated: ${JSON.stringify(date)}
 type: ${JSON.stringify(postType)}
 project: ${JSON.stringify(slug)}
 tags: []

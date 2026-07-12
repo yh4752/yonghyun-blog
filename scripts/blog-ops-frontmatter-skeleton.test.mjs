@@ -104,6 +104,7 @@ function validFrontmatter(overrides = {}) {
   return {
     title: "2026-06-10 개발 로그",
     date: "2026-06-10",
+    updated: "2026-06-10",
     type: "dev-log",
     project: "demo",
     tags: ["Documentation"],
@@ -146,6 +147,7 @@ test("readFrontmatterSkeletonCandidate infers structural fields and suggestions"
   assert.deepEqual(candidate.inferred, {
     title: "2026-06-10 개발 로그",
     date: "2026-06-10",
+    updated: "2026-06-10",
     type: "dev-log",
     project: "demo",
     tags: ["Documentation"],
@@ -313,6 +315,7 @@ test("applyFrontmatterSkeleton writes skeleton above the body", (t) => {
   assert.deepEqual(result.changedFields, [
     "title",
     "date",
+    "updated",
     "type",
     "project",
     "tags",
