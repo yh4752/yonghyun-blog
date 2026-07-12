@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && astro build",
+    "build": "astro check && astro build && pagefind --site dist && node scripts/verify-pagefind-output.mjs",
     "test": "node --test scripts/*.test.mjs",
     "preview": "astro preview",
     "astro": "astro",
@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
+    "pagefind": "^1.5.2",
     "typescript": "^6.0.3"
   }
 }

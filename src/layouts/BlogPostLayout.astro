@@ -47,14 +47,18 @@ const jsonLd = {
 
 <BaseLayout title={post.data.title} description={post.data.summary} canonicalPath={post.href} ogType="article" jsonLd={jsonLd}>
   <div class="reading-progress" data-reading-progress></div>
-  <article class="post-shell">
+  <article class="post-shell" data-pagefind-body>
     <header class="post-header">
       <PostMeta date={post.data.date} project={post.project} type={post.data.type} />
-      <h1>{post.data.title}</h1>
+      <div class="pagefind-filters" aria-hidden="true" data-pagefind-ignore>
+        <span data-pagefind-filter="project">{post.project}</span>
+        <span data-pagefind-filter="type">{post.data.type}</span>
+      </div>
+      <h1 data-pagefind-meta="title">{post.data.title}</h1>
       <p>{post.data.summary}</p>
       <div class="post-tools">
         <ul class="tags" aria-label="태그">
-          {post.data.tags.map((tag) => <li>{tag}</li>)}
+          {post.data.tags.map((tag) => <li data-pagefind-filter="tag">{tag}</li>)}
         </ul>
         <button class="copy-link" type="button" data-copy-link>Copy link</button>
       </div>
@@ -73,12 +77,14 @@ const jsonLd = {
       </div>
     </div>
 
-    <nav class="post-nav" aria-label="이전 다음 글">
+    <nav class="post-nav" aria-label="이전 다음 글" data-pagefind-ignore>
       {previous ? <a href={previous.href}>이전 글<span>{previous.data.title}</span></a> : <span></span>}
       {next ? <a href={next.href}>다음 글<span>{next.data.title}</span></a> : <span></span>}
     </nav>
 
-    <RelatedPosts posts={relatedPosts} />
+    <div data-pagefind-ignore>
+      <RelatedPosts posts={relatedPosts} />
+    </div>
   </article>
 
   <script>
@@ -122,6 +128,10 @@ const jsonLd = {
     display: grid;
     gap: 14px;
     max-width: 820px;
+  }
+
+  .pagefind-filters {
+    display: none;
   }
 
   .post-header h1 {

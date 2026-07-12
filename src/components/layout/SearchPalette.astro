@@ -1,0 +1,303 @@
+<button
+  class="search-trigger"
+  type="button"
+  aria-label="Search posts"
+  aria-expanded="false"
+  aria-controls="search-palette"
+  data-search-trigger
+>
+  Search <kbd>Ctrl K</kbd>
+</button>
+
+<div class="search-overlay" id="search-palette" role="dialog" aria-modal="true" aria-labelledby="search-title" hidden data-search-dialog>
+  <div class="search-panel">
+    <div class="search-heading">
+      <h2 id="search-title">Search posts</h2>
+      <button class="close-search" type="button" aria-label="Close search" data-search-close>Esc</button>
+    </div>
+    <input id="search-input" type="search" aria-label="Search posts" placeholder="Search posts" autocomplete="off" data-search-input />
+    <p class="search-status" aria-live="polite" data-search-status></p>
+    <ul class="search-results" aria-label="Search results" data-search-results></ul>
+  </div>
+</div>
+
+<script>
+  type SearchResult = {
+    url?: unknown;
+    meta?: { title?: unknown };
+    plain_excerpt?: unknown;
+  };
+
+  type PagefindModule = {
+    search: (query: string) => Promise<{ results: Array<{ data: () => Promise<SearchResult> }> }>;
+  };
+
+  const trigger = document.querySelector<HTMLButtonElement>("[data-search-trigger]");
+  const dialog = document.querySelector<HTMLElement>("[data-search-dialog]");
+  const closeButton = document.querySelector<HTMLButtonElement>("[data-search-close]");
+  const input = document.querySelector<HTMLInputElement>("[data-search-input]");
+  const status = document.querySelector<HTMLElement>("[data-search-status]");
+  const results = document.querySelector<HTMLUListElement>("[data-search-results]");
+
+  let debounceId: number | undefined;
+  let searchId = 0;
+  let pagefindPromise: Promise<PagefindModule> | undefined;
+  let previousBodyOverflow = "";
+  const pagefindPath = "/pagefind/pagefind.js";
+
+  const loadPagefind = () => {
+    pagefindPromise ??= import(/* @vite-ignore */ pagefindPath) as Promise<PagefindModule>;
+    return pagefindPromise;
+  };
+
+  const safeResultUrl = (url: unknown) => {
+    if (typeof url !== "string") return "/";
+
+    try {
+      const candidate = new URL(url, window.location.origin);
+      return candidate.origin === window.location.origin ? `${candidate.pathname}${candidate.search}${candidate.hash}` : "/";
+    } catch {
+      return "/";
+    }
+  };
+
+  const renderResults = (searchResults: SearchResult[]) => {
+    if (!results) return;
+    results.replaceChildren();
+
+    for (const result of searchResults) {
+      const item = document.createElement("li");
+      const link = document.createElement("a");
+      const title = document.createElement("strong");
+      const excerpt = document.createElement("span");
+
+      link.href = safeResultUrl(result.url);
+      title.textContent = typeof result.meta?.title === "string" && result.meta.title.trim() ? result.meta.title : "Untitled post";
+      excerpt.textContent = typeof result.plain_excerpt === "string" ? result.plain_excerpt : "";
+      link.append(title, excerpt);
+      item.append(link);
+      results.append(item);
+    }
+  };
+
+  const closeSearch = () => {
+    if (!trigger || !dialog) return;
+    searchId += 1;
+    window.clearTimeout(debounceId);
+    dialog.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+    document.body.style.overflow = previousBodyOverflow;
+    trigger.focus();
+  };
+
+  const openSearch = () => {
+    if (!trigger || !dialog || !input) return;
+    if (!dialog.hidden) return;
+    previousBodyOverflow = document.body.style.overflow;
+    dialog.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    document.body.style.overflow = "hidden";
+    window.setTimeout(() => input.focus(), 0);
+  };
+
+  const search = async (query: string, requestId: number) => {
+    if (!status) return;
+
+    try {
+      const pagefind = await loadPagefind();
+      const response = await pagefind.search(query);
+      const searchResults = await Promise.all(response.results.slice(0, 10).map((result) => result.data()));
+      if (requestId !== searchId) return;
+
+      renderResults(searchResults);
+      status.textContent = searchResults.length === 1 ? "1 result" : `${searchResults.length} results`;
+    } catch {
+      if (requestId !== searchId) return;
+      renderResults([]);
+      status.textContent = "Search is unavailable.";
+    }
+  };
+
+  trigger?.addEventListener("click", openSearch);
+  closeButton?.addEventListener("click", closeSearch);
+  dialog?.addEventListener("click", (event) => {
+    if (event.target === dialog) closeSearch();
+  });
+  dialog?.addEventListener("keydown", (event) => {
+    if (dialog.hidden || event.key !== "Tab") return;
+
+    const focusableElements = [...dialog.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled])")];
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements.at(-1);
+    if (!firstElement || !lastElement) return;
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  });
+  input?.addEventListener("input", () => {
+    const query = input.value.trim();
+    const requestId = ++searchId;
+    window.clearTimeout(debounceId);
+
+    if (!query) {
+      renderResults([]);
+      if (status) status.textContent = "";
+      return;
+    }
+
+    if (status) status.textContent = "Searching...";
+    debounceId = window.setTimeout(() => void search(query, requestId), 180);
+  });
+  window.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      openSearch();
+    }
+
+    if (event.key === "Escape" && dialog && !dialog.hidden) closeSearch();
+  });
+</script>
+
+<style>
+  .search-trigger,
+  .close-search {
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .search-trigger {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    height: 30px;
+    padding: 0 9px;
+    box-shadow: var(--shadow-rest);
+  }
+
+  .search-trigger:hover,
+  .close-search:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent-strong);
+  }
+
+  kbd {
+    border-left: 1px solid var(--color-border);
+    padding-left: 8px;
+    color: var(--color-faint);
+    font: inherit;
+  }
+
+  .search-overlay {
+    position: fixed;
+    z-index: 40;
+    inset: 0;
+    display: grid;
+    place-items: start center;
+    overflow-y: auto;
+    padding: min(12vh, 96px) 18px 32px;
+    background: color-mix(in srgb, var(--color-text) 30%, transparent);
+  }
+
+  .search-overlay[hidden] {
+    display: none;
+  }
+
+  .search-panel {
+    width: min(680px, 100%);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 8px;
+    background: var(--color-bg);
+    box-shadow: var(--shadow-raised);
+    padding: 18px;
+  }
+
+  .search-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: 0;
+  }
+
+  .close-search {
+    height: 26px;
+    padding: 0 8px;
+  }
+
+  input {
+    width: 100%;
+    margin-top: 16px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 5px;
+    padding: 11px 12px;
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .search-status {
+    min-height: 20px;
+    margin: 10px 0 0;
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .search-results {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .search-results li {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .search-results a {
+    display: grid;
+    gap: 5px;
+    padding: 12px 0;
+    text-decoration: none;
+  }
+
+  .search-results a:hover strong,
+  .search-results a:focus-visible strong {
+    color: var(--color-accent-strong);
+  }
+
+  .search-results strong {
+    font-size: 15px;
+  }
+
+  .search-results span {
+    color: var(--color-muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 860px) {
+    .search-trigger {
+      height: 28px;
+      padding: 0 8px;
+    }
+
+    .search-trigger kbd {
+      display: none;
+    }
+  }
+</style>
