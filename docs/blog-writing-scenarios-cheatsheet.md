@@ -233,6 +233,7 @@ npm run new:post -- \
 ---
 title: "Qdrant Vector Search Projection을 internal API로 먼저 만든 이유"
 date: "2026-06-02"
+updated: "2026-06-02"
 type: "architecture"
 project: "sigak"
 tags: ["Search", "Qdrant", "Vector Search", "Architecture"]
@@ -518,6 +519,7 @@ npm run build
 ---
 title: "글 제목"
 date: "2026-06-02"
+updated: "2026-06-02"
 type: "deep-dive"
 project: "sigak"
 tags: ["Search", "Qdrant", "Architecture"]
@@ -535,6 +537,7 @@ relatedPosts: ["sigak/2026-05-27-dev-log"]
 | --- | --- |
 | `title` | 목록과 상세 페이지에 보이는 제목 |
 | `date` | 글 작성일 또는 발행 기준일 |
+| `updated` | 마지막으로 실질 수정한 날짜 |
 | `type` | `dev-log`, `deep-dive`, `debugging`, `architecture`, `performance`, `research` |
 | `project` | `posts.config.yml`과 `src/data/projects.json`에 등록된 slug |
 | `tags` | `src/data/tags.json`의 허용 목록 |

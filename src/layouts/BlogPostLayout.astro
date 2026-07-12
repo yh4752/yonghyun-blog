@@ -4,6 +4,8 @@ import type { AstroComponentFactory } from "astro/runtime/server/index.js";
 import BaseLayout from "./BaseLayout.astro";
 import TableOfContents from "../components/blog/TableOfContents.astro";
 import PostMeta from "../components/blog/PostMeta.astro";
+import RelatedPosts from "../components/blog/RelatedPosts.astro";
+import { site } from "../data/site";
 import "../styles/prose.css";
 import type { BlogPost } from "../utils/posts";
 
@@ -13,12 +15,37 @@ type Props = {
   headings: MarkdownHeading[];
   previous?: BlogPost;
   next?: BlogPost;
+  relatedPosts: BlogPost[];
 };
 
-const { post, Content, headings, previous, next } = Astro.props;
+const { post, Content, headings, previous, next, relatedPosts } = Astro.props;
+const postUrl = new URL(post.href, site.siteUrl).toString();
+const authorUrl = new URL(site.author.url, site.siteUrl).toString();
+const ogImageUrl = new URL(site.defaultOgImage, site.siteUrl).toString();
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: post.data.title,
+  description: post.data.summary,
+  datePublished: post.data.date.toISOString(),
+  dateModified: (post.data.updated ?? post.data.date).toISOString(),
+  author: {
+    "@type": "Person",
+    name: site.author.name,
+    url: authorUrl,
+    sameAs: site.author.sameAs,
+  },
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": postUrl,
+  },
+  url: postUrl,
+  image: ogImageUrl,
+  keywords: post.data.tags.join(", "),
+};
 ---
 
-<BaseLayout title={post.data.title} description={post.data.summary} canonicalPath={post.href}>
+<BaseLayout title={post.data.title} description={post.data.summary} canonicalPath={post.href} ogType="article" jsonLd={jsonLd}>
   <div class="reading-progress" data-reading-progress></div>
   <article class="post-shell">
     <header class="post-header">
@@ -50,6 +77,8 @@ const { post, Content, headings, previous, next } = Astro.props;
       {previous ? <a href={previous.href}>이전 글<span>{previous.data.title}</span></a> : <span></span>}
       {next ? <a href={next.href}>다음 글<span>{next.data.title}</span></a> : <span></span>}
     </nav>
+
+    <RelatedPosts posts={relatedPosts} />
   </article>
 
   <script>

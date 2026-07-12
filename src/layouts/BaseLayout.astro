@@ -9,24 +9,30 @@ type Props = {
   description?: string;
   canonicalPath?: string;
   hideFooter?: boolean;
+  jsonLd?: Record<string, unknown>;
+  ogType?: "website" | "article";
 };
 
 const title = Astro.props.title ? `${Astro.props.title} | ${site.siteName}` : site.siteName;
 const description = Astro.props.description ?? site.description;
 const canonicalUrl = new URL(Astro.props.canonicalPath ?? Astro.url.pathname, site.siteUrl).toString();
 const ogImageUrl = new URL(site.defaultOgImage, site.siteUrl).toString();
+const rssFeedUrl = new URL("/rss.xml", site.siteUrl).toString();
+const ogType = Astro.props.ogType ?? "website";
+const serializedJsonLd = Astro.props.jsonLd ? JSON.stringify(Astro.props.jsonLd).replaceAll("<", "\\u003c") : undefined;
 ---
 
 <!doctype html>
-<html lang="ko">
+<html lang={site.language}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta name="author" content={site.author} />
+    <meta name="author" content={site.author.name} />
     <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" type="application/rss+xml" title={`${site.siteName} RSS`} href={rssFeedUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -35,12 +41,17 @@ const ogImageUrl = new URL(site.defaultOgImage, site.siteUrl).toString();
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600;700&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
     />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={ogImageUrl} />
     <meta name="twitter:card" content="summary_large_image" />
+    {
+      serializedJsonLd && (
+        <script is:inline type="application/ld+json" set:html={serializedJsonLd} />
+      )
+    }
     <script is:inline>
       (() => {
         try {

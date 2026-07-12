@@ -10,6 +10,7 @@ import { POST_TYPES } from "./status-rules.mjs";
 const FIELD_ORDER = [
   "title",
   "date",
+  "updated",
   "type",
   "project",
   "tags",
@@ -325,6 +326,7 @@ export function readFrontmatterSkeletonCandidate({ root = process.cwd(), project
     inferred: {
       title,
       date,
+      ...(date ? { updated: date } : {}),
       type: selectedType,
       project,
       tags: defaultTags(config.allowedTags),

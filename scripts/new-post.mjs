@@ -105,6 +105,7 @@ fs.mkdirSync(targetDir, { recursive: true });
 const frontmatter = `---
 title: ${JSON.stringify(title)}
 date: ${JSON.stringify(date)}
+updated: ${JSON.stringify(date)}
 type: ${JSON.stringify(args.type)}
 project: ${JSON.stringify(source.project)}
 tags: []

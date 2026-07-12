@@ -87,6 +87,7 @@ npm run new:post -- --project sigak --type deep-dive --title "Qdrant Vector Sear
 
 - `slug`
 - `featured`
+- `updated`
 - `canonicalProjectPath`
 - `sourceRepository`
 - `relatedPosts`
@@ -95,6 +96,11 @@ npm run new:post -- --project sigak --type deep-dive --title "Qdrant Vector Sear
 
 - 80-160자를 권장한다.
 - `draft: false`인 글에서 비어 있으면 validation error로 처리한다.
+
+`updated`:
+
+- 선택 필드이며, 처음 작성할 때는 `date`와 같은 값으로 둔다.
+- `updated`는 실질적으로 수정한 날에만 `date`와 다르게 갱신한다.
 
 `tags`:
 
@@ -418,6 +424,7 @@ Warning은 exit code 0으로 끝낸다. Error는 exit code 1로 실패시킨다.
 
 - 기존 글에는 처음 이관할 때 원본 Sigak 문서에 frontmatter를 직접 추가한다.
 - `date`, `title`, `project`, `type`, `tags`, `summary`, `draft`를 명시한다.
+- 기존 글을 실질적으로 보강했다면 `updated`도 함께 기록한다.
 - `canonicalProjectPath`는 Sigak 저장소 기준 상대 경로로 넣는다.
 - `sourceRepository`는 Sigak 저장소가 공개된 뒤 추가한다.
 - 기존 공개 URL이 없으므로 파일명 기반 slug를 그대로 사용한다.
