@@ -1,0 +1,104 @@
+---
+import { site } from "../../data/site";
+
+const isConfigured =
+  site.comments.provider === "giscus" &&
+  site.comments.enabled &&
+  [site.comments.repo, site.comments.repoId, site.comments.category, site.comments.categoryId].every(
+    (value) => value.trim().length > 0,
+  );
+---
+
+{
+  isConfigured && (
+    <section class="giscus-comments" aria-label="댓글" data-giscus-comments data-pagefind-ignore>
+      <div class="giscus"></div>
+      <script
+        is:inline
+        src="https://giscus.app/client.js"
+        data-repo={site.comments.repo}
+        data-repo-id={site.comments.repoId}
+        data-category={site.comments.category}
+        data-category-id={site.comments.categoryId}
+        data-mapping="pathname"
+        data-strict={site.comments.strict ? "1" : "0"}
+        data-reactions-enabled={site.comments.reactionsEnabled ? "1" : "0"}
+        data-emit-metadata="0"
+        data-input-position={site.comments.inputPosition}
+        data-theme="preferred_color_scheme"
+        data-lang={site.language}
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async
+      ></script>
+      <script is:inline>
+        (() => {
+          const root = document.currentScript?.closest("[data-giscus-comments]");
+          if (!root) return;
+
+          const targetOrigin = "https://giscus.app";
+          let frame;
+          let frameReady = false;
+
+          const syncTheme = () => {
+            if (!frameReady || !frame?.contentWindow) return;
+
+            const theme = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+            frame.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, targetOrigin);
+          };
+
+          const handleFrameLoad = () => {
+            frameReady = true;
+            syncTheme();
+          };
+
+          const attachFrame = () => {
+            const nextFrame = root.querySelector("iframe.giscus-frame");
+            if (!nextFrame || nextFrame === frame) return false;
+
+            frame?.removeEventListener("load", handleFrameLoad);
+            frame = nextFrame;
+            frameReady = false;
+            frame.addEventListener("load", handleFrameLoad);
+            return true;
+          };
+
+          const themeObserver = new MutationObserver(syncTheme);
+          themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["data-theme"],
+          });
+
+          const frameObserver = new MutationObserver(() => {
+            if (attachFrame()) frameObserver.disconnect();
+          });
+          frameObserver.observe(root, { childList: true, subtree: true });
+          if (attachFrame()) frameObserver.disconnect();
+
+          const cleanup = () => {
+            themeObserver.disconnect();
+            frameObserver.disconnect();
+            frame?.removeEventListener("load", handleFrameLoad);
+            document.removeEventListener("astro:before-swap", cleanup);
+            window.removeEventListener("pagehide", handlePageHide);
+          };
+
+          const handlePageHide = (event) => {
+            if (event.persisted) return;
+            cleanup();
+          };
+
+          document.addEventListener("astro:before-swap", cleanup, { once: true });
+          window.addEventListener("pagehide", handlePageHide);
+        })();
+      </script>
+    </section>
+  )
+}
+
+<style>
+  .giscus-comments {
+    max-width: var(--prose-width);
+    margin-top: 48px;
+  }
+</style>
