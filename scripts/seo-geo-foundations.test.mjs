@@ -2,19 +2,29 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
+import { renderPostMarkdown } from "./blog-ops/post-creator.mjs";
+
 function readSource(path) {
   return fs.readFileSync(path, "utf8");
 }
 
 test("content schema and post templates support an explicit modified date", () => {
   const contentConfig = readSource("src/content.config.ts");
-  const newPostScript = readSource("scripts/new-post.mjs");
   const initProjectScript = readSource("scripts/init-project.mjs");
   const writingCheatsheet = readSource("docs/blog-writing-scenarios-cheatsheet.md");
   const publishingWorkflow = readSource("docs/content-publishing-workflow.md");
+  const postMarkdown = renderPostMarkdown({
+    title: "Updated date test",
+    date: "2026-07-21",
+    type: "dev-log",
+    project: "demo",
+    tags: ["Testing"],
+    summary: "Verifies the modified date in generated post frontmatter.",
+    filename: "2026-07-21-updated-date-test.md",
+  });
 
   assert.match(contentConfig, /updated:\s*z\.coerce\.date\(\)\.optional\(\)/);
-  assert.match(newPostScript, /updated: \$\{JSON\.stringify\(date\)\}/);
+  assert.match(postMarkdown, /^updated: "2026-07-21"$/m);
   assert.match(initProjectScript, /updated: \$\{JSON\.stringify\(date\)\}/);
   assert.match(writingCheatsheet, /\| `updated` \| 마지막으로 실질 수정한 날짜 \|/);
   assert.match(publishingWorkflow, /`updated`는 실질적으로 수정한 날에만 `date`와 다르게 갱신한다\./);

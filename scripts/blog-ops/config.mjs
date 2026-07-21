@@ -32,29 +32,31 @@ export function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
-export function loadBlogOpsConfig({ root = process.cwd(), env = process.env } = {}) {
+export function loadBlogOpsConfig({ root = process.cwd(), env = process.env, metadata = true } = {}) {
   const rawConfig = parse(fs.readFileSync(path.join(root, "posts.config.yml"), "utf8")) ?? {};
-  const projects = readJson(path.join(root, "src", "data", "projects.json"));
-  const tags = readJson(path.join(root, "src", "data", "tags.json"));
+  const projects = metadata ? readJson(path.join(root, "src", "data", "projects.json")) : [];
+  const tags = metadata ? readJson(path.join(root, "src", "data", "tags.json")) : [];
   const sourceProjects = new Set((rawConfig.sources ?? []).map((source) => source.project));
   const metadataProjects = new Set(projects.map((project) => project.slug));
   const projectWarnings = [];
 
-  for (const project of sourceProjects) {
-    if (!metadataProjects.has(project)) {
-      projectWarnings.push({
-        code: "project-metadata-mismatch",
-        message: `${project} exists in posts.config.yml but not in src/data/projects.json`,
-      });
+  if (metadata) {
+    for (const project of sourceProjects) {
+      if (!metadataProjects.has(project)) {
+        projectWarnings.push({
+          code: "project-metadata-mismatch",
+          message: `${project} exists in posts.config.yml but not in src/data/projects.json`,
+        });
+      }
     }
-  }
 
-  for (const project of metadataProjects) {
-    if (!sourceProjects.has(project)) {
-      projectWarnings.push({
-        code: "project-metadata-mismatch",
-        message: `${project} exists in src/data/projects.json but not in posts.config.yml`,
-      });
+    for (const project of metadataProjects) {
+      if (!sourceProjects.has(project)) {
+        projectWarnings.push({
+          code: "project-metadata-mismatch",
+          message: `${project} exists in src/data/projects.json but not in posts.config.yml`,
+        });
+      }
     }
   }
 

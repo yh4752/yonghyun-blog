@@ -18,10 +18,23 @@ import {
   previewFrontmatterSkeleton,
   readFrontmatterSkeletonCandidate,
 } from "./blog-ops/frontmatter-skeleton.mjs";
+import {
+  applyNewPost,
+  POST_CREATION_MODES,
+  previewNewPost,
+  readNewPostOptions,
+} from "./blog-ops/post-creator.mjs";
 import { buildBlogOpsInventory } from "./blog-ops/posts-inventory.mjs";
 
 const DEFAULT_PORT = 4317;
 const DASHBOARD_TEMPLATE_URL = new URL("./blog-ops-dashboard-template.html", import.meta.url);
+const defaultNewPostProvider = {
+  getOptions: readNewPostOptions,
+  preview: previewNewPost,
+  apply: applyNewPost,
+};
+const NEW_POST_INPUT_FIELDS = new Set(["project", "title", "date", "type", "tags", "summary"]);
+const NEW_POST_APPLY_FIELDS = new Set([...NEW_POST_INPUT_FIELDS, "planHash"]);
 
 export function renderDashboardHtml() {
   return fs.readFileSync(DASHBOARD_TEMPLATE_URL, "utf8");
@@ -83,10 +96,22 @@ function statusForRunnerResult(result) {
 }
 
 function statusForMutationError(error) {
-  if (error.code === "stale-source" || error.code === "stale-metadata") return 409;
+  if (
+    [
+      "stale-source",
+      "stale-metadata",
+      "stale-preview",
+      "post-already-exists",
+      "source-directory-not-found",
+      "project-metadata-not-found",
+    ].includes(error.code)
+  ) {
+    return 409;
+  }
   if (
     [
       "source-not-found",
+      "project-required",
       "frontmatter-missing",
       "frontmatter-already-exists",
       "frontmatter-parse-error",
@@ -112,6 +137,7 @@ function statusForMutationError(error) {
       "invalid-request-body",
       "confirmation-mismatch",
       "unsafe-path",
+      "post-create-invalid",
     ].includes(error.code)
   ) {
     return 400;
@@ -149,6 +175,15 @@ function requireFields(value, fields) {
   }
 }
 
+function requireOnlyFields(body, allowedSet) {
+  const unsupportedFields = Object.keys(body).filter((field) => !allowedSet.has(field));
+  if (unsupportedFields.length > 0) {
+    throw clientError(`Request contains unsupported fields: ${unsupportedFields.join(", ")}.`, {
+      code: "unknown-field",
+    });
+  }
+}
+
 async function readJsonObjectBody(request) {
   const body = await readJsonBody(request);
   if (!isJsonObject(body)) {
@@ -159,6 +194,24 @@ async function readJsonObjectBody(request) {
 
 function awaitProvider(value) {
   return Promise.resolve(value);
+}
+
+function isPlainObject(value) {
+  if (!isJsonObject(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function sanitizeNewPostResponse(value) {
+  if (Array.isArray(value)) return value.map(sanitizeNewPostResponse);
+  if (!isPlainObject(value)) return value;
+
+  const safeValue = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (key === "absolutePath" || key === "targetPath") continue;
+    safeValue[key] = sanitizeNewPostResponse(nestedValue);
+  }
+  return safeValue;
 }
 
 function sendMutationError(response, error) {
@@ -182,6 +235,7 @@ export function createDashboardServer({
     preview: previewFrontmatterSkeleton,
     apply: applyFrontmatterSkeleton,
   },
+  newPostProvider = defaultNewPostProvider,
   folderProvider = {
     previewCreate: previewCreateFolder,
     applyCreate: applyCreateFolder,
@@ -272,6 +326,74 @@ export function createDashboardServer({
         });
       } finally {
         runnerBusy = false;
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/posts/new/options") {
+      if (request.method !== "GET") {
+        sendMethodNotAllowed(response, "GET");
+        return;
+      }
+
+      try {
+        const selectedProject = url.searchParams.get("project") ?? "";
+        const result = await awaitProvider(
+          newPostProvider.getOptions({
+            selectedProject,
+            mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+          }),
+        );
+        sendJson(response, 200, sanitizeNewPostResponse(result));
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/posts/new/preview") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const input = await readJsonObjectBody(request);
+        requireOnlyFields(input, NEW_POST_INPUT_FIELDS);
+        const result = await awaitProvider(
+          newPostProvider.preview({
+            input,
+            mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+          }),
+        );
+        sendJson(response, 200, sanitizeNewPostResponse(result));
+      } catch (error) {
+        sendMutationError(response, error);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/posts/new/apply") {
+      if (request.method !== "POST") {
+        sendMethodNotAllowed(response, "POST");
+        return;
+      }
+
+      try {
+        const body = await readJsonObjectBody(request);
+        requireOnlyFields(body, NEW_POST_APPLY_FIELDS);
+        requireFields(body, ["planHash"]);
+        const { planHash, ...input } = body;
+        const result = await awaitProvider(
+          newPostProvider.apply({
+            input,
+            planHash,
+            mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+          }),
+        );
+        sendJson(response, 200, sanitizeNewPostResponse(result));
+      } catch (error) {
+        sendMutationError(response, error);
       }
       return;
     }
