@@ -14,9 +14,9 @@
 - 개인 답변 노트는 공개 저장소에 올리지 않는다.
 - 이 문서는 전체 글별 상태표로 사용하지 않는다.
 - 글별 발행/학습 상태는 Blog Ops Dashboard의 Learning Ops inventory와 `.local/learning-progress.json`에서 관리한다.
-- 이 문서에는 현재 세션이나 이번 주에 실제로 집어 들 3-7개 작업만 남긴다.
+- 이 문서에는 현재 세션이나 이번 주에 실제로 집어들 3-7개 작업만 남긴다.
 
-## 현재 우선순위
+## 최근 완료
 
 - [x] Blog Ops Dashboard v1 사용 후기 기록
 - [x] safe CRUD에서 허용할 작업과 금지할 작업 정리
@@ -31,8 +31,13 @@
 - [x] Blog Ops Dashboard v1.4 Safe Mutations 구현
 - [x] Dashboard에서 발견한 Sigak `2026-06-05-dev-log.md` frontmatter 누락 정리
 - [x] v1.4 Safe Mutations disposable Folder dogfooding 결과 기록
-- [ ] Learning Ops 운영 대상 글 1개 선정
-- [ ] v1.5 우선순위 결정: missing frontmatter quick fix, 새 글 생성 UI, 새로 만든 빈 Folder rollback/delete UX 중 먼저 집을 것
+- [x] v1.5 missing frontmatter quick fix 구현 및 검증
+
+## 현재 우선순위
+
+- [ ] 작업 공간 회복과 template quality baseline 문서 PR 분리 완료
+- [ ] v1.6 Dashboard 새 글 생성 UI 설계
+- [ ] Learning Ops 운영 대상 글 `frontmatter validation` 1회 완료
 
 ## 이번 주 후보
 
@@ -44,7 +49,7 @@ Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 �
 - [ ] Sigak 글에서 프로젝트 맥락, 설계 결정, 검증 근거가 충분한지 점검
 - [ ] 새 프로젝트 생성 시 `docs/blog` 작성 규칙 적용
 - [ ] Sigak Flyway 검색/RAG 연결 1회 복습
-- [ ] frontmatter validation 답변 노트 1회 소리 내어 복습
+- [ ] frontmatter validation 질문 세트, 개인 답변 노트, 복습 상태 변경을 한 번 끝까지 수행
 
 ### blog ops
 
@@ -65,9 +70,9 @@ Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 �
 - [ ] Smart View를 단일 선택으로 충분히 쓰는지, 조합형 view 요청이 반복되는지 기록한다
 - [ ] `type: note` 요구가 실제로 반복되는지 기록한다
 - [x] 2026-06-06 dev-log에 v1.4 dogfooding 결과, 불편했던 점, 후속 조치를 남긴다
-- [ ] v1.5 후보로 새 글 생성 UI를 먼저 할지 판단한다
-- [ ] v1.5 후보로 missing frontmatter quick fix를 먼저 할지 판단한다
-- [ ] v1.5 후보로 새로 만든 빈 Folder rollback/delete UX를 먼저 할지 판단한다
+- [x] v1.5에서 missing frontmatter quick fix를 먼저 구현한다
+- [ ] v1.6에서 새 글 생성 UI를 먼저 설계한다
+- [ ] 새로 만든 빈 Folder rollback/delete UX 수요를 관찰한다
 
 ## 오늘 집어 들 작업
 
@@ -80,8 +85,8 @@ Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 �
 - [x] v1.4 Safe Mutations로 작은 safe CRUD 범위를 구현한다.
 - [x] Dashboard에서 발견한 Sigak `2026-06-05-dev-log.md` source frontmatter 누락을 정리한다.
 - [x] v1.4 Safe Mutations disposable Folder dogfooding 결과를 6/6 dev-log에 남긴다.
-- [ ] Learning Ops 대상 글 1개를 고른다.
-- [ ] v1.5 후보 우선순위를 정한다.
+- [ ] Learning Ops에서 `frontmatter validation` 글을 한 번 끝까지 복습한다.
+- [x] v1.5 우선순위를 정하고 missing frontmatter quick fix를 구현한다.
 
 ## Dashboard action runner v1.1 확정 범위
 
@@ -127,7 +132,7 @@ Dashboard에서 직접 실행할 수 있는 action은 아래 두 개로 제한�
 
 v1.4 Safe Mutations도 구현했다. 이 단계는 draft/frontmatter 같은 작은 수정, tag 선택/검증, Folder 추가, Empty Folder 삭제를 다루며 저장 전 preview/diff를 먼저 보여준다.
 
-v1.4 disposable Folder dogfooding 결과, 생성 apply는 성공했지만 생성 직후 삭제는 `metadata-dirty`로 차단됐다. 다음 단계는 v1.5에서 missing frontmatter quick fix, 새 글 생성 UI, 새로 만든 빈 Folder rollback/delete UX 중 무엇을 먼저 할지 결정하는 것이다.
+v1.4 disposable Folder dogfooding 결과, 생성 apply는 성공했지만 생성 직후 삭제는 `metadata-dirty`로 차단됐다. v1.5에서는 실제로 발견된 frontmatter 누락을 먼저 복구했다. 다음 Dashboard 기능은 새 글 생성 UI를 우선 설계하고, Folder rollback/delete UX는 사용 중 불편함이 반복되는지 관찰한다.
 
 ## 블로그 작성 스킬 목표
 
