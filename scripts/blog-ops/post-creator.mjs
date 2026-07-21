@@ -48,6 +48,10 @@ function inputObject(input) {
 }
 
 function sourceForProject(config, project) {
+  if (typeof project !== "string" || project.trim() === "") {
+    throw postCreationError("project-required", "project-required: select a project before creating a post.");
+  }
+
   const source = config.sources.find((item) => item.project === project);
   if (!source) {
     throw postCreationError("source-not-found", `source-not-found: project '${project ?? "(missing)"}' is not configured.`);
@@ -79,7 +83,8 @@ function requireSourceDirectory(source) {
 function isRealIsoDate(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split("-").map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
+  const parsed = new Date(0);
+  parsed.setUTCFullYear(year, month - 1, day);
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
 }
 
@@ -148,11 +153,11 @@ function validateInput({ input, policy, allowedTags }) {
   return { errors, warnings };
 }
 
-function invalidPreview(errors) {
+function invalidPreview(errors, warnings) {
   return {
     canApply: false,
     errors,
-    warnings: [],
+    warnings,
     planHash: null,
     derived: null,
     files: [],
@@ -202,7 +207,7 @@ function buildNewPostPlan({
     policy,
     allowedTags: config.allowedTags,
   });
-  if (Object.keys(errors).length > 0) return { response: invalidPreview(errors) };
+  if (Object.keys(errors).length > 0) return { response: invalidPreview(errors, warnings) };
 
   const { project, title, date, type, tags, summary } = normalizedInput;
   const { slug, filename } = filenameFor({ date, title, type });

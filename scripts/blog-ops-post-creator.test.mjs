@@ -128,6 +128,61 @@ test("dashboard-strict returns exact field errors for incomplete metadata", (t) 
   });
 });
 
+test("dashboard-strict requires a nonblank project before source lookup", (t) => {
+  const { root, env } = makeBlogHub(t);
+
+  for (const project of [undefined, "", "   "]) {
+    assert.throws(
+      () =>
+        previewNewPost({
+          root,
+          env,
+          mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+          input: validDashboardInput({ project }),
+        }),
+      { code: "project-required" },
+    );
+  }
+});
+
+test("dashboard-strict preserves summary warnings alongside field errors", (t) => {
+  const { root, env } = makeBlogHub(t);
+  const result = previewNewPost({
+    root,
+    env,
+    mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+    input: validDashboardInput({ title: "", summary: "짧은 요약" }),
+  });
+
+  assert.deepEqual(result, {
+    canApply: false,
+    errors: { title: "Enter a title." },
+    warnings: [
+      {
+        code: "summary-short",
+        field: "summary",
+        message: "조금 짧습니다. 문제, 결정, 결과가 드러나도록 80자 이상을 권장합니다.",
+      },
+    ],
+    planHash: null,
+    derived: null,
+    files: [],
+  });
+});
+
+test("dashboard-strict accepts a real ISO date in year 0001", (t) => {
+  const { root, env } = makeBlogHub(t);
+  const result = previewNewPost({
+    root,
+    env,
+    mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+    input: validDashboardInput({ date: "0001-01-01", title: "초기 기록" }),
+  });
+
+  assert.equal(result.canApply, true);
+  assert.equal(result.errors.date, undefined);
+});
+
 test("dashboard-strict blocks an absent source directory and an existing target", (t) => {
   const { root, sourceDir, env } = makeBlogHub(t);
   fs.rmdirSync(sourceDir);
