@@ -358,6 +358,112 @@ test("renderDashboardHtml renders invalid selected tags as removable options", (
   assert.match(html, /data-safe-edit-tag/);
 });
 
+test("renderDashboardHtml includes the accessible new post dialog shell", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /data-new-post-open/);
+  assert.match(html, /<dialog[^>]+data-new-post-dialog[^>]+aria-labelledby="new-post-title"/);
+  assert.match(html, /1 of 3/);
+  assert.match(html, /data-new-post-field=\\?"project\\?"/);
+  assert.match(html, /data-new-post-preview/);
+  assert.match(html, /data-new-post-apply/);
+  assert.match(html, /source-only/);
+});
+
+test("initialNewPostDraft uses only the active folder as the project default", () => {
+  const drafts = runDashboardScriptExpression(`(() => {
+    state.newPostOptions = {
+      defaultDate: "2026-07-21",
+      allowedTypes: ["deep-dive", "dev-log"],
+      projects: [{ slug: "demo", sourceReady: true }],
+    };
+    state.activeProject = "all";
+    state.activeSmartView = "dev-log";
+    const allFolders = initialNewPostDraft();
+    state.activeProject = "demo";
+    const selectedFolder = initialNewPostDraft();
+    return { allFolders, selectedFolder };
+  })()`);
+
+  assert.equal(drafts.allFolders.project, "");
+  assert.equal(drafts.allFolders.date, "2026-07-21");
+  assert.equal(drafts.allFolders.type, "dev-log");
+  assert.equal(drafts.selectedFolder.project, "demo");
+});
+
+test("updateNewPostDraft invalidates a cached preview and updates the draft", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostDraft = {
+      project: "demo",
+      title: "Original title",
+      date: "2026-07-21",
+      type: "dev-log",
+      tags: ["Documentation"],
+      summary: "A concise summary.",
+    };
+    state.newPostPreview = { canApply: true, requestPayload: newPostPreviewPayload() };
+    state.newPostResult = { status: "created" };
+    state.newPostError = "old error";
+    updateNewPostDraft("title", "Updated title");
+    return {
+      draft: state.newPostDraft,
+      preview: state.newPostPreview,
+      result: state.newPostResult,
+      error: state.newPostError,
+    };
+  })()`);
+
+  assert.equal(result.draft.title, "Updated title");
+  assert.equal(result.preview, null);
+  assert.equal(result.result, null);
+  assert.equal(result.error, "");
+});
+
+test("newPostPreviewCanApply requires the exact cached normalized payload", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostDraft = {
+      project: "demo",
+      title: "Dashboard draft",
+      date: "2026-07-21",
+      type: "dev-log",
+      tags: ["Tooling", "Documentation"],
+      summary: "A concise dashboard draft summary.",
+    };
+    state.newPostPreview = {
+      canApply: true,
+      planHash: "sha256:preview",
+      requestPayload: {
+        ...newPostPreviewPayload(),
+        tags: ["Documentation", "Tooling"],
+      },
+    };
+    const beforeUpdate = newPostPreviewCanApply();
+    updateNewPostDraft("summary", "Changed summary.");
+    return { beforeUpdate, afterUpdate: newPostPreviewCanApply() };
+  })()`);
+
+  assert.equal(result.beforeUpdate, true);
+  assert.equal(result.afterUpdate, false);
+});
+
+test("renderDashboardHtml includes responsive, scrollable new post dialog CSS", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /\.new-post-dialog\s*\{[^}]*max-height:/);
+  assert.match(html, /\.new-post-dialog-body\s*\{[^}]*overflow:/);
+  assert.match(html, /@media \(max-width: 820px\)[\s\S]*\.new-post-form-grid\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+});
+
+test("renderDashboardHtml refreshes inventory after apply and blocks close while applying", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /async function applyNewPostFromDialog\(\)/);
+  assert.match(html, /state\.newPostResult = json;[\s\S]*await loadInventory\(\);/);
+  assert.match(html, /data-new-post-dialog[\s\S]*addEventListener\("cancel"/);
+  assert.match(html, /if \(state\.newPostApplying\) event\.preventDefault\(\);/);
+  assert.match(html, /data-new-post-close[\s\S]*state\.newPostApplying/);
+});
+
 test("createDashboardServer serves inventory without private note content", async () => {
   const server = createDashboardServer({
     inventoryProvider: () => ({
