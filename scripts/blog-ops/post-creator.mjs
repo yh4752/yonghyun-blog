@@ -15,6 +15,7 @@ export const POST_CREATION_MODES = Object.freeze({
 const MODE_POLICIES = Object.freeze({
   [POST_CREATION_MODES.CLI_COMPATIBLE]: Object.freeze({
     defaults: true,
+    allowsCustomSlug: true,
     requiresSourceDirectory: false,
     requiresTitle: false,
     validatesDate: false,
@@ -23,6 +24,7 @@ const MODE_POLICIES = Object.freeze({
   }),
   [POST_CREATION_MODES.DASHBOARD_STRICT]: Object.freeze({
     defaults: false,
+    allowsCustomSlug: false,
     requiresSourceDirectory: true,
     requiresTitle: true,
     validatesDate: true,
@@ -118,6 +120,7 @@ function normalizeInput({ input, policy, now }) {
     type: raw.type,
     tags: raw.tags ?? (policy.defaults ? [] : raw.tags),
     summary: raw.summary ?? (policy.defaults ? "" : raw.summary),
+    slug: policy.allowsCustomSlug && typeof raw.slug === "string" ? raw.slug : undefined,
   };
 }
 
@@ -182,8 +185,16 @@ function publicFilePreview(root, targetPath, markdown) {
   return file;
 }
 
-function filenameFor({ date, title, type }) {
-  const slug = slugifyPostTitle(title) || type;
+function assertSafeCustomSlug(value) {
+  if (typeof value !== "string" || !value.trim()) return;
+  if (value.includes("/") || value.includes("\\") || value.includes("\0") || [".", ".."].includes(value.trim())) {
+    throw postCreationError("unsafe-path", "Unsafe slug.");
+  }
+}
+
+function filenameFor({ date, title, type, customSlug }) {
+  assertSafeCustomSlug(customSlug);
+  const slug = customSlug ?? (slugifyPostTitle(title) || type);
   const filenameSlug = slug === date || slug.startsWith(`${date}-`) ? slug : `${date}-${slug}`;
   return { slug, filename: `${filenameSlug}.md` };
 }
@@ -209,8 +220,8 @@ function buildNewPostPlan({
   });
   if (Object.keys(errors).length > 0) return { response: invalidPreview(errors, warnings) };
 
-  const { project, title, date, type, tags, summary } = normalizedInput;
-  const { slug, filename } = filenameFor({ date, title, type });
+  const { project, title, date, type, tags, summary, slug: customSlug } = normalizedInput;
+  const { slug, filename } = filenameFor({ date, title, type, customSlug });
   const targetPath = path.resolve(source.expandedPath, filename);
   const sourcePath = path.resolve(source.expandedPath);
   if (path.dirname(targetPath) !== sourcePath) {
@@ -315,6 +326,44 @@ export function previewNewPost(options = {}) {
   return buildNewPostPlan(options).response;
 }
 
-export function applyNewPost({ root, input, planHash, mode, env, now } = {}) {
-  throw postCreationError("apply-not-implemented", "apply-not-implemented: atomic post creation is not available in Task 1.");
+export function applyNewPost({
+  root = process.cwd(),
+  input,
+  planHash,
+  mode,
+  env = process.env,
+  now = new Date(),
+} = {}) {
+  const plan = buildNewPostPlan({ root, input, mode, env, now });
+  if (!plan.response.canApply) {
+    throw postCreationError("post-create-invalid", "Fix the post fields before creating a draft.");
+  }
+  if (typeof planHash !== "string" || planHash !== plan.response.planHash) {
+    throw postCreationError("stale-preview", "The draft preview changed. Preview it again before creating.");
+  }
+  if (fs.existsSync(plan.targetPath)) {
+    throw postCreationError("post-already-exists", "A post already exists at this filename.");
+  }
+  if (plan.mode === POST_CREATION_MODES.CLI_COMPATIBLE) {
+    fs.mkdirSync(path.dirname(plan.targetPath), { recursive: true });
+  }
+
+  try {
+    fs.writeFileSync(plan.targetPath, plan.markdown, { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    if (error?.code === "EEXIST") {
+      throw postCreationError("post-already-exists", "A post already exists at this filename.");
+    }
+    throw postCreationError("post-create-failed", `Could not create the source draft: ${error.message}`);
+  }
+
+  return {
+    status: "created",
+    project: plan.project,
+    slug: plan.response.derived.slug,
+    canonicalProjectPath: plan.response.derived.canonicalProjectPath,
+    sourcePathLabel: plan.response.derived.sourcePathLabel,
+    nextAction: `npm run validate:posts -- --source --project ${plan.project}`,
+    targetPath: plan.targetPath,
+  };
 }

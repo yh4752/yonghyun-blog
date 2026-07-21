@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  applyNewPost,
   POST_CREATION_MODES,
   kstDate,
   previewNewPost,
@@ -197,4 +198,65 @@ test("dashboard-strict blocks an absent source directory and an existing target"
     () => previewNewPost({ root, env, mode: POST_CREATION_MODES.DASHBOARD_STRICT, input: validDashboardInput() }),
     { code: "post-already-exists" },
   );
+});
+
+test("applyNewPost creates one planned source draft with an exclusive write", (t) => {
+  const { root, sourceDir, env } = makeBlogHub(t);
+  const input = validDashboardInput();
+  const preview = previewNewPost({
+    root,
+    env,
+    mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+    input,
+  });
+  const result = applyNewPost({
+    root,
+    env,
+    mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+    input,
+    planHash: preview.planHash,
+  });
+  const target = path.join(sourceDir, "2026-07-21-개발-로그.md");
+
+  assert.equal(result.status, "created");
+  assert.equal(fs.readFileSync(target, "utf8"), preview.files[0].afterPreview);
+  assert.deepEqual(fs.readdirSync(sourceDir), ["2026-07-21-개발-로그.md"]);
+});
+
+test("applyNewPost rejects stale plans and preserves a racing existing file", (t) => {
+  const { root, sourceDir, env } = makeBlogHub(t);
+  const input = validDashboardInput();
+  const preview = previewNewPost({
+    root,
+    env,
+    mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+    input,
+  });
+
+  assert.throws(
+    () =>
+      applyNewPost({
+        root,
+        env,
+        mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+        input: validDashboardInput({ title: "다른 제목" }),
+        planHash: preview.planHash,
+      }),
+    { code: "stale-preview" },
+  );
+
+  const target = path.join(sourceDir, "2026-07-21-개발-로그.md");
+  fs.writeFileSync(target, "# preserved\n", "utf8");
+  assert.throws(
+    () =>
+      applyNewPost({
+        root,
+        env,
+        mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+        input,
+        planHash: preview.planHash,
+      }),
+    { code: "post-already-exists" },
+  );
+  assert.equal(fs.readFileSync(target, "utf8"), "# preserved\n");
 });
