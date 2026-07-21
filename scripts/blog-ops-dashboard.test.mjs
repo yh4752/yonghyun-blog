@@ -14,6 +14,17 @@ async function listen(server) {
   return server.address().port;
 }
 
+function validNewPostInput() {
+  return {
+    project: "demo",
+    title: "Dashboard draft",
+    date: "2026-07-21",
+    type: "dev-log",
+    tags: ["Documentation"],
+    summary: "A concise dashboard draft summary.",
+  };
+}
+
 function runDashboardScriptExpression(expression) {
   const html = renderDashboardHtml();
   const match = html.match(/<script>([\s\S]*?)<\/script>/);
@@ -1699,6 +1710,254 @@ test("frontmatter skeleton preview rejects non-object frontmatter before provide
 
     assert.equal(response.status, 400);
     assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post options passes dashboard-strict mode and removes provider paths", async () => {
+  let providerInput;
+  const absoluteFixturePath = "/private/dashboard-new-post-options.md";
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: (input) => {
+        providerInput = input;
+        return {
+          projects: [{ slug: "demo", label: "Demo" }],
+          selectedProject: "demo",
+          absolutePath: absoluteFixturePath,
+          targetPath: absoluteFixturePath,
+        };
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/options?project=demo`);
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(providerInput, { selectedProject: "demo", mode: "dashboard-strict" });
+    assert.equal(json.absolutePath, undefined);
+    assert.equal(json.targetPath, undefined);
+    assert.doesNotMatch(JSON.stringify(json), new RegExp(absoluteFixturePath));
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post preview rejects unsupported fields before provider invocation", async () => {
+  let previewCalled = false;
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        previewCalled = true;
+        return {};
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...validNewPostInput(), draft: true }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(json, {
+      error: "unknown-field",
+      message: "Request contains unsupported fields: draft.",
+    });
+    assert.equal(previewCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post preview passes the six input fields in dashboard-strict mode", async () => {
+  let providerInput;
+  const input = validNewPostInput();
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: (value) => {
+        providerInput = value;
+        return {
+          canApply: false,
+          errors: { title: "Enter a title." },
+          warnings: [],
+          planHash: null,
+          derived: null,
+          files: [],
+        };
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.canApply, false);
+    assert.deepEqual(providerInput, { input, mode: "dashboard-strict" });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post apply passes the planned input and omits private paths", async () => {
+  let providerInput;
+  const input = validNewPostInput();
+  const absoluteFixturePath = "/private/dashboard-new-post-apply.md";
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: (value) => {
+        providerInput = value;
+        return {
+          status: "created",
+          project: "demo",
+          slug: "dashboard-draft",
+          canonicalProjectPath: "docs/blog/2026-07-21-dashboard-draft.md",
+          sourcePathLabel: "src/content/blog/demo/2026-07-21-dashboard-draft.md",
+          nextAction: "npm run validate:posts -- --source --project demo",
+          targetPath: absoluteFixturePath,
+          absolutePath: absoluteFixturePath,
+        };
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...input, planHash: "sha256:preview" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(providerInput, { input, planHash: "sha256:preview", mode: "dashboard-strict" });
+    assert.equal(json.targetPath, undefined);
+    assert.equal(json.absolutePath, undefined);
+    assert.doesNotMatch(JSON.stringify(json), new RegExp(absoluteFixturePath));
+    assert.equal(json.status, "created");
+    assert.equal(json.slug, "dashboard-draft");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post apply maps post creation conflicts to 409", async () => {
+  for (const code of ["stale-preview", "post-already-exists", "source-directory-not-found"]) {
+    const server = createDashboardServer({
+      newPostProvider: {
+        getOptions: () => {
+          throw new Error("not used");
+        },
+        preview: () => {
+          throw new Error("not used");
+        },
+        apply: () => {
+          throw Object.assign(new Error(code), { code });
+        },
+      },
+    });
+
+    const port = await listen(server);
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...validNewPostInput(), planHash: "sha256:preview" }),
+      });
+      const json = await response.json();
+
+      assert.equal(response.status, 409, code);
+      assert.equal(json.error, code);
+    } finally {
+      await closeServer(server);
+    }
+  }
+});
+
+test("new post routes preserve object-body and method validation", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        providerCalled = true;
+        return {};
+      },
+      preview: () => {
+        providerCalled = true;
+        return {};
+      },
+      apply: () => {
+        providerCalled = true;
+        return {};
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const malformed = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{",
+    });
+    const malformedJson = await malformed.json();
+    const nonObject = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "null",
+    });
+    const nonObjectJson = await nonObject.json();
+    const wrongMethod = await fetch(`http://127.0.0.1:${port}/api/posts/new/options`, { method: "POST" });
+    const wrongMethodJson = await wrongMethod.json();
+
+    assert.equal(malformed.status, 400);
+    assert.equal(malformedJson.error, "invalid-json");
+    assert.equal(nonObject.status, 400);
+    assert.equal(nonObjectJson.error, "invalid-request-body");
+    assert.equal(wrongMethod.status, 405);
+    assert.equal(wrongMethod.headers.get("allow"), "GET");
+    assert.equal(wrongMethodJson.error, "method-not-allowed");
     assert.equal(providerCalled, false);
   } finally {
     await closeServer(server);
