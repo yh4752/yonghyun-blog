@@ -1849,6 +1849,7 @@
         newPostOptions: null,
         newPostDraft: null,
         newPostPreview: null,
+        newPostPreviewRequestId: 0,
         newPostError: "",
         newPostApplying: false,
         newPostResult: null,
@@ -2592,6 +2593,14 @@
         return Boolean(requestPayload && valuesEqual(newPostPreviewPayload(), requestPayload));
       }
 
+      function newPostPreviewResponseIsCurrent(session, requestId, requestPayload) {
+        return Boolean(
+          newPostSessionIsCurrent(session) &&
+            state.newPostPreviewRequestId === requestId &&
+            newPostPreviewMatches(requestPayload),
+        );
+      }
+
       function newPostPreviewCanApply() {
         return Boolean(
           state.newPostPreview?.canApply &&
@@ -2804,6 +2813,7 @@
         state.newPostOptions = null;
         state.newPostDraft = null;
         state.newPostPreview = null;
+        state.newPostPreviewRequestId += 1;
         state.newPostError = "";
         state.newPostApplying = false;
         state.newPostResult = null;
@@ -2813,6 +2823,7 @@
         if (!state.newPostDraft) return;
         state.newPostDraft = { ...state.newPostDraft, [field]: value };
         state.newPostPreview = null;
+        state.newPostPreviewRequestId += 1;
         state.newPostResult = null;
         state.newPostError = "";
         updateNewPostApplyButton();
@@ -2913,13 +2924,15 @@
       async function previewNewPostFromDialog() {
         if (!newPostCanPreview()) return;
         const requestPayload = newPostPreviewPayload();
+        const session = state.newPostSession;
+        const requestId = ++state.newPostPreviewRequestId;
         state.newPostError = "";
         state.newPostPreview = null;
         state.newPostResult = null;
         renderNewPostDialog();
         try {
           const { response, json } = await postJson("/api/posts/new/preview", requestPayload);
-          if (!newPostPreviewMatches(requestPayload)) return;
+          if (!newPostPreviewResponseIsCurrent(session, requestId, requestPayload)) return;
           if (!response.ok) {
             state.newPostError = mutationErrorMessage(json, "New post preview failed.");
             renderNewPostDialog();
@@ -2929,7 +2942,7 @@
           state.newPostError = "";
           if (json.canApply && json.planHash) state.newPostStep = 3;
         } catch (error) {
-          if (!newPostPreviewMatches(requestPayload)) return;
+          if (!newPostPreviewResponseIsCurrent(session, requestId, requestPayload)) return;
           state.newPostError = error.message;
         }
         renderNewPostDialog();
@@ -4104,14 +4117,22 @@
         if (!target?.matches) return;
 
         if (target.matches("[data-new-post-field]")) {
+          const controlId = target.id;
           updateNewPostField(target);
-          if (rerender) renderNewPostDialog();
+          if (rerender) {
+            renderNewPostDialog();
+            document.getElementById(controlId)?.focus?.();
+          }
           return;
         }
 
         if (target.matches("[data-new-post-tag]")) {
+          const controlId = target.id;
           updateNewPostTag(target);
-          if (rerender) renderNewPostDialog();
+          if (rerender) {
+            renderNewPostDialog();
+            document.getElementById(controlId)?.focus?.();
+          }
           return;
         }
 

@@ -31,6 +31,7 @@ function runDashboardScriptExpression(expression) {
   assert.ok(match, "dashboard script should exist");
 
   const elementListeners = {};
+  const elementsById = {};
   const element = {
     addEventListener(type, listener) {
       elementListeners[type] = listener;
@@ -58,6 +59,9 @@ function runDashboardScriptExpression(expression) {
     document: {
       addEventListener() {},
       documentElement: { dataset: {} },
+      getElementById(id) {
+        return elementsById[id] || null;
+      },
       querySelector() {
         return element;
       },
@@ -78,6 +82,7 @@ function runDashboardScriptExpression(expression) {
     setTimeout() {},
   };
   context.__dashboardElement = element;
+  context.__dashboardElementsById = elementsById;
   context.__dashboardElementListeners = elementListeners;
 
   vm.runInNewContext(`${match[1]}\nglobalThis.__dashboardScriptResult = (${expression});`, context);
@@ -512,6 +517,75 @@ test("newPostSessionIsCurrent rejects stale option sessions", () => {
 
   assert.equal(result.priorSession, false);
   assert.equal(result.currentSession, true);
+});
+
+test("newPostPreviewResponseIsCurrent rejects a prior dialog session with the same payload", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostOpen = true;
+    state.newPostSession = 8;
+    state.newPostPreviewRequestId = 5;
+    state.newPostDraft = {
+      project: "demo",
+      title: "Same draft",
+      date: "2026-07-21",
+      type: "dev-log",
+      tags: ["Documentation"],
+      summary: "The unchanged request payload is deliberate.",
+    };
+    const payload = newPostPreviewPayload();
+    return {
+      staleSession: newPostPreviewResponseIsCurrent(7, 5, payload),
+      currentRequest: newPostPreviewResponseIsCurrent(8, 5, payload),
+      staleRequest: newPostPreviewResponseIsCurrent(8, 4, payload),
+    };
+  })()`);
+
+  assert.equal(result.staleSession, false);
+  assert.equal(result.currentRequest, true);
+  assert.equal(result.staleRequest, false);
+});
+
+test("new post change rerender restores focus to the changed type and tag controls", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostDraft = {
+      project: "demo",
+      title: "Dashboard draft",
+      date: "2026-07-21",
+      type: "dev-log",
+      tags: [],
+      summary: "A concise dashboard draft summary.",
+    };
+    const typeReplacement = { focusCalls: 0, focus() { this.focusCalls += 1; } };
+    const tagReplacement = { focusCalls: 0, focus() { this.focusCalls += 1; } };
+    __dashboardElementsById["new-post-type"] = typeReplacement;
+    __dashboardElementsById["new-post-tag-0"] = tagReplacement;
+    handleMutationFieldEvent({
+      target: {
+        id: "new-post-type",
+        dataset: { newPostField: "type" },
+        value: "deep-dive",
+        matches(selector) { return selector === "[data-new-post-field]"; },
+      },
+    }, { rerender: true });
+    handleMutationFieldEvent({
+      target: {
+        checked: true,
+        dataset: { newPostTag: "Documentation" },
+        id: "new-post-tag-0",
+        matches(selector) { return selector === "[data-new-post-tag]"; },
+      },
+    }, { rerender: true });
+    return {
+      typeFocusCalls: typeReplacement.focusCalls,
+      tagFocusCalls: tagReplacement.focusCalls,
+    };
+  })()`);
+  const html = renderDashboardHtml();
+
+  assert.equal(result.typeFocusCalls, 1);
+  assert.equal(result.tagFocusCalls, 1);
+  assert.match(html, /const controlId = target\.id;[\s\S]*renderNewPostDialog\(\);[\s\S]*document\.getElementById\(controlId\)\?\.focus\?\.\(\);/);
+  assert.match(html, /const id = "new-post-tag-" \+ index;/);
 });
 
 test("createDashboardServer serves inventory without private note content", async () => {
