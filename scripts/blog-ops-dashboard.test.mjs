@@ -14,18 +14,43 @@ async function listen(server) {
   return server.address().port;
 }
 
+function validNewPostInput() {
+  return {
+    project: "demo",
+    title: "Dashboard draft",
+    date: "2026-07-21",
+    type: "dev-log",
+    tags: ["Documentation"],
+    summary: "A concise dashboard draft summary.",
+  };
+}
+
 function runDashboardScriptExpression(expression) {
   const html = renderDashboardHtml();
   const match = html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(match, "dashboard script should exist");
 
+  const elementListeners = {};
+  const elementsById = {};
   const element = {
-    addEventListener() {},
+    addEventListener(type, listener) {
+      elementListeners[type] = listener;
+    },
     alert() {},
     classList: { toggle() {} },
     dataset: {},
+    focus() {},
     innerHTML: "",
+    matches() {
+      return false;
+    },
+    open: false,
     setAttribute() {},
+    showModalCalls: 0,
+    showModal() {
+      this.open = true;
+      this.showModalCalls += 1;
+    },
     textContent: "",
   };
   const context = {
@@ -34,6 +59,9 @@ function runDashboardScriptExpression(expression) {
     document: {
       addEventListener() {},
       documentElement: { dataset: {} },
+      getElementById(id) {
+        return elementsById[id] || null;
+      },
       querySelector() {
         return element;
       },
@@ -53,6 +81,9 @@ function runDashboardScriptExpression(expression) {
     navigator: { clipboard: { writeText: async () => {} } },
     setTimeout() {},
   };
+  context.__dashboardElement = element;
+  context.__dashboardElementsById = elementsById;
+  context.__dashboardElementListeners = elementListeners;
 
   vm.runInNewContext(`${match[1]}\nglobalThis.__dashboardScriptResult = (${expression});`, context);
   return context.__dashboardScriptResult;
@@ -345,6 +376,216 @@ test("renderDashboardHtml renders invalid selected tags as removable options", (
   assert.match(html, /tag-option warning/);
   assert.match(html, /not in tag policy/);
   assert.match(html, /data-safe-edit-tag/);
+});
+
+test("renderDashboardHtml includes the accessible new post dialog shell", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /data-new-post-open/);
+  assert.match(html, /<dialog[^>]+data-new-post-dialog[^>]+aria-labelledby="new-post-title"/);
+  assert.match(html, /1 of 3/);
+  assert.match(html, /data-new-post-field=\\?"project\\?"/);
+  assert.match(html, /data-new-post-preview/);
+  assert.match(html, /data-new-post-apply/);
+  assert.match(html, /source-only/);
+});
+
+test("initialNewPostDraft uses only the active folder as the project default", () => {
+  const drafts = runDashboardScriptExpression(`(() => {
+    state.newPostOptions = {
+      defaultDate: "2026-07-21",
+      allowedTypes: ["deep-dive", "dev-log"],
+      projects: [{ slug: "demo", sourceReady: true }],
+    };
+    state.activeProject = "all";
+    state.activeSmartView = "dev-log";
+    const allFolders = initialNewPostDraft();
+    state.activeProject = "demo";
+    const selectedFolder = initialNewPostDraft();
+    return { allFolders, selectedFolder };
+  })()`);
+
+  assert.equal(drafts.allFolders.project, "");
+  assert.equal(drafts.allFolders.date, "2026-07-21");
+  assert.equal(drafts.allFolders.type, "dev-log");
+  assert.equal(drafts.selectedFolder.project, "demo");
+});
+
+test("updateNewPostDraft invalidates a cached preview and updates the draft", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostDraft = {
+      project: "demo",
+      title: "Original title",
+      date: "2026-07-21",
+      type: "dev-log",
+      tags: ["Documentation"],
+      summary: "A concise summary.",
+    };
+    state.newPostPreview = { canApply: true, requestPayload: newPostPreviewPayload() };
+    state.newPostResult = { status: "created" };
+    state.newPostError = "old error";
+    updateNewPostDraft("title", "Updated title");
+    return {
+      draft: state.newPostDraft,
+      preview: state.newPostPreview,
+      result: state.newPostResult,
+      error: state.newPostError,
+    };
+  })()`);
+
+  assert.equal(result.draft.title, "Updated title");
+  assert.equal(result.preview, null);
+  assert.equal(result.result, null);
+  assert.equal(result.error, "");
+});
+
+test("newPostPreviewCanApply requires the exact cached normalized payload", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostDraft = {
+      project: "demo",
+      title: "Dashboard draft",
+      date: "2026-07-21",
+      type: "dev-log",
+      tags: ["Tooling", "Documentation"],
+      summary: "A concise dashboard draft summary.",
+    };
+    state.newPostPreview = {
+      canApply: true,
+      planHash: "sha256:preview",
+      requestPayload: {
+        ...newPostPreviewPayload(),
+        tags: ["Documentation", "Tooling"],
+      },
+    };
+    const beforeUpdate = newPostPreviewCanApply();
+    updateNewPostDraft("summary", "Changed summary.");
+    return { beforeUpdate, afterUpdate: newPostPreviewCanApply() };
+  })()`);
+
+  assert.equal(result.beforeUpdate, true);
+  assert.equal(result.afterUpdate, false);
+});
+
+test("renderDashboardHtml includes responsive, scrollable new post dialog CSS", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /\.new-post-dialog\s*\{[^}]*max-height:/);
+  assert.match(html, /\.new-post-dialog-body\s*\{[^}]*overflow:/);
+  assert.match(html, /@media \(max-width: 820px\)[\s\S]*\.new-post-form-grid\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+});
+
+test("renderDashboardHtml refreshes inventory after apply and blocks close while applying", () => {
+  const html = renderDashboardHtml();
+
+  assert.match(html, /async function applyNewPostFromDialog\(\)/);
+  assert.match(html, /state\.newPostResult = json;[\s\S]*await loadInventory\(\);/);
+  assert.match(html, /data-new-post-dialog[\s\S]*addEventListener\("cancel"/);
+  assert.match(html, /if \(state\.newPostApplying\) event\.preventDefault\(\);/);
+  assert.match(html, /data-new-post-close[\s\S]*state\.newPostApplying/);
+});
+
+test("new post native close reopens the dialog while applying", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostOpen = true;
+    state.newPostApplying = true;
+    state.newPostResult = { status: "created" };
+    __dashboardElement.open = false;
+    __dashboardElement.showModalCalls = 0;
+    __dashboardElementListeners.close();
+    return {
+      newPostOpen: state.newPostOpen,
+      result: state.newPostResult,
+      showModalCalls: __dashboardElement.showModalCalls,
+    };
+  })()`);
+  const html = renderDashboardHtml();
+
+  assert.equal(result.newPostOpen, true);
+  assert.equal(result.result.status, "created");
+  assert.equal(result.showModalCalls, 1);
+  assert.match(html, /newPostDialog\.addEventListener\("close", \(\) => \{\s*if \(state\.newPostApplying\) \{\s*newPostDialog\.showModal\(\);\s*return;/);
+});
+
+test("newPostSessionIsCurrent rejects stale option sessions", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostOpen = true;
+    state.newPostSession = 4;
+    const priorSession = newPostSessionIsCurrent(3);
+    const currentSession = newPostSessionIsCurrent(4);
+    return { priorSession, currentSession };
+  })()`);
+
+  assert.equal(result.priorSession, false);
+  assert.equal(result.currentSession, true);
+});
+
+test("newPostPreviewResponseIsCurrent rejects a prior dialog session with the same payload", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostOpen = true;
+    state.newPostSession = 8;
+    state.newPostPreviewRequestId = 5;
+    state.newPostDraft = {
+      project: "demo",
+      title: "Same draft",
+      date: "2026-07-21",
+      type: "dev-log",
+      tags: ["Documentation"],
+      summary: "The unchanged request payload is deliberate.",
+    };
+    const payload = newPostPreviewPayload();
+    return {
+      staleSession: newPostPreviewResponseIsCurrent(7, 5, payload),
+      currentRequest: newPostPreviewResponseIsCurrent(8, 5, payload),
+      staleRequest: newPostPreviewResponseIsCurrent(8, 4, payload),
+    };
+  })()`);
+
+  assert.equal(result.staleSession, false);
+  assert.equal(result.currentRequest, true);
+  assert.equal(result.staleRequest, false);
+});
+
+test("new post change rerender restores focus to the changed type and tag controls", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostDraft = {
+      project: "demo",
+      title: "Dashboard draft",
+      date: "2026-07-21",
+      type: "dev-log",
+      tags: [],
+      summary: "A concise dashboard draft summary.",
+    };
+    const typeReplacement = { focusCalls: 0, focus() { this.focusCalls += 1; } };
+    const tagReplacement = { focusCalls: 0, focus() { this.focusCalls += 1; } };
+    __dashboardElementsById["new-post-type"] = typeReplacement;
+    __dashboardElementsById["new-post-tag-0"] = tagReplacement;
+    handleMutationFieldEvent({
+      target: {
+        id: "new-post-type",
+        dataset: { newPostField: "type" },
+        value: "deep-dive",
+        matches(selector) { return selector === "[data-new-post-field]"; },
+      },
+    }, { rerender: true });
+    handleMutationFieldEvent({
+      target: {
+        checked: true,
+        dataset: { newPostTag: "Documentation" },
+        id: "new-post-tag-0",
+        matches(selector) { return selector === "[data-new-post-tag]"; },
+      },
+    }, { rerender: true });
+    return {
+      typeFocusCalls: typeReplacement.focusCalls,
+      tagFocusCalls: tagReplacement.focusCalls,
+    };
+  })()`);
+  const html = renderDashboardHtml();
+
+  assert.equal(result.typeFocusCalls, 1);
+  assert.equal(result.tagFocusCalls, 1);
+  assert.match(html, /const controlId = target\.id;[\s\S]*renderNewPostDialog\(\);[\s\S]*document\.getElementById\(controlId\)\?\.focus\?\.\(\);/);
+  assert.match(html, /const id = "new-post-tag-" \+ index;/);
 });
 
 test("createDashboardServer serves inventory without private note content", async () => {
@@ -1699,6 +1940,350 @@ test("frontmatter skeleton preview rejects non-object frontmatter before provide
 
     assert.equal(response.status, 400);
     assert.equal(json.error, "invalid-request-body");
+    assert.equal(providerCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post options passes dashboard-strict mode and removes provider paths", async () => {
+  let providerInput;
+  const absoluteFixturePath = "/private/dashboard-new-post-options.md";
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: (input) => {
+        providerInput = input;
+        return {
+          projects: [
+            {
+              slug: "demo",
+              label: "Demo",
+              metadata: {
+                absolutePath: absoluteFixturePath,
+                targetPath: absoluteFixturePath,
+              },
+            },
+          ],
+          selectedProject: "demo",
+          absolutePath: absoluteFixturePath,
+          targetPath: absoluteFixturePath,
+        };
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/options?project=demo`);
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(providerInput, { selectedProject: "demo", mode: "dashboard-strict" });
+    assert.equal(json.absolutePath, undefined);
+    assert.equal(json.targetPath, undefined);
+    assert.doesNotMatch(JSON.stringify(json), new RegExp(absoluteFixturePath));
+    assert.doesNotMatch(JSON.stringify(json), /absolutePath|targetPath/);
+    assert.deepEqual(json.projects, [{ slug: "demo", label: "Demo", metadata: {} }]);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post preview rejects unsupported fields before provider invocation", async () => {
+  let previewCalled = false;
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        previewCalled = true;
+        return {};
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...validNewPostInput(), draft: true }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(json, {
+      error: "unknown-field",
+      message: "Request contains unsupported fields: draft.",
+    });
+    assert.equal(previewCalled, false);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post preview passes the six input fields in dashboard-strict mode", async () => {
+  let providerInput;
+  const input = validNewPostInput();
+  const absoluteFixturePath = "/private/dashboard-new-post-preview.md";
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: (value) => {
+        providerInput = value;
+        return {
+          canApply: false,
+          errors: { title: "Enter a title." },
+          warnings: [],
+          planHash: null,
+          derived: null,
+          files: [
+            {
+              file: "docs/blog/2026-07-21-dashboard-draft.md",
+              absolutePath: absoluteFixturePath,
+              targetPath: absoluteFixturePath,
+              nested: {
+                absolutePath: absoluteFixturePath,
+                targetPath: absoluteFixturePath,
+              },
+            },
+          ],
+        };
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(json.canApply, false);
+    assert.deepEqual(providerInput, { input, mode: "dashboard-strict" });
+    assert.doesNotMatch(JSON.stringify(json), new RegExp(absoluteFixturePath));
+    assert.doesNotMatch(JSON.stringify(json), /absolutePath|targetPath/);
+    assert.deepEqual(json.files, [{ file: "docs/blog/2026-07-21-dashboard-draft.md", nested: {} }]);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post apply passes the planned input and omits private paths", async () => {
+  let providerInput;
+  const input = validNewPostInput();
+  const absoluteFixturePath = "/private/dashboard-new-post-apply.md";
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: (value) => {
+        providerInput = value;
+        return {
+          status: "created",
+          project: "demo",
+          slug: "dashboard-draft",
+          canonicalProjectPath: "docs/blog/2026-07-21-dashboard-draft.md",
+          sourcePathLabel: "src/content/blog/demo/2026-07-21-dashboard-draft.md",
+          nextAction: "npm run validate:posts -- --source --project demo",
+          targetPath: absoluteFixturePath,
+          absolutePath: absoluteFixturePath,
+        };
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...input, planHash: "sha256:preview" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(providerInput, { input, planHash: "sha256:preview", mode: "dashboard-strict" });
+    assert.equal(json.targetPath, undefined);
+    assert.equal(json.absolutePath, undefined);
+    assert.doesNotMatch(JSON.stringify(json), new RegExp(absoluteFixturePath));
+    assert.equal(json.status, "created");
+    assert.equal(json.slug, "dashboard-draft");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post apply maps post creation conflicts to 409", async () => {
+  for (const code of ["stale-preview", "post-already-exists", "source-directory-not-found"]) {
+    const server = createDashboardServer({
+      newPostProvider: {
+        getOptions: () => {
+          throw new Error("not used");
+        },
+        preview: () => {
+          throw new Error("not used");
+        },
+        apply: () => {
+          throw Object.assign(new Error(code), { code });
+        },
+      },
+    });
+
+    const port = await listen(server);
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...validNewPostInput(), planHash: "sha256:preview" }),
+      });
+      const json = await response.json();
+
+      assert.equal(response.status, 409, code);
+      assert.equal(json.error, code);
+    } finally {
+      await closeServer(server);
+    }
+  }
+});
+
+test("new post preview maps missing project metadata to 409", async () => {
+  const error = Object.assign(new Error("project-metadata-not-found"), { code: "project-metadata-not-found" });
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw error;
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(validNewPostInput()),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(json.error, "project-metadata-not-found");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post apply keeps post creation failures at 500", async () => {
+  const error = Object.assign(new Error("Could not create the source draft."), { code: "post-create-failed" });
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        throw error;
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...validNewPostInput(), planHash: "sha256:preview" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 500);
+    assert.equal(json.error, "post-create-failed");
+    assert.equal(json.message, "Could not create the source draft.");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post routes preserve object-body and method validation", async () => {
+  let providerCalled = false;
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        providerCalled = true;
+        return {};
+      },
+      preview: () => {
+        providerCalled = true;
+        return {};
+      },
+      apply: () => {
+        providerCalled = true;
+        return {};
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const malformed = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{",
+    });
+    const malformedJson = await malformed.json();
+    const nonObject = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "null",
+    });
+    const nonObjectJson = await nonObject.json();
+    const wrongMethod = await fetch(`http://127.0.0.1:${port}/api/posts/new/options`, { method: "POST" });
+    const wrongMethodJson = await wrongMethod.json();
+    const previewGet = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`);
+    const applyGet = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`);
+
+    assert.equal(malformed.status, 400);
+    assert.equal(malformedJson.error, "invalid-json");
+    assert.equal(nonObject.status, 400);
+    assert.equal(nonObjectJson.error, "invalid-request-body");
+    assert.equal(wrongMethod.status, 405);
+    assert.equal(wrongMethod.headers.get("allow"), "GET");
+    assert.equal(wrongMethodJson.error, "method-not-allowed");
+    assert.equal(previewGet.status, 405);
+    assert.equal(previewGet.headers.get("allow"), "POST");
+    assert.equal(applyGet.status, 405);
+    assert.equal(applyGet.headers.get("allow"), "POST");
     assert.equal(providerCalled, false);
   } finally {
     await closeServer(server);

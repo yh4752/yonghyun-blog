@@ -1346,6 +1346,246 @@
         display: none;
       }
 
+      .new-post-dialog {
+        width: min(760px, calc(100vw - 24px));
+        max-width: calc(100vw - 24px);
+        max-height: min(780px, calc(100vh - 24px));
+        margin: auto;
+        padding: 0;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+      }
+
+      .new-post-dialog::backdrop {
+        background: rgba(20, 24, 34, 0.32);
+      }
+
+      .new-post-dialog-content {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        max-height: inherit;
+      }
+
+      .new-post-dialog-body {
+        min-height: 0;
+        max-height: min(680px, calc(100vh - 96px));
+        overflow: auto;
+        padding: 22px;
+      }
+
+      .new-post-step {
+        margin: 0 0 6px;
+        color: var(--text-tertiary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .new-post-dialog h2 {
+        margin: 0;
+        font-size: 19px;
+        font-weight: 650;
+        line-height: 1.25;
+      }
+
+      .new-post-dialog-intro {
+        margin: 8px 0 0;
+        color: var(--text-sec);
+        font-size: 12.5px;
+        line-height: 1.5;
+      }
+
+      .new-post-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .new-post-field,
+      .new-post-fieldset {
+        min-width: 0;
+        display: grid;
+        gap: 6px;
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+
+      .new-post-field.full,
+      .new-post-fieldset.full {
+        grid-column: 1 / -1;
+      }
+
+      .new-post-field label,
+      .new-post-fieldset legend {
+        color: var(--text-sec);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .new-post-field input,
+      .new-post-field select,
+      .new-post-field textarea {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--panel-inset);
+        color: var(--text);
+        padding: 8px 9px;
+        font-size: 13px;
+      }
+
+      .new-post-field textarea {
+        min-height: 110px;
+        resize: vertical;
+      }
+
+      .new-post-field-error {
+        min-height: 17px;
+        margin: 0;
+        color: var(--error);
+        font-size: 11.5px;
+        line-height: 1.4;
+      }
+
+      .new-post-summary-status {
+        color: var(--text-sec);
+        font-size: 11.5px;
+        line-height: 1.4;
+      }
+
+      .new-post-summary-status.good {
+        color: var(--ok);
+      }
+
+      .new-post-summary-status.warning {
+        color: var(--warn);
+      }
+
+      .new-post-summary-status.error {
+        color: var(--error);
+      }
+
+      .new-post-tag-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .new-post-tag-option {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 8px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--panel-inset);
+        color: var(--text-sec);
+        font-size: 12px;
+      }
+
+      .new-post-tag-option.selected {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--text);
+      }
+
+      .new-post-tag-option strong {
+        margin-left: auto;
+        color: inherit;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+      .new-post-folder-details,
+      .new-post-preview-details,
+      .new-post-success-details {
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr);
+        gap: 8px 12px;
+        margin: 18px 0 0;
+        color: var(--text-sec);
+        font-size: 12.5px;
+        line-height: 1.45;
+      }
+
+      .new-post-folder-details dt,
+      .new-post-preview-details dt,
+      .new-post-success-details dt {
+        color: var(--text-tertiary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .new-post-folder-details dd,
+      .new-post-preview-details dd,
+      .new-post-success-details dd {
+        min-width: 0;
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .new-post-message {
+        margin-top: 16px;
+        padding: 9px 10px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--panel-alt);
+        color: var(--text-sec);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .new-post-message.error {
+        border-color: var(--error-bg);
+        background: var(--error-bg);
+        color: var(--error);
+      }
+
+      .new-post-message.good {
+        border-color: var(--ok-bg);
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+
+      .new-post-markdown {
+        max-height: 300px;
+        margin: 16px 0 0;
+        padding: 10px;
+        border: 1px solid var(--code-border);
+        border-radius: 7px;
+        background: var(--code-bg);
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        line-height: 1.5;
+        overflow: auto;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .new-post-dialog-footer {
+        min-height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 12px 22px;
+        border-top: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .new-post-dialog-footer .button {
+        min-width: 88px;
+      }
+
       @media (max-width: 1180px) {
         .layout {
           grid-template-columns: 210px minmax(0, 1fr);
@@ -1479,6 +1719,40 @@
           margin-left: 0;
           width: 100%;
         }
+
+        .new-post-dialog {
+          width: min(100vw - 16px, 760px);
+          max-width: calc(100vw - 16px);
+          max-height: calc(100vh - 16px);
+        }
+
+        .new-post-dialog-body {
+          padding: 18px;
+        }
+
+        .new-post-form-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .new-post-tag-list {
+          grid-template-columns: 1fr;
+        }
+
+        .new-post-folder-details,
+        .new-post-preview-details,
+        .new-post-success-details {
+          grid-template-columns: 1fr;
+          gap: 3px;
+        }
+
+        .new-post-dialog-footer {
+          flex-wrap: wrap;
+          padding: 10px 18px;
+        }
+
+        .new-post-dialog-footer .button {
+          flex: 1 1 120px;
+        }
       }
     </style>
   </head>
@@ -1494,6 +1768,7 @@
         <div class="topbar-spacer"></div>
         <div class="attention" id="attention">0 need attention</div>
         <div class="scan" id="scan-label">scan -</div>
+        <button class="top-button" data-new-post-open type="button">+ New post</button>
         <button class="top-button" id="theme-toggle" type="button">Dark</button>
         <button class="top-button" id="refresh" type="button">↻ Refresh</button>
       </header>
@@ -1544,6 +1819,10 @@
       <section class="pipeline" id="pipeline"></section>
     </div>
 
+    <dialog class="new-post-dialog" data-new-post-dialog aria-labelledby="new-post-title">
+      <div class="new-post-dialog-content" data-new-post-content></div>
+    </dialog>
+
     <script>
       const state = {
         inventory: { projects: [], posts: [], warnings: [] },
@@ -1564,6 +1843,16 @@
         safeEditPreview: null,
         safeEditError: "",
         safeEditApplying: false,
+        newPostOpen: false,
+        newPostSession: 0,
+        newPostStep: 1,
+        newPostOptions: null,
+        newPostDraft: null,
+        newPostPreview: null,
+        newPostPreviewRequestId: 0,
+        newPostError: "",
+        newPostApplying: false,
+        newPostResult: null,
         frontmatterSkeleton: null,
         frontmatterSkeletonDraft: null,
         frontmatterSkeletonPreview: null,
@@ -2263,6 +2552,437 @@
         return "<div class=\"mutation-message " + tone + "\"><strong>" + escapeHtml(title) + "</strong><ul class=\"mutation-list\">" + issues.map(mutationIssueLine).join("") + "</ul></div>";
       }
 
+      function newPostProjects() {
+        return Array.isArray(state.newPostOptions?.projects) ? state.newPostOptions.projects : [];
+      }
+
+      function newPostSelectedProject() {
+        return newPostProjects().find((project) => project.slug === state.newPostDraft?.project) || null;
+      }
+
+      function initialNewPostDraft() {
+        const options = state.newPostOptions || {};
+        const allowedTypes = Array.isArray(options.allowedTypes) ? options.allowedTypes : [];
+        return {
+          project: state.activeProject === "all" ? "" : state.activeProject,
+          title: "",
+          date: options.defaultDate || "",
+          type: allowedTypes.includes("dev-log") ? "dev-log" : allowedTypes[0] || "",
+          tags: [],
+          summary: "",
+        };
+      }
+
+      function newPostSessionIsCurrent(session) {
+        return state.newPostOpen && state.newPostSession === session;
+      }
+
+      function newPostPreviewPayload() {
+        const draft = state.newPostDraft || {};
+        return {
+          project: String(draft.project || ""),
+          title: String(draft.title || ""),
+          date: String(draft.date || ""),
+          type: String(draft.type || ""),
+          tags: [...new Set(Array.isArray(draft.tags) ? draft.tags.map((tag) => String(tag)) : [])].sort(),
+          summary: String(draft.summary || ""),
+        };
+      }
+
+      function newPostPreviewMatches(requestPayload) {
+        return Boolean(requestPayload && valuesEqual(newPostPreviewPayload(), requestPayload));
+      }
+
+      function newPostPreviewResponseIsCurrent(session, requestId, requestPayload) {
+        return Boolean(
+          newPostSessionIsCurrent(session) &&
+            state.newPostPreviewRequestId === requestId &&
+            newPostPreviewMatches(requestPayload),
+        );
+      }
+
+      function newPostPreviewCanApply() {
+        return Boolean(
+          state.newPostPreview?.canApply &&
+            state.newPostPreview?.planHash &&
+            state.newPostPreview?.requestPayload &&
+            newPostPreviewMatches(state.newPostPreview.requestPayload) &&
+            !state.newPostApplying,
+        );
+      }
+
+      function newPostCanContinueFromFolder() {
+        return Boolean(state.newPostDraft?.project && newPostSelectedProject()?.sourceReady === true);
+      }
+
+      function newPostCanPreview() {
+        const draft = state.newPostDraft || {};
+        return Boolean(
+          draft.project &&
+            String(draft.title || "").trim() &&
+            String(draft.date || "").trim() &&
+            String(draft.type || "").trim() &&
+            Array.isArray(draft.tags) &&
+            draft.tags.length > 0 &&
+            String(draft.summary || "").trim() &&
+            !state.newPostApplying,
+        );
+      }
+
+      function newPostFieldErrorMessage(field, fallback = "") {
+        const error = state.newPostPreview?.errors?.[field];
+        if (typeof error === "string") return error;
+        if (Array.isArray(error)) return error.map((item) => item?.message || item).join(" ");
+        if (error?.message) return error.message;
+        return fallback;
+      }
+
+      function renderNewPostFieldError(id, message) {
+        return "<p class=\"new-post-field-error\" id=\"" + escapeAttribute(id) + "\" aria-live=\"polite\">" + escapeHtml(message || "") + "</p>";
+      }
+
+      function renderNewPostActionMessage() {
+        if (!state.newPostError) return "";
+        return "<div class=\"new-post-message error\" role=\"alert\">" + escapeHtml(state.newPostError) + "</div>";
+      }
+
+      function renderNewPostFolderStep() {
+        const draft = state.newPostDraft || initialNewPostDraft();
+        const selected = newPostSelectedProject();
+        const projectOptions = newPostProjects()
+          .map((project) => {
+            const selectedAttribute = project.slug === draft.project ? " selected" : "";
+            return "<option value=\"" + escapeAttribute(project.slug) + "\"" + selectedAttribute + ">" + escapeHtml(project.label || project.slug) + "</option>";
+          })
+          .join("");
+        const projectError = newPostFieldErrorMessage("project", draft.project ? "" : "Choose a configured folder.");
+        const sourceGuidance = selected && !selected.sourceReady
+          ? "<div class=\"new-post-message error\" role=\"status\">This folder's source path is not ready. Set up the configured source folder before creating a post.</div>"
+          : "";
+        const selectedDetails = selected
+          ? "<dl class=\"new-post-folder-details\"><dt>Selected folder</dt><dd>" + escapeHtml(selected.label || selected.slug) + "</dd><dt>sourcePathLabel</dt><dd>" + escapeHtml(selected.sourcePathLabel || "-") + "</dd></dl>"
+          : "";
+
+        return "<p class=\"new-post-step\">Step 1 of 3</p>" +
+          "<h2 id=\"new-post-title\" tabindex=\"-1\">1 of 3: Choose Folder</h2>" +
+          "<p class=\"new-post-dialog-intro\">Select the configured source folder for this draft.</p>" +
+          "<div class=\"new-post-form-grid\"><div class=\"new-post-field full\">" +
+            "<label for=\"new-post-project\">Folder</label>" +
+            "<select id=\"new-post-project\" data-new-post-field=\"project\" aria-describedby=\"new-post-project-error\">" +
+              "<option value=\"\">Choose a configured folder</option>" + projectOptions +
+            "</select>" +
+            renderNewPostFieldError("new-post-project-error", projectError) +
+          "</div></div>" +
+          selectedDetails + sourceGuidance + renderNewPostActionMessage();
+      }
+
+      function renderNewPostTagOptions() {
+        const selected = new Set(state.newPostDraft?.tags || []);
+        const allowedTags = Array.isArray(state.newPostOptions?.allowedTags) ? state.newPostOptions.allowedTags : [];
+        if (!allowedTags.length) return "<p class=\"new-post-dialog-intro\">No allowed tags are available for this folder.</p>";
+        return allowedTags
+          .map((tag, index) => {
+            const checked = selected.has(tag);
+            const id = "new-post-tag-" + index;
+            return "<label class=\"new-post-tag-option" + (checked ? " selected" : "") + "\" for=\"" + id + "\">" +
+              "<input id=\"" + id + "\" type=\"checkbox\" data-new-post-tag=\"" + escapeAttribute(tag) + "\"" + (checked ? " checked" : "") + " aria-describedby=\"new-post-tags-error\">" +
+              "<span>" + escapeHtml(tag) + "</span><strong>" + (checked ? "Selected" : "Not selected") + "</strong></label>";
+          })
+          .join("");
+      }
+
+      function renderNewPostMetadataStep() {
+        const draft = state.newPostDraft || initialNewPostDraft();
+        const allowedTypes = Array.isArray(state.newPostOptions?.allowedTypes) ? state.newPostOptions.allowedTypes : [];
+        const typeOptions = "<option value=\"\">Select a type</option>" + allowedTypes
+          .map((type) => "<option value=\"" + escapeAttribute(type) + "\"" + (type === draft.type ? " selected" : "") + ">" + escapeHtml(type) + "</option>")
+          .join("");
+        const summaryState = summaryLengthStatus(draft.summary);
+
+        return "<p class=\"new-post-step\">Step 2 of 3</p>" +
+          "<h2 id=\"new-post-title\" tabindex=\"-1\">2 of 3: Post details</h2>" +
+          "<p class=\"new-post-dialog-intro\">Filename is calculated during preview.</p>" +
+          "<div class=\"new-post-form-grid\">" +
+            "<div class=\"new-post-field full\"><label for=\"new-post-title-input\">Title</label>" +
+              "<input id=\"new-post-title-input\" type=\"text\" data-new-post-field=\"title\" value=\"" + escapeAttribute(draft.title) + "\" aria-describedby=\"new-post-title-error\">" +
+              renderNewPostFieldError("new-post-title-error", newPostFieldErrorMessage("title")) +
+            "</div>" +
+            "<div class=\"new-post-field\"><label for=\"new-post-date\">Date</label>" +
+              "<input id=\"new-post-date\" type=\"date\" data-new-post-field=\"date\" value=\"" + escapeAttribute(draft.date) + "\" aria-describedby=\"new-post-date-error\">" +
+              renderNewPostFieldError("new-post-date-error", newPostFieldErrorMessage("date")) +
+            "</div>" +
+            "<div class=\"new-post-field\"><label for=\"new-post-type\">Type</label>" +
+              "<select id=\"new-post-type\" data-new-post-field=\"type\" aria-describedby=\"new-post-type-error\">" + typeOptions + "</select>" +
+              renderNewPostFieldError("new-post-type-error", newPostFieldErrorMessage("type")) +
+            "</div>" +
+            "<fieldset class=\"new-post-fieldset full\" aria-describedby=\"new-post-tags-error\"><legend>Tags</legend>" +
+              "<div class=\"new-post-tag-list\">" + renderNewPostTagOptions() + "</div>" +
+              renderNewPostFieldError("new-post-tags-error", newPostFieldErrorMessage("tags")) +
+            "</fieldset>" +
+            "<div class=\"new-post-field full\"><label for=\"new-post-summary\">Summary</label>" +
+              "<textarea id=\"new-post-summary\" data-new-post-field=\"summary\" aria-describedby=\"new-post-summary-status new-post-summary-error\">" + escapeHtml(draft.summary) + "</textarea>" +
+              "<div class=\"new-post-summary-status " + summaryState.status + "\" id=\"new-post-summary-status\" aria-live=\"polite\"><strong>summaryCount</strong> " + escapeHtml(summaryState.label) + " - " + escapeHtml(summaryState.message) + "</div>" +
+              renderNewPostFieldError("new-post-summary-error", newPostFieldErrorMessage("summary")) +
+            "</div>" +
+          "</div>" + renderNewPostActionMessage();
+      }
+
+      function renderNewPostPreviewStep() {
+        const preview = state.newPostPreview;
+        if (!preview) {
+          return "<p class=\"new-post-step\">Step 3 of 3</p><h2 id=\"new-post-title\" tabindex=\"-1\">3 of 3: Review draft</h2>" +
+            "<div class=\"new-post-message error\" role=\"alert\">Preview the post details before creating a draft.</div>" + renderNewPostActionMessage();
+        }
+        const file = preview.files?.[0] || {};
+        const sourcePathLabel = preview.derived?.sourcePathLabel || file.path || "-";
+        const operation = file.operation || "create";
+        return "<p class=\"new-post-step\">Step 3 of 3</p>" +
+          "<h2 id=\"new-post-title\" tabindex=\"-1\">3 of 3: Review draft</h2>" +
+          "<dl class=\"new-post-preview-details\"><dt>sourcePathLabel</dt><dd>" + escapeHtml(sourcePathLabel) + "</dd><dt>Operation</dt><dd>" + escapeHtml(operation) + " source draft</dd></dl>" +
+          "<pre class=\"new-post-markdown\">" + escapeHtml(file.afterPreview || "") + "</pre>" +
+          renderMutationIssues("Warnings", preview.warnings || [], "warning") +
+          "<div class=\"new-post-message\">draft: true, source-only, sync and publish are not run.</div>" +
+          renderNewPostActionMessage();
+      }
+
+      function renderNewPostSuccess() {
+        const result = state.newPostResult || {};
+        const sourcePathLabel = result.sourcePathLabel || "-";
+        const copied = state.copied === sourcePathLabel;
+        return "<p class=\"new-post-step\">Draft created</p>" +
+          "<h2 id=\"new-post-title\" tabindex=\"-1\">New post created</h2>" +
+          "<div class=\"new-post-message good\" role=\"status\" aria-live=\"polite\">The source draft was created. Sync and publish were not run.</div>" +
+          "<dl class=\"new-post-success-details\"><dt>sourcePathLabel</dt><dd>" + escapeHtml(sourcePathLabel) + "</dd><dt>nextAction</dt><dd><code>" + escapeHtml(result.nextAction || "-") + "</code></dd></dl>" +
+          "<div class=\"button-row\" style=\"margin-top: 16px\"><button class=\"button\" data-copy=\"" + escapeAttribute(sourcePathLabel) + "\" data-copy-label=\"Copy path\" type=\"button\">" + (copied ? "Path copied" : "Copy path") + "</button></div>";
+      }
+
+      function renderNewPostFooter() {
+        if (state.newPostResult) {
+          return "<button class=\"button primary\" data-new-post-done type=\"button\">Done</button>";
+        }
+        if (!state.newPostOptions) {
+          const retry = state.newPostError ? "<button class=\"button primary\" data-new-post-retry type=\"button\">Retry</button>" : "";
+          return "<button class=\"button\" data-new-post-close type=\"button\">Close</button>" + retry;
+        }
+        if (state.newPostStep === 1) {
+          return "<button class=\"button\" data-new-post-close type=\"button\">Close</button>" +
+            "<button class=\"button primary\" data-new-post-next type=\"button\"" + (newPostCanContinueFromFolder() ? "" : " disabled") + ">Continue</button>";
+        }
+        if (state.newPostStep === 2) {
+          return "<button class=\"button\" data-new-post-back type=\"button\">Back</button>" +
+            "<button class=\"button\" data-new-post-close type=\"button\">Close</button>" +
+            "<button class=\"button primary\" data-new-post-preview type=\"button\"" + (newPostCanPreview() ? "" : " disabled") + ">Local Preview</button>";
+        }
+        return "<button class=\"button\" data-new-post-back type=\"button\">Back</button>" +
+          "<button class=\"button\" data-new-post-preview type=\"button\"" + (state.newPostApplying ? " disabled" : "") + ">Preview again</button>" +
+          "<button class=\"button primary\" data-new-post-apply type=\"button\"" + (newPostPreviewCanApply() ? "" : " disabled") + ">" + (state.newPostApplying ? "Creating..." : "Create draft") + "</button>";
+      }
+
+      function renderNewPostDialog() {
+        const dialog = document.querySelector("[data-new-post-dialog]");
+        const content = dialog?.querySelector?.("[data-new-post-content]") || document.querySelector("[data-new-post-content]");
+        if (!content) return;
+        if (!state.newPostOpen) {
+          content.innerHTML = "";
+          return;
+        }
+        const body = state.newPostResult
+          ? renderNewPostSuccess()
+          : !state.newPostOptions
+            ? "<p class=\"new-post-step\">New post</p><h2 id=\"new-post-title\" tabindex=\"-1\">New post</h2><p class=\"new-post-dialog-intro\" aria-live=\"polite\">Loading configured folders...</p>" + renderNewPostActionMessage()
+            : state.newPostStep === 1
+              ? renderNewPostFolderStep()
+              : state.newPostStep === 2
+                ? renderNewPostMetadataStep()
+                : renderNewPostPreviewStep();
+        content.innerHTML = "<div class=\"new-post-dialog-body\">" + body + "</div><footer class=\"new-post-dialog-footer\">" + renderNewPostFooter() + "</footer>";
+      }
+
+      function focusNewPostDialog() {
+        setTimeout(() => {
+          const dialog = document.querySelector("[data-new-post-dialog]");
+          const focusTarget = dialog?.querySelector?.("#new-post-project, #new-post-title-input, #new-post-title");
+          focusTarget?.focus?.();
+        }, 0);
+      }
+
+      function resetNewPostDialogState() {
+        state.newPostOpen = false;
+        state.newPostSession += 1;
+        state.newPostStep = 1;
+        state.newPostOptions = null;
+        state.newPostDraft = null;
+        state.newPostPreview = null;
+        state.newPostPreviewRequestId += 1;
+        state.newPostError = "";
+        state.newPostApplying = false;
+        state.newPostResult = null;
+      }
+
+      function updateNewPostDraft(field, value) {
+        if (!state.newPostDraft) return;
+        state.newPostDraft = { ...state.newPostDraft, [field]: value };
+        state.newPostPreview = null;
+        state.newPostPreviewRequestId += 1;
+        state.newPostResult = null;
+        state.newPostError = "";
+        updateNewPostApplyButton();
+        updateNewPostPreviewButton();
+      }
+
+      function updateNewPostSummaryElement() {
+        const element = document.querySelector("#new-post-summary-status");
+        if (!element || !state.newPostDraft) return;
+        const status = summaryLengthStatus(state.newPostDraft.summary);
+        element.className = "new-post-summary-status " + status.status;
+        element.innerHTML = "<strong>summaryCount</strong> " + escapeHtml(status.label) + " - " + escapeHtml(status.message);
+      }
+
+      function updateNewPostApplyButton() {
+        const button = document.querySelector("[data-new-post-apply]");
+        if (button) button.disabled = !newPostPreviewCanApply();
+      }
+
+      function updateNewPostPreviewButton() {
+        const button = document.querySelector("[data-new-post-preview]");
+        if (button && state.newPostStep === 2) button.disabled = !newPostCanPreview();
+      }
+
+      function updateNewPostField(element) {
+        const field = element.dataset.newPostField;
+        updateNewPostDraft(field, element.value);
+        if (field === "summary") updateNewPostSummaryElement();
+      }
+
+      function updateNewPostTag(element) {
+        const tag = element.dataset.newPostTag;
+        const tags = new Set(state.newPostDraft?.tags || []);
+        if (element.checked) tags.add(tag);
+        else tags.delete(tag);
+        updateNewPostDraft("tags", [...tags]);
+      }
+
+      async function openNewPostDialog() {
+        const dialog = document.querySelector("[data-new-post-dialog]");
+        resetNewPostDialogState();
+        state.newPostOpen = true;
+        const session = state.newPostSession;
+        renderNewPostDialog();
+        if (dialog && !dialog.open) dialog.showModal();
+        focusNewPostDialog();
+
+        const project = state.activeProject === "all" ? "" : state.activeProject;
+        try {
+          const response = await fetch("/api/posts/new/options?project=" + encodeURIComponent(project));
+          const json = await readJsonResponse(response);
+          if (!newPostSessionIsCurrent(session)) return;
+          if (!response.ok) {
+            state.newPostError = mutationErrorMessage(json, "New post options failed to load.");
+            renderNewPostDialog();
+            focusNewPostDialog();
+            return;
+          }
+          state.newPostOptions = json;
+          state.newPostDraft = initialNewPostDraft();
+          state.newPostError = "";
+        } catch (error) {
+          if (!newPostSessionIsCurrent(session)) return;
+          state.newPostError = error.message;
+        }
+        renderNewPostDialog();
+        focusNewPostDialog();
+      }
+
+      function closeNewPostDialog() {
+        if (state.newPostApplying) return;
+        const dialog = document.querySelector("[data-new-post-dialog]");
+        if (dialog?.open) {
+          dialog.close();
+          return;
+        }
+        resetNewPostDialogState();
+        renderNewPostDialog();
+        document.querySelector("[data-new-post-open]")?.focus?.();
+      }
+
+      function advanceNewPostDialog() {
+        if (!newPostCanContinueFromFolder()) return;
+        state.newPostStep = 2;
+        state.newPostError = "";
+        renderNewPostDialog();
+        focusNewPostDialog();
+      }
+
+      function goBackNewPostDialog() {
+        if (state.newPostApplying) return;
+        state.newPostStep = Math.max(1, state.newPostStep - 1);
+        state.newPostError = "";
+        renderNewPostDialog();
+        focusNewPostDialog();
+      }
+
+      async function previewNewPostFromDialog() {
+        if (!newPostCanPreview()) return;
+        const requestPayload = newPostPreviewPayload();
+        const session = state.newPostSession;
+        const requestId = ++state.newPostPreviewRequestId;
+        state.newPostError = "";
+        state.newPostPreview = null;
+        state.newPostResult = null;
+        renderNewPostDialog();
+        try {
+          const { response, json } = await postJson("/api/posts/new/preview", requestPayload);
+          if (!newPostPreviewResponseIsCurrent(session, requestId, requestPayload)) return;
+          if (!response.ok) {
+            state.newPostError = mutationErrorMessage(json, "New post preview failed.");
+            renderNewPostDialog();
+            return;
+          }
+          state.newPostPreview = { ...json, requestPayload };
+          state.newPostError = "";
+          if (json.canApply && json.planHash) state.newPostStep = 3;
+        } catch (error) {
+          if (!newPostPreviewResponseIsCurrent(session, requestId, requestPayload)) return;
+          state.newPostError = error.message;
+        }
+        renderNewPostDialog();
+        focusNewPostDialog();
+      }
+
+      async function applyNewPostFromDialog() {
+        if (!newPostPreviewCanApply() || state.newPostApplying) return;
+        const requestPayload = state.newPostPreview.requestPayload;
+        const planHash = state.newPostPreview.planHash;
+        state.newPostApplying = true;
+        state.newPostError = "";
+        renderNewPostDialog();
+        try {
+          const { response, json } = await postJson("/api/posts/new/apply", { ...requestPayload, planHash });
+          if (!response.ok) {
+            state.newPostPreview = null;
+            state.newPostStep = 2;
+            state.newPostError = mutationErrorMessage(json, "New post apply failed. Preview again before creating a draft.");
+            renderNewPostDialog();
+            return;
+          }
+          state.newPostResult = json;
+          state.newPostError = "";
+          try {
+            await loadInventory();
+          } catch (error) {
+            state.newPostError = "Inventory refresh failed: " + error.message;
+          }
+        } catch (error) {
+          state.newPostPreview = null;
+          state.newPostStep = 2;
+          state.newPostError = error.message;
+        } finally {
+          state.newPostApplying = false;
+          renderNewPostDialog();
+          focusNewPostDialog();
+        }
+      }
+
       function renderOperations(operations = []) {
         if (!operations.length) return "";
         return "<div class=\"mutation-message\"><strong>Planned file changes</strong><ul class=\"mutation-list\">" +
@@ -2857,10 +3577,12 @@
           await navigator.clipboard.writeText(value);
           state.copied = copiedLabel;
           render();
+          if (state.newPostOpen) renderNewPostDialog();
           setTimeout(() => {
             if (state.copied === copiedLabel) {
               state.copied = null;
               render();
+              if (state.newPostOpen) renderNewPostDialog();
             }
           }, 1400);
         } catch (error) {
@@ -3394,6 +4116,26 @@
         const target = event.target;
         if (!target?.matches) return;
 
+        if (target.matches("[data-new-post-field]")) {
+          const controlId = target.id;
+          updateNewPostField(target);
+          if (rerender) {
+            renderNewPostDialog();
+            document.getElementById(controlId)?.focus?.();
+          }
+          return;
+        }
+
+        if (target.matches("[data-new-post-tag]")) {
+          const controlId = target.id;
+          updateNewPostTag(target);
+          if (rerender) {
+            renderNewPostDialog();
+            document.getElementById(controlId)?.focus?.();
+          }
+          return;
+        }
+
         if (target.matches("[data-safe-edit-field]")) {
           updateSafeEditField(target);
           if (rerender) render();
@@ -3446,6 +4188,41 @@
       }, true);
 
       document.addEventListener("click", (event) => {
+        if (event.target.closest("[data-new-post-open]")) {
+          openNewPostDialog();
+          return;
+        }
+
+        if (event.target.closest("[data-new-post-close]") || event.target.closest("[data-new-post-done]")) {
+          closeNewPostDialog();
+          return;
+        }
+
+        if (event.target.closest("[data-new-post-retry]")) {
+          openNewPostDialog();
+          return;
+        }
+
+        if (event.target.closest("[data-new-post-next]")) {
+          advanceNewPostDialog();
+          return;
+        }
+
+        if (event.target.closest("[data-new-post-back]")) {
+          goBackNewPostDialog();
+          return;
+        }
+
+        if (event.target.closest("[data-new-post-preview]")) {
+          previewNewPostFromDialog();
+          return;
+        }
+
+        if (event.target.closest("[data-new-post-apply]")) {
+          applyNewPostFromDialog();
+          return;
+        }
+
         const projectButton = event.target.closest("[data-project]");
         if (projectButton) {
           state.activeProject = projectButton.dataset.project;
@@ -3577,6 +4354,20 @@
 
       document.addEventListener("input", (event) => handleMutationFieldEvent(event));
       document.addEventListener("change", (event) => handleMutationFieldEvent(event, { rerender: true }));
+
+      const newPostDialog = document.querySelector("[data-new-post-dialog]");
+      newPostDialog.addEventListener("cancel", (event) => {
+        if (state.newPostApplying) event.preventDefault();
+      });
+      newPostDialog.addEventListener("close", () => {
+        if (state.newPostApplying) {
+          newPostDialog.showModal();
+          return;
+        }
+        resetNewPostDialogState();
+        renderNewPostDialog();
+        document.querySelector("[data-new-post-open]")?.focus?.();
+      });
 
       document.querySelector("#refresh").addEventListener("click", loadInventory);
       document.querySelector("#theme-toggle").addEventListener("click", () => {
