@@ -346,10 +346,15 @@ export function applyNewPost({
   if (fs.existsSync(plan.targetPath)) {
     throw postCreationError("post-already-exists", "A post already exists at this filename.");
   }
-  try {
-    if (plan.mode === POST_CREATION_MODES.CLI_COMPATIBLE) {
+  if (plan.mode === POST_CREATION_MODES.CLI_COMPATIBLE) {
+    try {
       fs.mkdirSync(path.dirname(plan.targetPath), { recursive: true });
+    } catch {
+      throw postCreationError("post-create-failed", "Could not create the source draft.");
     }
+  }
+
+  try {
     fs.writeFileSync(plan.targetPath, plan.markdown, { encoding: "utf8", flag: "wx" });
   } catch (error) {
     if (error?.code === "EEXIST") {

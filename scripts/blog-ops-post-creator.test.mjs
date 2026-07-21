@@ -293,3 +293,34 @@ test("applyNewPost reports a safe creation error when the CLI source parent is a
   assert.doesNotMatch(thrown?.message ?? "", /ENOTDIR|not a directory/i);
   assert.equal(fs.readFileSync(blockedParent, "utf8"), "# blocker\n");
 });
+
+test("applyNewPost classifies a configured CLI source file as a setup failure", (t) => {
+  const { root, sourceDir, env } = makeBlogHub(t);
+  const input = validDashboardInput();
+  fs.rmSync(sourceDir, { recursive: true });
+  fs.writeFileSync(sourceDir, "# source blocker\n", "utf8");
+  const preview = previewNewPost({
+    root,
+    env,
+    mode: POST_CREATION_MODES.CLI_COMPATIBLE,
+    input,
+  });
+
+  assert.equal(preview.canApply, true);
+  assert.throws(
+    () =>
+      applyNewPost({
+        root,
+        env,
+        mode: POST_CREATION_MODES.CLI_COMPATIBLE,
+        input,
+        planHash: preview.planHash,
+      }),
+    (error) => {
+      assert.equal(error.code, "post-create-failed");
+      assert.equal(error.message.includes(root), false);
+      return true;
+    },
+  );
+  assert.equal(fs.readFileSync(sourceDir, "utf8"), "# source blocker\n");
+});
