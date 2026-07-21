@@ -30,13 +30,26 @@ function runDashboardScriptExpression(expression) {
   const match = html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(match, "dashboard script should exist");
 
+  const elementListeners = {};
   const element = {
-    addEventListener() {},
+    addEventListener(type, listener) {
+      elementListeners[type] = listener;
+    },
     alert() {},
     classList: { toggle() {} },
     dataset: {},
+    focus() {},
     innerHTML: "",
+    matches() {
+      return false;
+    },
+    open: false,
     setAttribute() {},
+    showModalCalls: 0,
+    showModal() {
+      this.open = true;
+      this.showModalCalls += 1;
+    },
     textContent: "",
   };
   const context = {
@@ -64,6 +77,8 @@ function runDashboardScriptExpression(expression) {
     navigator: { clipboard: { writeText: async () => {} } },
     setTimeout() {},
   };
+  context.__dashboardElement = element;
+  context.__dashboardElementListeners = elementListeners;
 
   vm.runInNewContext(`${match[1]}\nglobalThis.__dashboardScriptResult = (${expression});`, context);
   return context.__dashboardScriptResult;
@@ -462,6 +477,41 @@ test("renderDashboardHtml refreshes inventory after apply and blocks close while
   assert.match(html, /data-new-post-dialog[\s\S]*addEventListener\("cancel"/);
   assert.match(html, /if \(state\.newPostApplying\) event\.preventDefault\(\);/);
   assert.match(html, /data-new-post-close[\s\S]*state\.newPostApplying/);
+});
+
+test("new post native close reopens the dialog while applying", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostOpen = true;
+    state.newPostApplying = true;
+    state.newPostResult = { status: "created" };
+    __dashboardElement.open = false;
+    __dashboardElement.showModalCalls = 0;
+    __dashboardElementListeners.close();
+    return {
+      newPostOpen: state.newPostOpen,
+      result: state.newPostResult,
+      showModalCalls: __dashboardElement.showModalCalls,
+    };
+  })()`);
+  const html = renderDashboardHtml();
+
+  assert.equal(result.newPostOpen, true);
+  assert.equal(result.result.status, "created");
+  assert.equal(result.showModalCalls, 1);
+  assert.match(html, /newPostDialog\.addEventListener\("close", \(\) => \{\s*if \(state\.newPostApplying\) \{\s*newPostDialog\.showModal\(\);\s*return;/);
+});
+
+test("newPostSessionIsCurrent rejects stale option sessions", () => {
+  const result = runDashboardScriptExpression(`(() => {
+    state.newPostOpen = true;
+    state.newPostSession = 4;
+    const priorSession = newPostSessionIsCurrent(3);
+    const currentSession = newPostSessionIsCurrent(4);
+    return { priorSession, currentSession };
+  })()`);
+
+  assert.equal(result.priorSession, false);
+  assert.equal(result.currentSession, true);
 });
 
 test("createDashboardServer serves inventory without private note content", async () => {

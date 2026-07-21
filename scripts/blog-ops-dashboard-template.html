@@ -1844,6 +1844,7 @@
         safeEditError: "",
         safeEditApplying: false,
         newPostOpen: false,
+        newPostSession: 0,
         newPostStep: 1,
         newPostOptions: null,
         newPostDraft: null,
@@ -2571,6 +2572,10 @@
         };
       }
 
+      function newPostSessionIsCurrent(session) {
+        return state.newPostOpen && state.newPostSession === session;
+      }
+
       function newPostPreviewPayload() {
         const draft = state.newPostDraft || {};
         return {
@@ -2794,6 +2799,7 @@
 
       function resetNewPostDialogState() {
         state.newPostOpen = false;
+        state.newPostSession += 1;
         state.newPostStep = 1;
         state.newPostOptions = null;
         state.newPostDraft = null;
@@ -2849,6 +2855,7 @@
         const dialog = document.querySelector("[data-new-post-dialog]");
         resetNewPostDialogState();
         state.newPostOpen = true;
+        const session = state.newPostSession;
         renderNewPostDialog();
         if (dialog && !dialog.open) dialog.showModal();
         focusNewPostDialog();
@@ -2857,7 +2864,7 @@
         try {
           const response = await fetch("/api/posts/new/options?project=" + encodeURIComponent(project));
           const json = await readJsonResponse(response);
-          if (!state.newPostOpen) return;
+          if (!newPostSessionIsCurrent(session)) return;
           if (!response.ok) {
             state.newPostError = mutationErrorMessage(json, "New post options failed to load.");
             renderNewPostDialog();
@@ -2868,7 +2875,7 @@
           state.newPostDraft = initialNewPostDraft();
           state.newPostError = "";
         } catch (error) {
-          if (!state.newPostOpen) return;
+          if (!newPostSessionIsCurrent(session)) return;
           state.newPostError = error.message;
         }
         renderNewPostDialog();
@@ -4332,7 +4339,10 @@
         if (state.newPostApplying) event.preventDefault();
       });
       newPostDialog.addEventListener("close", () => {
-        if (state.newPostApplying) return;
+        if (state.newPostApplying) {
+          newPostDialog.showModal();
+          return;
+        }
         resetNewPostDialogState();
         renderNewPostDialog();
         document.querySelector("[data-new-post-open]")?.focus?.();
