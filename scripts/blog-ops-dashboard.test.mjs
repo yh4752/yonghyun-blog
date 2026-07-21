@@ -1724,7 +1724,16 @@ test("new post options passes dashboard-strict mode and removes provider paths",
       getOptions: (input) => {
         providerInput = input;
         return {
-          projects: [{ slug: "demo", label: "Demo" }],
+          projects: [
+            {
+              slug: "demo",
+              label: "Demo",
+              metadata: {
+                absolutePath: absoluteFixturePath,
+                targetPath: absoluteFixturePath,
+              },
+            },
+          ],
           selectedProject: "demo",
           absolutePath: absoluteFixturePath,
           targetPath: absoluteFixturePath,
@@ -1749,6 +1758,8 @@ test("new post options passes dashboard-strict mode and removes provider paths",
     assert.equal(json.absolutePath, undefined);
     assert.equal(json.targetPath, undefined);
     assert.doesNotMatch(JSON.stringify(json), new RegExp(absoluteFixturePath));
+    assert.doesNotMatch(JSON.stringify(json), /absolutePath|targetPath/);
+    assert.deepEqual(json.projects, [{ slug: "demo", label: "Demo", metadata: {} }]);
   } finally {
     await closeServer(server);
   }
@@ -1794,6 +1805,7 @@ test("new post preview rejects unsupported fields before provider invocation", a
 test("new post preview passes the six input fields in dashboard-strict mode", async () => {
   let providerInput;
   const input = validNewPostInput();
+  const absoluteFixturePath = "/private/dashboard-new-post-preview.md";
   const server = createDashboardServer({
     newPostProvider: {
       getOptions: () => {
@@ -1807,7 +1819,17 @@ test("new post preview passes the six input fields in dashboard-strict mode", as
           warnings: [],
           planHash: null,
           derived: null,
-          files: [],
+          files: [
+            {
+              file: "docs/blog/2026-07-21-dashboard-draft.md",
+              absolutePath: absoluteFixturePath,
+              targetPath: absoluteFixturePath,
+              nested: {
+                absolutePath: absoluteFixturePath,
+                targetPath: absoluteFixturePath,
+              },
+            },
+          ],
         };
       },
       apply: () => {
@@ -1828,6 +1850,9 @@ test("new post preview passes the six input fields in dashboard-strict mode", as
     assert.equal(response.status, 200);
     assert.equal(json.canApply, false);
     assert.deepEqual(providerInput, { input, mode: "dashboard-strict" });
+    assert.doesNotMatch(JSON.stringify(json), new RegExp(absoluteFixturePath));
+    assert.doesNotMatch(JSON.stringify(json), /absolutePath|targetPath/);
+    assert.deepEqual(json.files, [{ file: "docs/blog/2026-07-21-dashboard-draft.md", nested: {} }]);
   } finally {
     await closeServer(server);
   }
@@ -1915,6 +1940,71 @@ test("new post apply maps post creation conflicts to 409", async () => {
   }
 });
 
+test("new post preview maps missing project metadata to 409", async () => {
+  const error = Object.assign(new Error("project-metadata-not-found"), { code: "project-metadata-not-found" });
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw error;
+      },
+      apply: () => {
+        throw new Error("not used");
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(validNewPostInput()),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(json.error, "project-metadata-not-found");
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("new post apply keeps post creation failures at 500", async () => {
+  const error = Object.assign(new Error("Could not create the source draft."), { code: "post-create-failed" });
+  const server = createDashboardServer({
+    newPostProvider: {
+      getOptions: () => {
+        throw new Error("not used");
+      },
+      preview: () => {
+        throw new Error("not used");
+      },
+      apply: () => {
+        throw error;
+      },
+    },
+  });
+
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...validNewPostInput(), planHash: "sha256:preview" }),
+    });
+    const json = await response.json();
+
+    assert.equal(response.status, 500);
+    assert.equal(json.error, "post-create-failed");
+    assert.equal(json.message, "Could not create the source draft.");
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("new post routes preserve object-body and method validation", async () => {
   let providerCalled = false;
   const server = createDashboardServer({
@@ -1950,6 +2040,8 @@ test("new post routes preserve object-body and method validation", async () => {
     const nonObjectJson = await nonObject.json();
     const wrongMethod = await fetch(`http://127.0.0.1:${port}/api/posts/new/options`, { method: "POST" });
     const wrongMethodJson = await wrongMethod.json();
+    const previewGet = await fetch(`http://127.0.0.1:${port}/api/posts/new/preview`);
+    const applyGet = await fetch(`http://127.0.0.1:${port}/api/posts/new/apply`);
 
     assert.equal(malformed.status, 400);
     assert.equal(malformedJson.error, "invalid-json");
@@ -1958,6 +2050,10 @@ test("new post routes preserve object-body and method validation", async () => {
     assert.equal(wrongMethod.status, 405);
     assert.equal(wrongMethod.headers.get("allow"), "GET");
     assert.equal(wrongMethodJson.error, "method-not-allowed");
+    assert.equal(previewGet.status, 405);
+    assert.equal(previewGet.headers.get("allow"), "POST");
+    assert.equal(applyGet.status, 405);
+    assert.equal(applyGet.headers.get("allow"), "POST");
     assert.equal(providerCalled, false);
   } finally {
     await closeServer(server);

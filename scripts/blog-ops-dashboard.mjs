@@ -97,9 +97,14 @@ function statusForRunnerResult(result) {
 
 function statusForMutationError(error) {
   if (
-    ["stale-source", "stale-metadata", "stale-preview", "post-already-exists", "source-directory-not-found"].includes(
-      error.code,
-    )
+    [
+      "stale-source",
+      "stale-metadata",
+      "stale-preview",
+      "post-already-exists",
+      "source-directory-not-found",
+      "project-metadata-not-found",
+    ].includes(error.code)
   ) {
     return 409;
   }
@@ -191,9 +196,21 @@ function awaitProvider(value) {
   return Promise.resolve(value);
 }
 
-function omitTopLevelPaths(value) {
-  if (!isJsonObject(value)) return value;
-  const { targetPath, absolutePath, ...safeValue } = value;
+function isPlainObject(value) {
+  if (!isJsonObject(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function sanitizeNewPostResponse(value) {
+  if (Array.isArray(value)) return value.map(sanitizeNewPostResponse);
+  if (!isPlainObject(value)) return value;
+
+  const safeValue = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (key === "absolutePath" || key === "targetPath") continue;
+    safeValue[key] = sanitizeNewPostResponse(nestedValue);
+  }
   return safeValue;
 }
 
@@ -327,7 +344,7 @@ export function createDashboardServer({
             mode: POST_CREATION_MODES.DASHBOARD_STRICT,
           }),
         );
-        sendJson(response, 200, omitTopLevelPaths(result));
+        sendJson(response, 200, sanitizeNewPostResponse(result));
       } catch (error) {
         sendMutationError(response, error);
       }
@@ -343,16 +360,13 @@ export function createDashboardServer({
       try {
         const input = await readJsonObjectBody(request);
         requireOnlyFields(input, NEW_POST_INPUT_FIELDS);
-        sendJson(
-          response,
-          200,
-          await awaitProvider(
-            newPostProvider.preview({
-              input,
-              mode: POST_CREATION_MODES.DASHBOARD_STRICT,
-            }),
-          ),
+        const result = await awaitProvider(
+          newPostProvider.preview({
+            input,
+            mode: POST_CREATION_MODES.DASHBOARD_STRICT,
+          }),
         );
+        sendJson(response, 200, sanitizeNewPostResponse(result));
       } catch (error) {
         sendMutationError(response, error);
       }
@@ -377,7 +391,7 @@ export function createDashboardServer({
             mode: POST_CREATION_MODES.DASHBOARD_STRICT,
           }),
         );
-        sendJson(response, 200, omitTopLevelPaths(result));
+        sendJson(response, 200, sanitizeNewPostResponse(result));
       } catch (error) {
         sendMutationError(response, error);
       }
