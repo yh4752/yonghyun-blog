@@ -217,7 +217,7 @@ Dashboard에서 글별 학습 상태를 추적하는 방식은 [Learning Ops Das
 
 ## 당장 다음 작업
 
-다음 작업은 v1.4 Safe Mutations dogfooding과 v1.5 우선순위 결정이다.
+v1.5에서는 Dashboard에서 발견한 frontmatter 누락을 source 본문을 건드리지 않고 복구하는 흐름을 먼저 완성했다. 이후 QA와 운영 문서는 기능 구현 PR과 분리해 정리한다.
 
 완료된 v1.4 범위는 **Safe Mutations**다.
 
@@ -228,13 +228,20 @@ Dashboard에서 글별 학습 상태를 추적하는 방식은 [Learning Ops Das
 - Dashboard는 브라우저에서 임의 command를 받지 않고, 서버 allow-list action만 실행한다.
 - Safe Mutations는 frontmatter 편집, draft toggle, tag 선택/검증, Folder 추가, Empty Folder 삭제를 preview/diff-before-apply로 처리한다.
 
+현재 상태:
+
+- [x] v1.5 missing frontmatter quick fix 구현 및 검증
+- [ ] 작업 공간 회복과 template quality baseline 문서 PR 분리 완료
+- [ ] v1.6 Dashboard 새 글 생성 UI 설계
+- [ ] 새로 만든 빈 Folder rollback/delete UX 수요 관찰
+
 다음 순서:
 
-1. v1.4 Safe Mutations를 실제 Dashboard에서 2026-06-06 dev-log 대상으로 dogfooding한다.
-2. dogfooding 결과, 불편했던 점, 후속 조치를 6/6 dev-log에 기록한다.
-3. v1.5에서 새 글 생성 UI를 먼저 할지, missing frontmatter quick fix를 먼저 할지 결정한다.
-4. Learning Ops에서 복습할 글 1개를 고르고 private note/progress manifest 흐름을 확인한다.
-5. unpublish는 실제 요구가 반복될 때까지 pending으로 둔다.
+1. 운영 문서와 production QA 결과를 별도 PR로 남긴다.
+2. 원래 `main` 작업 공간의 미완료 변경은 merged PR과 대조한 뒤에만 회복한다.
+3. v1.6에서 Dashboard 새 글 생성 UI를 설계한다. 기존 `new:post` CLI를 대체하는 작업이 아니라, 같은 source-first 흐름을 화면에서 안전하게 안내하는 작업이다.
+4. Learning Ops의 첫 dogfooding 대상으로 `frontmatter validation` 글을 고르고, 질문 세트, 개인 답변 노트, 복습 상태 변경을 한 번 끝까지 확인한다.
+5. Folder rollback/delete UX와 unpublish는 실제 사용 중 불편함이 반복될 때까지 관찰한다.
 
 ## 보류할 것
 
