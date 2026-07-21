@@ -16,13 +16,12 @@ function runCli(root, args) {
   });
 }
 
-function makeCliHub(t, { sourceExists }) {
+function makeCliHub(t, { sourceExists, metadata = true }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "blog-ops-new-post-cli-"));
   const sourceDir = path.join(root, "source", "docs", "blog");
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
   if (sourceExists) fs.mkdirSync(sourceDir, { recursive: true });
-  fs.mkdirSync(path.join(root, "src", "data"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "posts.config.yml"),
     `site:
@@ -38,23 +37,26 @@ sources:
 `,
     "utf8",
   );
-  fs.writeFileSync(
-    path.join(root, "src", "data", "projects.json"),
-    `${JSON.stringify([
-      {
-        slug: "demo",
-        name: "Demo",
-        description: "Demo",
-        stack: ["Astro"],
-        status: "active",
-        featured: false,
-        repositoryUrl: null,
-        demoUrl: null,
-      },
-    ])}\n`,
-    "utf8",
-  );
-  fs.writeFileSync(path.join(root, "src", "data", "tags.json"), '["Documentation"]\n', "utf8");
+  if (metadata) {
+    fs.mkdirSync(path.join(root, "src", "data"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "src", "data", "projects.json"),
+      `${JSON.stringify([
+        {
+          slug: "demo",
+          name: "Demo",
+          description: "Demo",
+          stack: ["Astro"],
+          status: "active",
+          featured: false,
+          repositoryUrl: null,
+          demoUrl: null,
+        },
+      ])}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(path.join(root, "src", "data", "tags.json"), '["Documentation"]\n', "utf8");
+  }
 
   return { root, sourceDir };
 }
@@ -75,6 +77,24 @@ test("new-post creates an absent configured source directory with legacy default
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, `Created ${path.join(fs.realpathSync(sourceDir), "2026-07-21-개발-로그.md")}\n`);
+  assert.equal(fs.readFileSync(target, "utf8").includes('tags: []\nsummary: ""'), true);
+});
+
+test("new-post keeps the legacy config-only contract", (t) => {
+  const { root, sourceDir } = makeCliHub(t, { sourceExists: false, metadata: false });
+  const result = runCli(root, [
+    "--project",
+    "demo",
+    "--type",
+    "dev-log",
+    "--date",
+    "2026-07-21",
+    "--title",
+    "구성 전용 생성",
+  ]);
+  const target = path.join(sourceDir, "2026-07-21-구성-전용-생성.md");
+
+  assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.readFileSync(target, "utf8").includes('tags: []\nsummary: ""'), true);
 });
 

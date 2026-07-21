@@ -260,3 +260,36 @@ test("applyNewPost rejects stale plans and preserves a racing existing file", (t
   );
   assert.equal(fs.readFileSync(target, "utf8"), "# preserved\n");
 });
+
+test("applyNewPost reports a safe creation error when the CLI source parent is a file", (t) => {
+  const { root, sourceDir, env } = makeBlogHub(t);
+  const input = validDashboardInput();
+  const blockedParent = path.join(root, "source", "docs");
+  fs.rmSync(sourceDir, { recursive: true });
+  fs.rmSync(blockedParent, { recursive: true });
+  fs.writeFileSync(blockedParent, "# blocker\n", "utf8");
+  const preview = previewNewPost({
+    root,
+    env,
+    mode: POST_CREATION_MODES.CLI_COMPATIBLE,
+    input,
+  });
+
+  let thrown;
+  try {
+    applyNewPost({
+      root,
+      env,
+      mode: POST_CREATION_MODES.CLI_COMPATIBLE,
+      input,
+      planHash: preview.planHash,
+    });
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert.equal(thrown?.code, "post-create-failed");
+  assert.equal(thrown?.message.includes(root), false);
+  assert.doesNotMatch(thrown?.message ?? "", /ENOTDIR|not a directory/i);
+  assert.equal(fs.readFileSync(blockedParent, "utf8"), "# blocker\n");
+});

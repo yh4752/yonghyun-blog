@@ -15,6 +15,7 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2));
+const now = new Date();
 const input = {
   project: args.project,
   type: args.type,
@@ -29,6 +30,7 @@ const preview = previewNewPost({
   input,
   mode: POST_CREATION_MODES.CLI_COMPATIBLE,
   env: process.env,
+  now,
 });
 
 if (!preview.canApply) throw new Error(Object.values(preview.errors).join(" "));
@@ -39,6 +41,7 @@ const created = applyNewPost({
   planHash: preview.planHash,
   mode: POST_CREATION_MODES.CLI_COMPATIBLE,
   env: process.env,
+  now,
 });
 
 console.log(`Created ${created.targetPath}`);

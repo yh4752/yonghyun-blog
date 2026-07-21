@@ -16,6 +16,7 @@ const MODE_POLICIES = Object.freeze({
   [POST_CREATION_MODES.CLI_COMPATIBLE]: Object.freeze({
     defaults: true,
     allowsCustomSlug: true,
+    requiresMetadata: false,
     requiresSourceDirectory: false,
     requiresTitle: false,
     validatesDate: false,
@@ -25,6 +26,7 @@ const MODE_POLICIES = Object.freeze({
   [POST_CREATION_MODES.DASHBOARD_STRICT]: Object.freeze({
     defaults: false,
     allowsCustomSlug: false,
+    requiresMetadata: true,
     requiresSourceDirectory: true,
     requiresTitle: true,
     validatesDate: true,
@@ -49,7 +51,7 @@ function inputObject(input) {
   return input && typeof input === "object" && !Array.isArray(input) ? input : {};
 }
 
-function sourceForProject(config, project) {
+function sourceForProject(config, project, policy) {
   if (typeof project !== "string" || project.trim() === "") {
     throw postCreationError("project-required", "project-required: select a project before creating a post.");
   }
@@ -59,7 +61,7 @@ function sourceForProject(config, project) {
     throw postCreationError("source-not-found", `source-not-found: project '${project ?? "(missing)"}' is not configured.`);
   }
 
-  if (!config.projects.some((item) => item.slug === project)) {
+  if (policy.requiresMetadata && !config.projects.some((item) => item.slug === project)) {
     throw postCreationError(
       "project-metadata-not-found",
       `project-metadata-not-found: project '${project}' is not registered in src/data/projects.json.`,
@@ -208,8 +210,8 @@ function buildNewPostPlan({
 } = {}) {
   const policy = policyFor(mode);
   const normalizedInput = normalizeInput({ input, policy, now });
-  const config = loadBlogOpsConfig({ root, env });
-  const source = sourceForProject(config, normalizedInput.project);
+  const config = loadBlogOpsConfig({ root, env, metadata: policy.requiresMetadata });
+  const source = sourceForProject(config, normalizedInput.project, policy);
 
   if (policy.requiresSourceDirectory) requireSourceDirectory(source);
 
@@ -344,17 +346,16 @@ export function applyNewPost({
   if (fs.existsSync(plan.targetPath)) {
     throw postCreationError("post-already-exists", "A post already exists at this filename.");
   }
-  if (plan.mode === POST_CREATION_MODES.CLI_COMPATIBLE) {
-    fs.mkdirSync(path.dirname(plan.targetPath), { recursive: true });
-  }
-
   try {
+    if (plan.mode === POST_CREATION_MODES.CLI_COMPATIBLE) {
+      fs.mkdirSync(path.dirname(plan.targetPath), { recursive: true });
+    }
     fs.writeFileSync(plan.targetPath, plan.markdown, { encoding: "utf8", flag: "wx" });
   } catch (error) {
     if (error?.code === "EEXIST") {
       throw postCreationError("post-already-exists", "A post already exists at this filename.");
     }
-    throw postCreationError("post-create-failed", `Could not create the source draft: ${error.message}`);
+    throw postCreationError("post-create-failed", "Could not create the source draft.");
   }
 
   return {
