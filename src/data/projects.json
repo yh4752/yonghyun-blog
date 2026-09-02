@@ -28,5 +28,20 @@
     "featured": false,
     "repositoryUrl": null,
     "demoUrl": null
+  },
+  {
+    "slug": "lg-aimers-9th-competition",
+    "name": "LG Aimers 9th Competition",
+    "description": "야구 제구 성공 확률을 예측하며 시간 전이 검증, 규칙 준수 추론과 잔차 보정을 연구한 프로젝트",
+    "stack": [
+      "Python",
+      "CatBoost",
+      "TabM",
+      "Kaggle"
+    ],
+    "status": "complete",
+    "featured": true,
+    "repositoryUrl": "https://github.com/yh4752/lg-aimers-9th-competition",
+    "demoUrl": null
   }
 ]
