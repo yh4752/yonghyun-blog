@@ -1,7 +1,6 @@
 site:
   type: astro
   contentDir: src/content/blog
-
 sources:
   - project: sigak
     label: Sigak
@@ -15,6 +14,14 @@ sources:
   - project: yonghyun-blog
     label: yonghyun-blog
     path: docs/blog
+    include:
+      - "*.md"
+    exclude:
+      - README.md
+      - topic-queue.md
+  - project: lg-aimers-9th-competition
+    label: LG Aimers 9th Competition
+    path: ${HOME}/Documents/lg-aimers-9th-competition/docs/blog
     include:
       - "*.md"
     exclude:
