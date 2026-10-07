@@ -16,127 +16,58 @@
 - 글별 발행/학습 상태는 Blog Ops Dashboard의 Learning Ops inventory와 `.local/learning-progress.json`에서 관리한다.
 - 이 문서에는 현재 세션이나 이번 주에 실제로 집어들 3-7개 작업만 남긴다.
 
+## 상태 기준
+
+2026-10-07에 로컬 `main`의 구현과 최근 커밋을 대조했다. 구현 완료, 이번 점검 결과, 실제 학습 완료를 구분한다. 배포 상태는 로컬 병합 기록만으로 확정하지 않는다.
+
 ## 최근 완료
 
-- [x] Blog Ops Dashboard v1 사용 후기 기록
-- [x] safe CRUD에서 허용할 작업과 금지할 작업 정리
-- [x] 검증, sync, PR 자동화 흐름 설계
-- [x] Blog Ops Dashboard 디자인 반영
-- [x] `publish:posts`로 project-scoped 발행 검증 체인 추가
-- [x] 2026-06-04 yonghyun-blog dev-log 작성, PR, production 배포
-- [x] 운영 문서를 현재 구현 상태에 맞춰 최신화
-- [x] Dashboard action runner v1.1 범위 확정
-- [x] `publish:posts --dry-run` command preview를 Dashboard에 연결
-- [x] Dashboard action runner v1.3 Controlled Runner 구현
-- [x] Blog Ops Dashboard v1.4 Safe Mutations 구현
-- [x] Dashboard에서 발견한 Sigak `2026-06-05-dev-log.md` frontmatter 누락 정리
-- [x] v1.4 Safe Mutations disposable Folder dogfooding 결과 기록
-- [x] v1.5 missing frontmatter quick fix 구현 및 검증
+- [x] Dashboard의 Content Ops와 Learning Ops inventory 구현
+- [x] project-scoped `validate:posts`, `sync:posts`, `publish:posts` 흐름 구현
+- [x] Controlled Runner v1.3: `validate-source`, `publish-dry-run` 직접 실행
+- [x] Safe Mutations v1.4: frontmatter 수정, draft 전환, tag 검증, Folder 추가와 Empty Folder 삭제
+- [x] v1.5 missing frontmatter quick fix 구현
+- [x] SEO/GEO, Pagefind 검색, 선택형 Giscus 댓글 구현 (댓글은 기본 비활성)
+- [x] template quality baseline과 운영 QA 문서 변경을 기능 변경과 분리해 반영 (`0106c2e`)
+- [x] v1.6 새 글 생성 UI 설계와 구현 (`85f5b94`)
+- [x] LG Aimers 프로젝트 등록과 검증 설계·E2 개선·E3 OOM 회고 3편의 발행 변경을 `main`에 병합 (PR #38–#40)
+- [x] 이번 작업 시작 시 커밋하지 않은 변경이 없음을 확인
 
 ## 현재 우선순위
 
-- [ ] 작업 공간 회복과 template quality baseline 문서 PR 분리 완료
-- [ ] v1.6 Dashboard 새 글 생성 UI 설계
-- [ ] Learning Ops 운영 대상 글 `frontmatter validation` 1회 완료
+1. [x] 진행 문서를 v1.6과 LG Aimers 3편 발행 변경까지 최신화
+2. [x] v1.6 새 글 생성의 브라우저 사용 흐름, 테스트, 글 검증과 빌드 점검
+3. [x] Learning Ops의 `frontmatter validation` 글 상태와 기존 개인 답변 노트를 확인하고 복습 준비
+4. [x] 사용자 재답변 → 답변 검토 → 개인 노트 갱신 → 복습 상태 변경을 1회 수행
+5. [x] 기존 질문별 답변 노트의 Learning Ops 인식 호환성 개선과 회귀 검증 완료
 
-## 이번 주 후보
+다음에는 Learning Ops에서 다른 글 하나로 작성·복습 흐름을 사용하고, 반복되는 불편을 기록한다. PR assistant는 실제 발행 반복 작업을 확인한 뒤 판단한다.
 
-Dashboard가 구현되었으므로 전체 글 목록은 여기에 누적하지 않는다. 아래에는 이번 주에 실제로 집어 들 수 있는 후보만 남긴다.
+이번 점검의 근거와 남은 항목은 [2026-10-07 운영 점검](blog-ops-qa/2026-10-07-v16-and-learning-ops.md)에 기록한다.
 
-- [ ] 블로그 스캐폴딩 글 재구성 검토
-- [ ] 발행본 직접 수정 방지 글 재구성 검토
-- [ ] SchemaSpy adoption 글 학습형/포트폴리오형 재구성 후보 검토
-- [ ] Sigak 글에서 프로젝트 맥락, 설계 결정, 검증 근거가 충분한지 점검
-- [ ] 새 프로젝트 생성 시 `docs/blog` 작성 규칙 적용
-- [ ] Sigak Flyway 검색/RAG 연결 1회 복습
-- [ ] frontmatter validation 질문 세트, 개인 답변 노트, 복습 상태 변경을 한 번 끝까지 수행
+## 운영 경계
 
-### blog ops
+- Dashboard의 runner 실행 범위는 선택한 Folder 전체다. `All Folders`와 Smart View는 실행 범위가 아니다.
+- 직접 실행하는 runner action은 `validate-source`, `publish-dry-run`이다. Full publish는 command copy-only다.
+- v1.4와 v1.5의 파일 변경은 preview/diff를 확인한 뒤 적용한다.
+- v1.6 새 글 생성은 Folder 선택 → 글 정보 → Markdown 미리보기의 3단계다.
+- 새 글은 원본 `docs/blog`에 `draft: true` 파일 하나로 생성한다. 자동 sync, publish, commit, push, PR은 실행하지 않는다.
+- 기존 파일 덮어쓰기와 preview 이후 입력·파일 변경은 서버에서도 차단한다.
+- 실제 답변 없이 학습 상태를 `interview-ready`로 올리지 않는다.
 
-- [x] `orphan-published` 처리 정책 확정
-- [x] `unknown` source post 처리 정책 확정
-- [x] 상태별 next action 문구 정의
-- [x] read-only inventory 구현
-- [x] Content Ops와 Learning Ops 탭 구현
-- [x] private note 본문 비노출 정책 구현
-- [x] project-scoped `sync:posts` 구현
-- [x] project-scoped `publish:posts` 구현
-- [x] Dashboard runner는 먼저 dry-run/command preview로 시작
-- [x] Dashboard runner v1.3에서 `validate-source`, `publish-dry-run` allow-list 실행을 지원
-- [x] v1.4 Safe Mutations에서 frontmatter 편집, draft toggle, tag 선택/검증, Folder 추가, Empty Folder 삭제를 지원
-- [x] v1.4 Safe Mutations에서 저장 전 preview/diff-before-apply를 보여준다
-- [ ] v1.2 Folder 용어가 실제 사용 중 project와 혼동되는지 관찰한다
-- [ ] v1.2 모바일 Folder 통계가 작은 화면에서 읽기 좋은지 QA 결과를 기록한다
-- [ ] Smart View를 단일 선택으로 충분히 쓰는지, 조합형 view 요청이 반복되는지 기록한다
-- [ ] `type: note` 요구가 실제로 반복되는지 기록한다
-- [x] 2026-06-06 dev-log에 v1.4 dogfooding 결과, 불편했던 점, 후속 조치를 남긴다
-- [x] v1.5에서 missing frontmatter quick fix를 먼저 구현한다
-- [ ] v1.6에서 새 글 생성 UI를 먼저 설계한다
-- [ ] 새로 만든 빈 Folder rollback/delete UX 수요를 관찰한다
+## 관찰할 후보
 
-## 오늘 집어 들 작업
+아래 항목은 현재 우선순위를 끝낸 뒤 실제 사용 근거가 있을 때 검토한다.
 
-오늘은 아래 순서로 진행한다.
-
-- [x] 운영 문서를 현재 구현 상태에 맞춰 최신화한다.
-- [x] Dashboard action runner v1.1의 최소 범위를 정한다.
-- [x] 구현한다면 `publish:posts --dry-run` command preview부터 시작한다.
-- [x] v1.3 Controlled Runner로 파일을 바꾸지 않는 두 action을 Dashboard에서 실행한다.
-- [x] v1.4 Safe Mutations로 작은 safe CRUD 범위를 구현한다.
-- [x] Dashboard에서 발견한 Sigak `2026-06-05-dev-log.md` source frontmatter 누락을 정리한다.
-- [x] v1.4 Safe Mutations disposable Folder dogfooding 결과를 6/6 dev-log에 남긴다.
-- [ ] Learning Ops에서 `frontmatter validation` 글을 한 번 끝까지 복습한다.
-- [x] v1.5 우선순위를 정하고 missing frontmatter quick fix를 구현한다.
-
-## Dashboard action runner v1.1 확정 범위
-
-v1.1은 **Action Runner Preview**로 제한한다.
-
-포함:
-
-- 선택한 프로젝트의 publish plan 표시
-- `npm run publish:posts -- --project <project> --dry-run` 표시
-- `npm run publish:posts -- --project <project>` 표시
-- 단계 목록 표시: source validation, folder sync, published validation, test, build
-- dry-run command와 publish command 복사
-- source 우선, 발행본 직접 수정 금지, dirty state 확인 같은 safety note 표시
-
-제외:
-
-- Dashboard에서 명령 직접 실행
-- 임의 shell command 입력
-- 파일 변경
-- frontmatter 편집
-- draft 토글
-- 자동 commit, push, PR 생성
-
-실제 실행 버튼은 allow-list, dirty state check, diff preview, 로그 panel이 구현된 뒤 별도 후속 단계에서 검토한다.
-
-## Dashboard action runner v1.3 구현 상태
-
-v1.3은 **Controlled Runner**로 구현했다.
-
-Dashboard에서 직접 실행할 수 있는 action은 아래 두 개로 제한한다.
-
-- `validate-source`: `npm run validate:posts -- --source --project <project>`
-- `publish-dry-run`: `npm run publish:posts -- --project <project> --dry-run`
-
-안전 기준:
-
-- 실행 범위는 Smart View가 아니라 선택한 Folder 전체다.
-- `All Folders`에서는 실행하지 않는다.
-- 브라우저는 `{ action, project }`만 서버로 보낸다.
-- 서버는 allow-list argv만 실행하고, 임의 command string은 받지 않는다.
-- 실행 로그는 stdout/stderr 최근 32KB tail만 보여준다.
-- full publish는 여전히 copy-only다.
-
-v1.4 Safe Mutations도 구현했다. 이 단계는 draft/frontmatter 같은 작은 수정, tag 선택/검증, Folder 추가, Empty Folder 삭제를 다루며 저장 전 preview/diff를 먼저 보여준다.
-
-v1.4 disposable Folder dogfooding 결과, 생성 apply는 성공했지만 생성 직후 삭제는 `metadata-dirty`로 차단됐다. v1.5에서는 실제로 발견된 frontmatter 누락을 먼저 복구했다. 다음 Dashboard 기능은 새 글 생성 UI를 우선 설계하고, Folder rollback/delete UX는 사용 중 불편함이 반복되는지 관찰한다.
+- Folder 용어, 모바일 통계와 Smart View가 사용 중 혼동을 만드는지 관찰
+- 새로 만든 빈 Folder rollback/delete UX와 unpublish 필요성 관찰
+- PR assistant로 줄일 수 있는 반복 발행 작업 기록
+- Sigak 대표 글과 블로그 스캐폴딩·발행본 직접 수정 방지 글의 재구성 후보 검토
+- Pagefind 한국어 검색 품질과 Giscus 활성화 시 live QA
 
 ## 블로그 작성 스킬 목표
 
-스킬 이름 후보는 `technical-blog-learning-writer`다.
+구현한 스킬 이름은 `technical-blog-learning-writer`다.
 
 이 스킬은 글을 대신 써주는 도구가 아니라, 내가 설계를 이해하고 설명할 수 있게 만드는 작성 루프가 되어야 한다.
 

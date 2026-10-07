@@ -12,8 +12,10 @@
 - `main` 직접 push는 branch protection으로 막는다.
 - 글은 문제, 선택지, 결정, 검증, 트레이드오프, 면접 질문으로 이어지는 학습형 구조를 지향한다.
 - `init:project`, `new:post`, `validate:posts`, `sync:posts`, `publish:posts`로 작성과 발행 루틴을 CLI에서 반복할 수 있다.
-- Blog Ops Dashboard는 로컬에서 Content Ops와 Learning Ops 상태, Controlled Runner, Safe Mutations v1.4를 제공한다.
-- 2026-06-06 기준 Dashboard 디자인 반영, project-scoped publish flow, Controlled Runner, Safe Mutations v1.4까지 구현했다.
+- Blog Ops Dashboard는 로컬에서 Content Ops와 Learning Ops 상태, Controlled Runner, Safe Mutations, missing frontmatter quick fix와 v1.6 새 글 생성 UI를 제공한다.
+- 2026-07-21에 새 글 생성 UI와 SEO/GEO, Pagefind 검색, 선택형 댓글 구현이 반영됐다. 댓글은 기본 비활성이다.
+- 2026-09-02에 LG Aimers 프로젝트와 검증 설계·E2 개선·E3 OOM 회고 3편의 발행 변경이 `main`에 병합됐다.
+- 2026-10-07에 로컬 구현과 운영 문서를 대조했다. 이번 점검 결과는 [운영 점검 기록](blog-ops-qa/2026-10-07-v16-and-learning-ops.md)에서 추적한다.
 
 ## 장기 목표
 
@@ -78,6 +80,14 @@
 
 8. [x] Project onboarding CLI
    - 새 프로젝트의 `docs/blog` 생성, `posts.config.yml` 등록, `projects.json` 등록을 한 흐름으로 묶는다.
+
+9. [x] Missing frontmatter quick fix v1.5
+   - 원본 본문을 유지하고 누락된 frontmatter를 preview 후 복구한다.
+
+10. [x] New Post Wizard v1.6
+    - Folder 선택, 글 정보 입력, Markdown 미리보기 후 원본 초안 하나를 만든다.
+    - 새 파일은 항상 `draft: true`이며 자동 발행은 하지 않는다.
+    - 구현 완료와 브라우저 사용 점검 결과는 따로 기록한다.
 
 ### Track B. Learning and Interview Agent
 
@@ -183,7 +193,7 @@ Dashboard에서 글별 학습 상태를 추적하는 방식은 [Learning Ops Das
 
 ### Phase 3. Safe CRUD
 
-- [ ] 새 글 생성
+- [x] 새 글 생성 (v1.6: preview 후 source-only draft 생성)
 - [x] frontmatter 편집
 - [x] draft 토글
 - [x] 태그 선택/검증
@@ -217,31 +227,16 @@ Dashboard에서 글별 학습 상태를 추적하는 방식은 [Learning Ops Das
 
 ## 당장 다음 작업
 
-v1.5에서는 Dashboard에서 발견한 frontmatter 누락을 source 본문을 건드리지 않고 복구하는 흐름을 먼저 완성했다. 이후 QA와 운영 문서는 기능 구현 PR과 분리해 정리한다.
+v1.6 구현 이후에는 새 기능보다 현재 작성·복습 흐름을 먼저 점검한다.
 
-완료된 v1.4 범위는 **Safe Mutations**다.
+1. [x] `next-actions.md`와 로드맵을 실제 구현 상태에 맞춘다. 새 글 생성 UI와 LG Aimers 3편 발행 변경은 완료로 기록한다.
+2. [x] v1.6 새 글 생성 UI를 브라우저에서 점검한다. 임시 Folder에서 입력 오류, preview, draft 생성, 중복 방지, Back 시 입력 유지와 Close 시 입력 초기화 동작을 확인했다. 테스트, 글 검증과 빌드 결과를 함께 남긴다.
+3. [x] Learning Ops의 첫 대상으로 `frontmatter validation` 글을 확인한다. 기존 답변 노트를 보존하고 현재 학습 상태와 복습 시작 지점을 준비한다.
+4. [x] 사용자 재답변, 답변 검토, 개인 노트 갱신과 복습 상태 변경을 1회 수행했다. 답변 내용과 개인 학습 상태는 비공개 파일에 유지한다.
+5. [x] 기존 질문별 답변 노트의 Learning Ops 인식 호환성을 개선했다. 부분 답변의 준비 완료 오판을 막고 기존 복습 기록 보존을 검증했다.
+6. [ ] 다른 글 하나로 작성·복습 흐름을 사용하고 불편을 기록한다. PR assistant는 실제 발행 반복 작업을 확인한 뒤 판단한다.
 
-- Dashboard는 선택한 Folder의 발행 검증 계획을 보여준다.
-- `validate-source`와 `publish-dry-run`은 Dashboard에서 직접 실행할 수 있다.
-- full publish는 여전히 command copy-only다.
-- Smart View는 화면 필터일 뿐 runner 실행 범위가 아니다.
-- Dashboard는 브라우저에서 임의 command를 받지 않고, 서버 allow-list action만 실행한다.
-- Safe Mutations는 frontmatter 편집, draft toggle, tag 선택/검증, Folder 추가, Empty Folder 삭제를 preview/diff-before-apply로 처리한다.
-
-현재 상태:
-
-- [x] v1.5 missing frontmatter quick fix 구현 및 검증
-- [ ] 작업 공간 회복과 template quality baseline 문서 PR 분리 완료
-- [ ] v1.6 Dashboard 새 글 생성 UI 설계
-- [ ] 새로 만든 빈 Folder rollback/delete UX 수요 관찰
-
-다음 순서:
-
-1. 운영 문서와 production QA 결과를 별도 PR로 남긴다.
-2. 원래 `main` 작업 공간의 미완료 변경은 merged PR과 대조한 뒤에만 회복한다.
-3. v1.6에서 Dashboard 새 글 생성 UI를 설계한다. 기존 `new:post` CLI를 대체하는 작업이 아니라, 같은 source-first 흐름을 화면에서 안전하게 안내하는 작업이다.
-4. Learning Ops의 첫 dogfooding 대상으로 `frontmatter validation` 글을 고르고, 질문 세트, 개인 답변 노트, 복습 상태 변경을 한 번 끝까지 확인한다.
-5. Folder rollback/delete UX와 unpublish는 실제 사용 중 불편함이 반복될 때까지 관찰한다.
+Controlled Runner의 직접 실행 대상은 `validate-source`, `publish-dry-run`이며 full publish는 command copy-only다. Smart View는 화면 필터다. Folder rollback/delete UX와 unpublish는 사용 중 수요를 관찰한다.
 
 ## 보류할 것
 

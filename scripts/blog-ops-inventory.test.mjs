@@ -632,3 +632,64 @@ sources:
 
   assert.equal(post.warnings.some((warning) => warning.code === "private-note-not-ignored"), true);
 });
+
+
+test("question note inventory preserves manifest overrides and private files", () => {
+  const root = makeTempDir();
+  fs.writeFileSync(path.join(root, "posts.config.yml"), `site:
+  contentDir: src/content/blog
+sources:
+  - project: demo
+    path: docs/blog
+    include: ["*.md"]
+`, "utf8");
+  writeJson(path.join(root, "src/data/projects.json"), [{ slug: "demo", name: "Demo" }]);
+  writeJson(path.join(root, "src/data/tags.json"), ["Testing"]);
+  fs.writeFileSync(path.join(root, ".gitignore"), "docs/interview-notes/private/\n.local/\n");
+  const body = "## 면접에서 설명할 수 있어야 할 질문\n\n- 이유는?\n- 근거는?\n- 한계는?\n";
+  const sourceFile = path.join(root, "docs/blog/post.md");
+  writePost(sourceFile, {
+    title: "Post", date: "2026-10-07", type: "deep-dive", project: "demo",
+    tags: ["Testing"], summary: "Summary", draft: true,
+  }, body);
+  const noteFile = path.join(root, "docs/interview-notes/private/demo/post.md");
+  const manifestFile = path.join(root, ".local/learning-progress.json");
+  fs.mkdirSync(path.dirname(noteFile), { recursive: true });
+  fs.writeFileSync(noteFile, "## 질문별 답변\n\n" + [1, 2, 3].map((n) => `### ${n}. 질문?
+
+#### 첫 답변
+
+PRIVATE_FIRST_ANSWER_${n}
+
+#### 부족한 개념
+
+PRIVATE_REVIEW_${n}
+
+#### 코드/문서 근거
+
+scripts/validate-posts.mjs
+
+#### 면접용 30-60초 답변
+
+PRIVATE_FINAL_ANSWER_${n}
+`).join("\n"));
+  writeJson(manifestFile, { entries: { "demo/post": {
+    status: "reviewed", lastReviewedAt: "2026-10-07", nextReviewAt: "2026-10-14",
+    sourceHash: hashText(readMarkdownFile(sourceFile).body),
+    questionsHash: hashText(extractSection(readMarkdownFile(sourceFile).body, "면접에서 설명할 수 있어야 할 질문")),
+  } } });
+  const files = [sourceFile, noteFile, manifestFile];
+  const before = files.map((file) => fs.readFileSync(file, "utf8"));
+  const inventory = buildBlogOpsInventory({ root, env: { HOME: root, BLOG_OPS_TODAY: "2026-10-07" } });
+  const post = inventory.posts.find((item) => item.id === "demo/post");
+  assert.equal(post.hasFirstAnswer, true);
+  assert.equal(post.reviewed, true);
+  assert.equal(post.interviewReady, true);
+  assert.equal(post.learningStatus, "reviewed");
+  assert.equal(post.learningStatusSource, "manifest");
+  assert.equal(post.lastReviewedAt, "2026-10-07");
+  assert.equal(post.nextReviewAt, "2026-10-14");
+  assert.deepEqual(post.learningWarnings, []);
+  assert.equal(JSON.stringify(inventory).includes("PRIVATE_"), false);
+  assert.deepEqual(files.map((file) => fs.readFileSync(file, "utf8")), before);
+});
