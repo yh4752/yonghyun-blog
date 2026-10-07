@@ -1,11 +1,73 @@
 import { extractSection } from "./markdown.mjs";
 import { getLearningStatus } from "./status-rules.mjs";
 
-const FIRST_ANSWER_UNCERTAIN = /^(잘\s*모르겠다|모르겠다|불확실)$/;
+const FIRST_ANSWER_UNCERTAIN = /^(?:(?:잘\s*)?모르(?:겠다|겠어|겠습니다)|불확실)[.!?]*$/;
+const ANSWER_HEADINGS = new Set([
+  "첫 답변", "부족한 개념", "코드/문서 근거", "꼬리 질문 대비",
+  "면접용 30-60초 답변", "다음에 다시 볼 것",
+]);
+const PLACEHOLDERS = new Set([
+  "", "TODO", "작성 예정", "비어 있음", "없음",
+  "아직 정리되지 않은 말로 먼저 적는다.", "짧고 자연스럽게 다시 쓴다.",
+]);
+
+function meaningfulLines(value) {
+  return String(value ?? "").split(/\r?\n/)
+    .map((line) => line.trim().replace(/^(?:[-*+](?:\s+|$)|\d+[.)](?:\s+|$))(?:\[[ xX]\](?:\s+|$))?/, "").trim())
+    .filter((text) => !PLACEHOLDERS.has(text));
+}
 
 function hasMeaningfulText(value) {
-  const normalized = String(value ?? "").trim();
-  return normalized.length > 0 && !["-", "비어 있음", "없음"].includes(normalized);
+  return meaningfulLines(value).length > 0;
+}
+
+// Keep private-note parsing separate from public sections and their saved hashes.
+function readAnswerUnits(body) {
+  const legacy = {};
+  const questions = [];
+  let inQuestions = false;
+  let question = null;
+  let field = null;
+  let fence = null;
+
+  for (const line of body.split(/\r?\n/)) {
+    const marker = /^\s{0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && !marker[2].trim()) {
+        fence = null;
+      } else if (field) {
+        field.target[field.name] += `${line}\n`;
+      }
+      continue;
+    }
+    if (marker) {
+      fence = marker[1];
+      continue;
+    }
+
+    const heading = /^(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
+    if (heading) {
+      const level = heading[1].length;
+      if (field && level > field.level) continue;
+      field = null;
+      const name = heading[2];
+      if (level <= 2) {
+        inQuestions = level === 2 && name === "질문별 답변";
+        question = null;
+        if (level === 2 && ANSWER_HEADINGS.has(name)) field = { target: legacy, name, level };
+      } else if (inQuestions && level === 3) {
+        question = {};
+        questions.push(question);
+      } else if (inQuestions && question && level === 4 && ANSWER_HEADINGS.has(name)) {
+        field = { target: question, name, level };
+      }
+      if (field) field.target[field.name] ??= "";
+    } else if (field) {
+      field.target[field.name] += `${line}\n`;
+    }
+  }
+
+  return { units: questions.length ? questions : [legacy], structured: questions.length > 0, revisit: legacy["다음에 다시 볼 것"] };
 }
 
 function countQuestionLines(section) {
@@ -27,23 +89,27 @@ export function buildLearningState({
   explicitNeedsRevisit = false,
 }) {
   const questionsReady = hasQuestionSet(publicBody);
-  const firstAnswer = extractSection(privateBody, "첫 답변");
-  const weakConcepts = extractSection(privateBody, "부족한 개념");
-  const evidence = extractSection(privateBody, "코드/문서 근거");
-  const followUps = extractSection(privateBody, "꼬리 질문 대비");
-  const interviewAnswer = extractSection(privateBody, "면접용 30-60초 답변");
-  const revisit = extractSection(privateBody, "다음에 다시 볼 것");
-
-  const firstAnswerWritten = hasPrivateNote && hasMeaningfulText(firstAnswer);
-  const reviewedSections = [weakConcepts, evidence, followUps].filter(hasMeaningfulText).length;
-  const reviewed = reviewedSections >= 2;
-  const interviewReady = questionsReady && hasPrivateNote && hasMeaningfulText(interviewAnswer);
-  const uncertainOnly = FIRST_ANSWER_UNCERTAIN.test(firstAnswer.trim());
+  const { units, structured, revisit } = readAnswerUnits(hasPrivateNote ? privateBody : "");
+  const firstAnswerWritten = hasPrivateNote && units.some((unit) => hasMeaningfulText(unit["첫 답변"]));
+  const unitReviewed = (unit) => ["부족한 개념", "코드/문서 근거", "꼬리 질문 대비"]
+    .filter((name) => hasMeaningfulText(unit[name])).length >= 2;
+  const reviewed = hasPrivateNote && units.every(unitReviewed);
+  const allAnswersWritten = units.every((unit) =>
+    hasMeaningfulText(unit["첫 답변"]) && hasMeaningfulText(unit["면접용 30-60초 답변"]),
+  );
+  const questionsCovered = !structured || units.length >= countQuestionLines(
+    extractSection(publicBody, "면접에서 설명할 수 있어야 할 질문"),
+  );
+  const uncertainWithoutReview = units.some((unit) =>
+    FIRST_ANSWER_UNCERTAIN.test(meaningfulLines(unit["첫 답변"]).join("\n")) && !unitReviewed(unit),
+  );
+  const interviewReady = questionsReady && hasPrivateNote && allAnswersWritten && questionsCovered && !uncertainWithoutReview;
   const needsRevisit =
     explicitNeedsRevisit ||
     hasMeaningfulText(revisit) ||
-    (firstAnswerWritten && !hasMeaningfulText(interviewAnswer)) ||
-    (uncertainOnly && !reviewed);
+    units.some((unit) => hasMeaningfulText(unit["다음에 다시 볼 것"])) ||
+    (firstAnswerWritten && (!allAnswersWritten || !questionsCovered)) ||
+    uncertainWithoutReview;
 
   return {
     hasQuestions: questionsReady,
