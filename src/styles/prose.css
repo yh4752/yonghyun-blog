@@ -55,10 +55,17 @@
 
 .prose pre code {
   background: transparent;
-  color: var(--color-text);
+  color: inherit;
   padding: 0;
   font-size: 0.82em;
   line-height: 1.65;
+}
+
+/* Shiki의 밝은 inline 색보다 선택한 다크 테마를 우선해 본문·토큰의 대비를 함께 유지한다. */
+[data-theme="dark"] .prose .astro-code,
+[data-theme="dark"] .prose .astro-code span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
 }
 
 .prose blockquote {
